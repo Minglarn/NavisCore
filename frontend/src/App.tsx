@@ -410,22 +410,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 <label>MQTT Broker URL</label>
                                 <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_url} onChange={e => setSettings({ ...settings, mqtt_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
                             </div>
-                            <div className="settings-section-title">Kartvy</div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Visa fartygsnamn</label>
-                                    <div className="description">Visar namn direkt ovanför fartygsikonen på kartan</div>
-                                </div>
-                                <Toggle
-                                    checked={settings.show_names_on_map === 'true'}
-                                    onChange={val => setSettings({ ...settings, show_names_on_map: String(val) })}
-                                />
-                            </div>
                             <div className="form-group vertical">
-                                <label>Kartstil</label>
-                                <input type="text" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                                <label>MQTT Topic</label>
+                                <input type="text" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Autentisering</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Autentisering (Frivilligt)</div>
                             <div className="form-group">
                                 <label>Användarnamn</label>
                                 <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
@@ -474,6 +463,16 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                     {activeTab === 'map' && (
                         <div className="settings-section">
                             <div className="settings-section-title">Kartinställningar</div>
+                            <div className="form-group">
+                                <div>
+                                    <label>Visa fartygsnamn</label>
+                                    <div className="description">Visar namn direkt ovanför fartygsikonen på kartan</div>
+                                </div>
+                                <Toggle
+                                    checked={settings.show_names_on_map === 'true'}
+                                    onChange={val => setSettings({ ...settings, show_names_on_map: String(val) })}
+                                />
+                            </div>
                             <div className="form-group">
                                 <label>Kartstil (Gränssnitt)</label>
                                 <select value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
