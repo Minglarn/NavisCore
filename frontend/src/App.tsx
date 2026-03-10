@@ -697,6 +697,13 @@ export default function App() {
     const [isResizing, setIsResizing] = useState(false);
     const hoverTimerRef = useRef<number | null>(null);
 
+    const filteredShipsCount = useMemo(() => {
+        return ships.filter(s => {
+            const nameUpper = (s.name || "").toUpperCase();
+            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+        }).length;
+    }, [ships]);
+
     // Fetch settings on mount
     useEffect(() => {
         const isDev = window.location.port === '5173';
@@ -1090,6 +1097,22 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    <div style={{
+                        background: isDark ? 'rgba(0, 240, 255, 0.1)' : '#e0f7fa',
+                        color: isDark ? '#00f0ff' : '#006064',
+                        padding: '6px 16px',
+                        borderRadius: '20px',
+                        fontSize: '0.9rem',
+                        fontWeight: 600,
+                        border: `1px solid ${isDark ? 'rgba(0, 240, 255, 0.3)' : '#b2ebf2'}`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}>
+                        <Ship size={16} />
+                        Fartyg: {filteredShipsCount}
+                    </div>
+
                     {!isNaN(originLat) && !isNaN(originLon) && maxDistance > 0 && (
                         <div style={{
                             background: isDark ? 'rgba(0, 240, 255, 0.1)' : '#e0f7fa',
@@ -1109,13 +1132,13 @@ export default function App() {
                     )}
 
                     <div style={{
-                        background: status.includes('Ansluten') ? (isDark ? 'rgba(0, 255, 128, 0.1)' : '#e6fffa') : (isDark ? 'rgba(255, 50, 50, 0.1)' : '#fff5f5'),
-                        color: status.includes('Ansluten') ? (isDark ? '#00ff80' : '#047857') : (isDark ? '#ff3333' : '#c53030'),
+                        background: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? 'rgba(0, 255, 128, 0.1)' : '#e6fffa') : (isDark ? 'rgba(255, 50, 50, 0.1)' : '#fff5f5'),
+                        color: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? '#00ff80' : '#047857') : (isDark ? '#ff3333' : '#c53030'),
                         padding: '6px 16px',
                         borderRadius: '20px',
                         fontSize: '0.9rem',
                         fontWeight: 500,
-                        border: `1px solid ${status.includes('Ansluten') ? (isDark ? 'rgba(0, 255, 128, 0.3)' : '#a7f3d0') : (isDark ? 'rgba(255, 50, 50, 0.3)' : '#feb2b2')}`,
+                        border: `1px solid ${(status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? 'rgba(0, 255, 128, 0.3)' : '#a7f3d0') : (isDark ? 'rgba(255, 50, 50, 0.3)' : '#feb2b2')}`,
                         display: 'flex',
                         alignItems: 'center',
                         gap: '8px'
@@ -1124,8 +1147,8 @@ export default function App() {
                             width: '8px',
                             height: '8px',
                             borderRadius: '50%',
-                            background: status.includes('Ansluten') ? (isDark ? '#00ff80' : '#10b981') : (isDark ? '#ff3333' : '#ef4444'),
-                            boxShadow: isDark ? `0 0 10px ${status.includes('Ansluten') ? '#00ff80' : '#ff3333'}` : 'none'
+                            background: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? '#00ff80' : '#10b981') : (isDark ? '#ff3333' : '#ef4444'),
+                            boxShadow: isDark ? `0 0 10px ${(status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? '#00ff80' : '#ff3333'}` : 'none'
                         }} />
                         {status}
                     </div>
