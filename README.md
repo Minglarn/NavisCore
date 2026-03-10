@@ -14,7 +14,7 @@
 - **Mock Mode**: Development-friendly mode to generate simulated AIS traffic without an SDR device.
 
 ## Architecture
-1. **SDR (rtl-ais)**: Interacts with the RTL-SDR hardware, decodes radio signals, and publishes NMEA 0183 data via UDP (Port 10110).
+1. **SDR (AIS-catcher)**: Interacts with the RTL-SDR hardware using the modern [AIS-catcher](https://github.com/jvde-github/AIS-catcher) receiver, decodes radio signals, and publishes NMEA 0183 data via UDP (Port 10110).
 2. **Backend (Python/FastAPI)**: Processes AIS messages, enriches data with vessel images, and broadcasts real-time updates via WebSockets.
 3. **Frontend (React/Vite)**: High-performance dashboard utilizing Leaflet for mapping and Lucide for iconography.
 

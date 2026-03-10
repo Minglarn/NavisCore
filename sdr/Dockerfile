@@ -6,11 +6,15 @@ RUN apk add --no-cache \
     librtlsdr-dev \
     libusb-dev \
     cmake \
-    pkgconfig
+    pkgconfig \
+    zlib-dev \
+    openssl-dev
 
 WORKDIR /src
-RUN git clone https://github.com/dgiardini/rtl-ais.git . && \
-    make
+RUN git clone https://github.com/jvde-github/AIS-catcher.git . && \
+    mkdir build && cd build && \
+    cmake .. -DAIRSPY=OFF -DSDRPLAY=OFF -DAIRSPYHF=OFF -DHACKRF=OFF -DHYDRASDR=OFF -DZMQ=OFF -DPSQL=OFF -DNMEA2000=OFF -DSQLITE=OFF && \
+    make -j$(nproc)
 
 FROM alpine:3.19
 
@@ -22,7 +26,7 @@ RUN apk add --no-cache \
     curl \
     jq
 
-COPY --from=builder /src/rtl_ais /usr/local/bin/rtl_ais
+COPY --from=builder /src/build/AIS-catcher /usr/local/bin/AIS-catcher
 
 # Ensure we have the udev rules available in container just in case, though host handles devices
 COPY ./udev-rules/rtl-sdr.rules /etc/udev/rules.d/

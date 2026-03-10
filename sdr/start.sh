@@ -32,11 +32,12 @@ else
 fi
 
 # Build command
-CMD="/usr/local/bin/rtl_ais -n -h app -P 10110 -d $INDEX -p $PPM"
+CMD="/usr/local/bin/AIS-catcher -u app 10110 -d $INDEX -p $PPM"
 
-    # Do nothing, auto is default when -g is omitted
+if [ "$GAIN" = "auto" ] || [ "$GAIN" = "AGC" ] || [ -z "$GAIN" ]; then
+    CMD="$CMD -gr TUNER auto"
 else
-    CMD="$CMD -g $GAIN"
+    CMD="$CMD -gr TUNER $GAIN"
 fi
 
 echo "Starting SDR (Device $INDEX) with command: $CMD"
