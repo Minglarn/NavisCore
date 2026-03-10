@@ -507,6 +507,14 @@ async def process_ais_data(data: dict):
         update_values.append(mmsi_str)
         await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(update_values))
         
+        # Save position to ship_history if it moved significantly (>50m) or if no history exists
+        now_ms = int(datetime.now().timestamp() * 1000)
+        async with db.execute('SELECT latitude, longitude FROM ship_history WHERE mmsi = ? ORDER BY timestamp DESC LIMIT 1', (mmsi_str,)) as cursor:
+            row = await cursor.fetchone()
+            if not row or haversine_distance(row[0], row[1], lat, lon) > 0.05:
+                # Limit history to prevent excessive growth (e.g. keep last 200 points per ship in DB)
+                await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, now_ms))
+        
         # Read back whatever data we lacked in this specific incoming packet
         async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
@@ -817,7 +825,7 @@ async def startup_event():
             mmsi TEXT,
             latitude REAL,
             longitude REAL,
-            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            timestamp INTEGER
         )''')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_ship_history_mmsi_ts ON ship_history (mmsi, timestamp)")
 
