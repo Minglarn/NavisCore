@@ -2,7 +2,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -13,7 +13,7 @@ RUN apk add --no-cache nginx gettext gcc musl-dev libffi-dev
 
 WORKDIR /app/backend
 COPY backend/requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./
 # Backup for default image

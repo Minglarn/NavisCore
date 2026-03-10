@@ -1,6 +1,6 @@
 FROM alpine:3.19 AS builder
 
-RUN apk add --no-cache \
+RUN --mount=type=cache,target=/var/cache/apk apk add \
     git \
     build-base \
     librtlsdr-dev \
@@ -18,7 +18,7 @@ RUN git clone https://github.com/jvde-github/AIS-catcher.git . && \
 
 FROM alpine:3.19
 
-RUN apk add --no-cache \
+RUN --mount=type=cache,target=/var/cache/apk apk add \
     librtlsdr \
     libusb \
     libstdc++ \
