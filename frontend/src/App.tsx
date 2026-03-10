@@ -122,9 +122,9 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     if (countryCode && typeof countryCode === 'string' && countryCode.length === 2 && countryCode !== "00") {
         const code = countryCode.toLowerCase();
         return `<span style="display: inline-flex; align-items: center;">
-            <img src="https://flagcdn.com/16x12/${code}.png" 
+            <img src="https://flagcdn.com/w40/${code}.png" 
                  alt="${countryCode}" 
-                 style="height: 12px; width: 16px; vertical-align: middle; border-radius: 1px; margin-right: 4px; display: inline-block;" 
+                 style="height: 1.2em; width: auto; vertical-align: middle; border-radius: 2px; margin-right: 6px; display: inline-block; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" 
                  onerror="this.style.display='none'; this.nextSibling.style.display='inline';" 
             /><span style="display: none;">${emoji}</span>
         </span>`;
@@ -151,18 +151,20 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     } else if (isMoving) {
         // Triangel
         svg = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);">
-                 <polygon points="12,2 22,20 12,17 2,20" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
+                 <polygon points="12,2 22,20 12,17 2,20" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
+                          class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
     } else {
         // Cirkel
         svg = `<svg width="16" height="16" viewBox="0 0 16 16">
-                 <circle cx="8" cy="8" r="6" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
+                 <circle cx="8" cy="8" r="6" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
+                         class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
     }
 
     return L.divIcon({
         html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%;">${svg}</div>`,
-        className: `ship-custom-icon-container ${shouldFlash ? 'ship-flash' : ''}`,
+        className: 'ship-custom-icon-container',
         iconSize: isMoving || isAircraft ? [24, 24] : [16, 16],
         iconAnchor: isMoving || isAircraft ? [12, 12] : [8, 8]
     });
@@ -204,12 +206,12 @@ const extraStyles = `
     color: white;
     border: none;
 }
-.ship-flash {
-    animation: ship-flash 2.5s ease-out;
+.svg-flash-fill {
+    animation: svg-fill-flash 1.5s ease-out;
 }
-@keyframes ship-flash {
-    0% { background-color: rgba(255, 255, 0, 0.5); }
-    100% { background-color: transparent; }
+@keyframes svg-fill-flash {
+    0% { fill: #ffff00; stroke: #ffffff; stroke-width: 3px; }
+    100% { }
 }
 .settings-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -329,6 +331,17 @@ function formatDistance(km: number | undefined, units: string) {
         return `${km.toFixed(1)} km`;
     }
     return `${(km / 1.852).toFixed(1)} nm`;
+}
+
+function getTimeAgo(timestamp: number) {
+    const diffMs = Date.now() - timestamp;
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Nu';
+    if (diffMins < 60) return `${diffMins}min`;
+    const diffHours = Math.floor(diffMins / 60);
+    const remainingMins = diffMins % 60;
+    if (diffHours < 24) return `${diffHours}h ${remainingMins}m`;
+    return `${Math.floor(diffHours / 24)}d`;
 }
 
 
@@ -647,6 +660,11 @@ export default function App() {
     const [settingsTab, setSettingsTab] = useState('general');
     const [currentZoom, setCurrentZoom] = useState(10);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'last_seen', direction: 'desc' });
+    const [sidebarWidth, setSidebarWidth] = useState(() => {
+        const saved = localStorage.getItem('naviscore_sidebar_width');
+        return saved ? parseInt(saved) : 380;
+    });
+    const [isResizing, setIsResizing] = useState(false);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -801,6 +819,37 @@ export default function App() {
         };
     }, []);
 
+    // Sidebar resizing logic
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (!isResizing) return;
+            const newWidth = window.innerWidth - e.clientX;
+            if (newWidth > 250 && newWidth < 800) {
+                setSidebarWidth(newWidth);
+            }
+        };
+        const handleMouseUp = () => {
+            if (isResizing) {
+                setIsResizing(false);
+                localStorage.setItem('naviscore_sidebar_width', sidebarWidth.toString());
+                document.body.style.cursor = 'default';
+            }
+        };
+
+        if (isResizing) {
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseup', handleMouseUp);
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        }
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+            document.body.style.userSelect = 'auto';
+        };
+    }, [isResizing, sidebarWidth]);
+
     // Sync theme to CSS variables (to style body outside of React if needed)
     useEffect(() => {
         document.documentElement.setAttribute('data-theme', theme);
@@ -864,66 +913,66 @@ export default function App() {
     const rangePolygon = React.useMemo(() => {
         if (isNaN(originLat) || isNaN(originLon) || coverageSectors.length === 0) return null;
 
-        const SECTORS = 72; // Samma som backend
-        const populated: { sector: number, dist: number }[] = [];
+        const SECTORS = 72; // Same as backend
 
-        coverageSectors.forEach((s: any) => {
-            let rangeAmount = mqttSettings.range_type === 'alltime' ? s.range_km_alltime : s.range_km_24h;
-            if (rangeAmount > 1.0) {
-                // Buffer padding so ships don't sit perfectly on the very outer edge
-                populated.push({ sector: s.sector_id, dist: rangeAmount + 1.5 });
-            }
-        });
+        // Group contiguous sectors to create solid "pie slices"
+        const sortedSectors = [...coverageSectors].sort((a, b) => a.sector_id - b.sector_id);
+        if (sortedSectors.length === 0) return null;
 
-        if (populated.length === 0) return null;
-        populated.sort((a, b) => a.sector - b.sector);
+        const clusters: any[][] = [];
+        let currentCluster = [sortedSectors[0]];
 
-        const MAX_GAP = 15; // 75 degrees max gap between adjacent vessels
-        const clusters: { sector: number, dist: number }[][] = [];
-        let currentCluster = [populated[0]];
+        for (let i = 1; i < sortedSectors.length; i++) {
+            const prev = sortedSectors[i - 1];
+            const curr = sortedSectors[i];
 
-        for (let i = 1; i < populated.length; i++) {
-            const prev = populated[i - 1];
-            const curr = populated[i];
-
-            if ((curr.sector - prev.sector) > MAX_GAP) {
+            // Check if they are adjacent
+            if (curr.sector_id === prev.sector_id + 1) {
+                currentCluster.push(curr);
+            } else {
                 clusters.push(currentCluster);
                 currentCluster = [curr];
-            } else {
-                currentCluster.push(curr);
             }
         }
 
-        // Handle wrap-around for the last and first cluster
-        if (clusters.length > 0) {
-            const firstCluster = clusters[0];
-            const lastCluster = currentCluster;
-            const firstSector = firstCluster[0].sector;
-            const lastSector = lastCluster[lastCluster.length - 1].sector;
-            const wrapGap = (firstSector + SECTORS) - lastSector;
-
-            if (wrapGap <= MAX_GAP && firstCluster !== lastCluster) {
-                // Merge them!
-                clusters[0] = lastCluster.concat(firstCluster);
+        // Handle wrap-around (sector 71 vs 0)
+        if (clusters.length > 1) {
+            const first = clusters[0];
+            const last = currentCluster;
+            if (first[0].sector_id === 0 && last[last.length - 1].sector_id === SECTORS - 1) {
+                clusters[0] = last.concat(first);
             } else {
-                clusters.push(lastCluster);
+                clusters.push(currentCluster);
             }
         } else {
             clusters.push(currentCluster);
         }
 
-        const polygons = clusters.map(cluster => {
+        // Convert clusters to solid polygons (Pie Wedges)
+        return clusters.map(cluster => {
             const pts: [number, number][] = [[originLat, originLon]];
-            cluster.forEach(p => {
-                const bearing = p.sector * (360 / SECTORS) + (360 / SECTORS / 2);
-                const pt = calculateDestinationPoint(originLat, originLon, p.dist, bearing);
-                pts.push([pt[0], pt[1]]);
+
+            // Outer arc points
+            cluster.forEach(s => {
+                let rangeAmount = mqttSettings.range_type === 'alltime' ? s.range_km_alltime : s.range_km_24h;
+                if (rangeAmount > 1.0) {
+                    const startBearing = s.sector_id * (360 / SECTORS);
+                    const endBearing = (s.sector_id + 1) * (360 / SECTORS);
+                    const midBearing = startBearing + (360 / SECTORS / 2);
+
+                    const p1 = calculateDestinationPoint(originLat, originLon, rangeAmount + 1.2, startBearing);
+                    const p2 = calculateDestinationPoint(originLat, originLon, rangeAmount + 1.2, midBearing);
+                    const p3 = calculateDestinationPoint(originLat, originLon, rangeAmount + 1.2, endBearing);
+
+                    pts.push([p1[0], p1[1]]);
+                    pts.push([p2[0], p2[1]]);
+                    pts.push([p3[0], p3[1]]);
+                }
             });
+
             pts.push([originLat, originLon]);
             return pts;
         });
-
-        return polygons;
     }, [coverageSectors, originLat, originLon, mqttSettings.range_type]);
 
     const initialCenter = (() => {
@@ -968,7 +1017,12 @@ export default function App() {
             moveend: (e: any) => {
                 const c = e.target.getCenter();
                 localStorage.setItem('naviscore_center', JSON.stringify([c.lat, c.lng]));
-            }
+            },
+            mousemove: (e: any) => {
+                // To avoid tooltips sticking, clear hover if user moves mouse far from ships
+                // Markers handle their own hover, but this is a safety fallback
+            },
+            mousedown: () => setHoveredMmsi(null) // Hard clear on click anywhere else
         });
         return null;
     }
@@ -1155,8 +1209,9 @@ export default function App() {
                                 </>
                             )}
 
-                            {ships.filter((s: any) => !s.is_meteo).map((s: any, idx: number) => {
+                            {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
+                                if (!s.lat || !s.lon) return null;
 
                                 // Smart Label Logic:
                                 // 1. Zoom > 13: Show all names
@@ -1164,100 +1219,94 @@ export default function App() {
                                 // 3. Zoom < 11: Show every 10th ship 
                                 // This prevents clutter in busy areas while still showing some activity
                                 let shouldShowName = false;
-                                if (mqttSettings.show_names_on_map === 'true') {
+                                if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
                                     if (currentZoom > 13) shouldShowName = true;
                                     else if (currentZoom > 11 && idx % 3 === 0) shouldShowName = true;
                                     else if (currentZoom <= 11 && idx % 10 === 0) shouldShowName = true;
                                 }
 
-                                return s.lat && s.lon && (
-                                    <Marker key={s.mmsi} position={[s.lat, s.lon]} icon={ShipIcon(s.sog, s.cog, String(s.mmsi), s.shiptype || s.ship_type, showFlash && flashedMmsis.has(String(s.mmsi)))}
+                                return (
+                                    <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={ShipIcon(s.sog, s.cog, mmsiStr, s.shiptype || s.ship_type, showFlash && flashedMmsis.has(mmsiStr))}
                                         eventHandlers={{
-                                            mouseover: () => setHoveredMmsi(String(s.mmsi)),
+                                            mouseover: () => setHoveredMmsi(mmsiStr),
                                             mouseout: () => setHoveredMmsi(null)
                                         }}
                                     >
-                                        {/* permanent name label (Smart display) */}
+                                        {/* Smart Label (Fast text under ship) */}
                                         {shouldShowName && (
-                                            <Tooltip
-                                                permanent
-                                                direction="bottom"
-                                                offset={[0, 10]}
-                                                opacity={0.8}
-                                                className="ship-name-label"
-                                            >
+                                            <Tooltip permanent direction="bottom" offset={[0, 10]} opacity={0.8} className="ship-name-label">
                                                 <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)', whiteSpace: 'nowrap' }}>
                                                     {s.name || s.mmsi}
                                                 </div>
                                             </Tooltip>
                                         )}
 
-                                        {/* Hover Tooltip/Card */}
-                                        <Tooltip
-                                            permanent={hoveredMmsi === mmsiStr}
-                                            direction="top"
-                                            offset={[0, -10]}
-                                            opacity={0.95}
-                                            className={s.is_meteo ? "custom-meteo-tooltip" : ""}
-                                        >
-                                            {/* ... rest of existing tooltip content ... */}
-                                            {s.is_meteo ? (
-                                                <div style={{
-                                                    display: 'flex', flexDirection: 'column',
-                                                    borderRadius: '6px', overflow: 'hidden',
-                                                    boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                                                    width: '300px',
-                                                    fontFamily: 'sans-serif'
-                                                }}>
-                                                    {/* Header */}
-                                                    <div style={{ background: 'rgba(130, 140, 150, 0.9)', padding: '6px 12px', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                                        From: MMSI {mmsiStr} {s.shiptype ? `(${s.shiptype})` : '(1)'}
-                                                    </div>
-                                                    {/* Body */}
-                                                    <div style={{ background: '#22282d', padding: '12px', color: '#fff' }}>
-                                                        <div style={{ textAlign: 'center', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                                                            {new Date(s.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
+                                        {/* Hover Card (Endast synlig om hovrad) */}
+                                        {hoveredMmsi === mmsiStr && (
+                                            <Tooltip
+                                                key={`hover-tip-${mmsiStr}`}
+                                                permanent
+                                                direction="top"
+                                                offset={[0, -15]}
+                                                opacity={0.98}
+                                                className={s.is_meteo ? "custom-meteo-tooltip" : ""}
+                                            >
+                                                {s.is_meteo ? (
+                                                    <div style={{
+                                                        display: 'flex', flexDirection: 'column',
+                                                        borderRadius: '6px', overflow: 'hidden',
+                                                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
+                                                        width: '300px',
+                                                        fontFamily: 'sans-serif'
+                                                    }}>
+                                                        <div style={{ background: 'rgba(130, 140, 150, 0.9)', padding: '6px 12px', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>
+                                                            From: MMSI {mmsiStr} {s.shiptype ? `(${s.shiptype})` : '(1)'}
                                                         </div>
-                                                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '8px 0' }}></div>
-                                                        <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.9rem' }}>
-                                                            <span>Vind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
-                                                            <span>Byar: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
+                                                        <div style={{ background: '#22282d', padding: '12px', color: '#fff' }}>
+                                                            <div style={{ textAlign: 'center', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px' }}>
+                                                                {new Date(s.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
+                                                            </div>
+                                                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '8px 0' }}></div>
+                                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.9rem' }}>
+                                                                <span>Vind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
+                                                                <span>Byar: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
-                                                    <strong style={{ fontSize: '1rem' }}>{s.name || s.mmsi}</strong>
-                                                    {s.status_text && (
-                                                        <span style={{ fontSize: '0.8rem', fontStyle: 'italic', color: '#666' }}>
-                                                            {s.status_text}
-                                                        </span>
-                                                    )}
-                                                    {s.imageUrl && (
-                                                        <img
-                                                            src={s.imageUrl}
-                                                            onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
-                                                            alt={s.name}
-                                                            style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
-                                                        />
-                                                    )}
-                                                </div>
-                                            )}
-                                        </Tooltip>
+                                                ) : (
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '8px', borderRadius: '8px', color: 'var(--text-main)' }}>
+                                                        <strong style={{ fontSize: '1rem' }}>{s.name || s.mmsi}</strong>
+                                                        {s.status_text && (
+                                                            <span style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>
+                                                                {s.status_text}
+                                                            </span>
+                                                        )}
+                                                        {s.imageUrl && (
+                                                            <img
+                                                                src={s.imageUrl}
+                                                                onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
+                                                                alt={s.name}
+                                                                style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </Tooltip>
+                                        )}
 
                                         {/* Detailed Popup on Click - NOT for meteo markers */}
-                                        {!s.is_meteo && <Popup className="custom-detailed-popup">
+                                        {!s.is_meteo && <Popup className="custom-detailed-popup" offset={[0, -20]}>
                                             <div style={{ display: 'flex', flexDirection: 'column', width: '460px' }}>
                                                 {/* SHIP NAME HEADER */}
                                                 <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)' }}>
-                                                    <span style={{ fontSize: '1.2rem' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                    <span style={{ fontSize: '1.6rem', display: 'flex' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
                                                     <div style={{ flex: 1, overflow: 'hidden' }}>
                                                         <div style={{ fontWeight: '700', fontSize: '1.05rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                             <span>{s.name || 'Unknown Vessel'}</span>
                                                             {s.callsign && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{s.callsign}</span>}
                                                         </div>
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                            MMSI: {mmsiStr} • Last seen: {new Date(s.timestamp).toLocaleTimeString()}
+                                                            MMSI: {mmsiStr} • Sett: {s.message_count || 1} ggr • Last Seen: {getTimeAgo(s.timestamp)}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -1300,9 +1349,9 @@ export default function App() {
                                                         </div>
 
                                                         <div style={{ marginTop: '2px', borderTop: `1px solid ${colors.border}`, paddingTop: '8px' }}>
-                                                            <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Destination / Msgs</div>
+                                                            <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Destination / Update</div>
                                                             <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                {s.destination || '--'} • {s.message_count || 1} msg
+                                                                {s.destination || '--'} • {new Date(s.timestamp).toLocaleTimeString()}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1310,7 +1359,7 @@ export default function App() {
                                             </div>
                                         </Popup>}
                                     </Marker>
-                                )
+                                );
                             })}
 
                             {/* Ship History Trails */}
@@ -1344,133 +1393,186 @@ export default function App() {
                                 return null;
                             })()}
 
+
                         </MapContainer>
                     )}
                 </div>
 
                 {/* Expandable Right Sidebar */}
                 {isSidebarOpen && (
-                    <div style={{
-                        width: '380px',
-                        minWidth: '380px',
-                        maxWidth: '380px',
-                        background: colors.bgSidebar,
-                        borderLeft: `1px solid ${colors.border}`,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        zIndex: 1000,
-                        boxShadow: isDark ? '-5px 0 20px rgba(0,0,0,0.5)' : '-5px 0 20px rgba(0,0,0,0.05)',
-                        transition: 'width 0.3s ease',
-                        overflow: 'hidden'
-                    }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
-                            <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                Lokala Fartyg ({ships.filter(s => !s.is_meteo).length})
-                            </h2>
-                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <select
-                                    value={sortConfig.key}
-                                    onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
-                                    style={{
-                                        background: 'rgba(0,0,0,0.2)',
-                                        color: colors.textMain,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '4px',
-                                        padding: '4px 8px',
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer'
-                                    }}
-                                >
-                                    <option value="name">Namn</option>
-                                    <option value="last_seen">Senast sedd</option>
-                                    <option value="shiptype">Typ</option>
-                                    <option value="distance">Distans</option>
-                                    <option value="message_count">Meddelanden</option>
-                                </select>
-                                <button onClick={() => setSortConfig({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
-                                    <Navigation size={16} style={{
-                                        transform: sortConfig.direction === 'asc' ? 'rotate(0deg)' : 'rotate(180deg)',
-                                        transition: 'transform 0.2s'
-                                    }} />
-                                </button>
-                                <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer' }}>
-                                    <X size={24} />
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                {ships.length === 0 ? (
-                                    <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                        Inget fartyg på radarn ännu...
-                                    </div>
-                                ) : ships
-                                    .filter(s => !s.is_meteo)
-                                    .map(s => {
-                                        const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
-                                            ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
-                                            : Infinity;
-                                        return { ...s, distance: dist };
-                                    })
-                                    .sort((a, b) => {
-                                        let valA = a[sortConfig.key];
-                                        let valB = b[sortConfig.key];
-
-                                        // Specific handling for strings
-                                        if (typeof valA === 'string') valA = valA.toLowerCase();
-                                        if (typeof valB === 'string') valB = valB.toLowerCase();
-
-                                        // Fallbacks for undefined
-                                        if (valA === undefined) valA = sortConfig.direction === 'asc' ? Infinity : -Infinity;
-                                        if (valB === undefined) valB = sortConfig.direction === 'asc' ? Infinity : -Infinity;
-
-                                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                                        return 0;
-                                    })
-                                    .map((ship: any, idx: number) => (
-                                        <div key={ship.mmsi} className={showFlash && flashedMmsis.has(String(ship.mmsi)) ? 'ship-flash' : ''} style={{
-                                            padding: '12px 15px',
-                                            background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
-                                            borderRadius: '6px',
-                                            borderLeft: `4px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)}`,
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            cursor: 'pointer',
-                                            transition: 'transform 0.1s',
-                                            boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.05)'
+                    <>
+                        {/* Resize Handle */}
+                        <div
+                            onMouseDown={() => setIsResizing(true)}
+                            style={{
+                                width: '6px',
+                                cursor: 'col-resize',
+                                background: isResizing ? '#44aaff' : 'transparent',
+                                zIndex: 1001,
+                                transition: 'background 0.2s',
+                                borderLeft: `1px solid ${colors.border}`,
+                                height: '100%',
+                                position: 'relative'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.background = '#44aaff'}
+                            onMouseLeave={e => !isResizing && (e.currentTarget.style.background = 'transparent')}
+                        />
+                        <div style={{
+                            width: `${sidebarWidth}px`,
+                            minWidth: '250px',
+                            maxWidth: '800px',
+                            background: colors.bgSidebar,
+                            display: 'flex',
+                            flexDirection: 'column',
+                            zIndex: 1000,
+                            boxShadow: isDark ? '-5px 0 20px rgba(0,0,0,0.5)' : '-5px 0 20px rgba(0,0,0,0.05)',
+                            transition: isResizing ? 'none' : 'width 0.3s ease',
+                            overflow: 'hidden'
+                        }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
+                                <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
+                                    Lokala Fartyg ({ships.filter(s => !s.is_meteo).length})
+                                </h2>
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <select
+                                        value={sortConfig.key}
+                                        onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
+                                        style={{
+                                            background: 'rgba(0,0,0,0.2)',
+                                            color: colors.textMain,
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '4px',
+                                            padding: '4px 8px',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer'
                                         }}
-                                            onClick={() => setHoveredMmsi(hoveredMmsi === String(ship.mmsi) ? null : String(ship.mmsi))}
-                                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                                        >
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 600, fontSize: '0.90rem', marginBottom: '2px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
-                                                    <span style={{
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        maxWidth: '180px'
-                                                    }}>
-                                                        {ship.name || ship.mmsi}
-                                                    </span>
-                                                </div>
-                                                <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
-                                                    {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)} • {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'} • {ship.message_count || 1} msg
-                                                </div>
-                                            </div>
-                                            <div style={{ textAlign: 'right', fontSize: '0.85rem', color: colors.textMain }}>
-                                                <div style={{ fontWeight: 600 }}>{formatSpeed(ship.sog, mqttSettings.units)}</div>
-                                                <div style={{ color: colors.textMuted }}>{ship.cog?.toFixed(0) ?? '--'}°</div>
-                                            </div>
+                                    >
+                                        <option value="name">Namn</option>
+                                        <option value="last_seen">Senast sedd</option>
+                                        <option value="shiptype">Typ</option>
+                                        <option value="distance">Distans</option>
+                                        <option value="message_count">Meddelanden</option>
+                                    </select>
+                                    <button onClick={() => setSortConfig({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
+                                        <Navigation size={16} style={{
+                                            transform: sortConfig.direction === 'asc' ? 'rotate(0deg)' : 'rotate(180deg)',
+                                            transition: 'transform 0.2s'
+                                        }} />
+                                    </button>
+                                    <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer' }}>
+                                        <X size={24} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {ships.length === 0 ? (
+                                        <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                            Inget fartyg på radarn ännu...
                                         </div>
-                                    ))}
+                                    ) : ships
+                                        .filter(s => !s.is_meteo)
+                                        .map(s => {
+                                            const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
+                                                ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
+                                                : Infinity;
+                                            return { ...s, distance: dist };
+                                        })
+                                        .sort((a, b) => {
+                                            let valA = a[sortConfig.key];
+                                            let valB = b[sortConfig.key];
+
+                                            // Specific handling for strings
+                                            if (typeof valA === 'string') valA = valA.toLowerCase();
+                                            if (typeof valB === 'string') valB = valB.toLowerCase();
+
+                                            // Fallbacks for undefined
+                                            if (valA === undefined) valA = sortConfig.direction === 'asc' ? Infinity : -Infinity;
+                                            if (valB === undefined) valB = sortConfig.direction === 'asc' ? Infinity : -Infinity;
+
+                                            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                                            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                                            return 0;
+                                        })
+                                        .map((ship: any, idx: number) => (
+                                            <div key={ship.mmsi}
+                                                className={showFlash && flashedMmsis.has(String(ship.mmsi)) ? 'ship-flash' : ''}
+                                                style={{
+                                                    padding: '10px',
+                                                    background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
+                                                    borderRadius: '8px',
+                                                    borderLeft: `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)}`,
+                                                    display: 'flex',
+                                                    gap: '12px',
+                                                    alignItems: 'center',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s',
+                                                    border: `1px solid ${colors.border}`,
+                                                    marginBottom: '8px'
+                                                }}
+                                                onClick={() => setHoveredMmsi(hoveredMmsi === String(ship.mmsi) ? null : String(ship.mmsi))}
+                                                onMouseEnter={e => {
+                                                    e.currentTarget.style.transform = 'translateX(-4px)';
+                                                    e.currentTarget.style.borderColor = '#44aaff';
+                                                }}
+                                                onMouseLeave={e => {
+                                                    e.currentTarget.style.transform = 'translateX(0)';
+                                                    e.currentTarget.style.borderColor = colors.border;
+                                                }}
+                                            >
+                                                {/* Thumbnail or Icon */}
+                                                <div style={{ width: '60px', minWidth: '60px', height: '45px', borderRadius: '4px', overflow: 'hidden', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.border}` }}>
+                                                    {ship.imageUrl ? (
+                                                        <img src={ship.imageUrl} alt={ship.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }} />
+                                                    ) : (
+                                                        <Ship size={20} color={getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)} />
+                                                    )}
+                                                </div>
+
+                                                {/* Info Section */}
+                                                <div style={{ flex: 1, minWidth: 0 }}>
+                                                    <div style={{
+                                                        fontWeight: 700,
+                                                        fontSize: '0.9rem',
+                                                        color: 'var(--text-main)',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '6px',
+                                                        marginBottom: '2px'
+                                                    }}>
+                                                        <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
+                                                        <span style={{
+                                                            whiteSpace: 'nowrap',
+                                                            overflow: 'hidden',
+                                                            textOverflow: 'ellipsis'
+                                                        }}>
+                                                            {ship.name || ship.mmsi}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                                                        <span>{getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}</span>
+                                                        <span style={{ opacity: 0.5 }}>•</span>
+                                                        <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Speed/Direction */}
+                                                <div style={{ textAlign: 'right', minWidth: '65px' }}>
+                                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: (ship.sog && ship.sog > 1) ? '#00ee00' : colors.textMain }}>
+                                                        {formatSpeed(ship.sog, mqttSettings.units)}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.75rem', color: colors.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
+                                                        <Navigation size={10} style={{ transform: `rotate(${ship.cog || 0}deg)` }} />
+                                                        {ship.cog?.toFixed(0) ?? '--'}°
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    </>
                 )}
             </div>
 
