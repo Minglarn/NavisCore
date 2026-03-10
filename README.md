@@ -10,6 +10,7 @@
 - **Smart Image Persistence**: Automatically fetches vessel images with a 24h retry logic for missing images and 30-day cache for real ship photos.
 - **Real-time Map**: Interactive map with real-time ship positions, COG (Course Over Ground) lines, and persistence (saves your zoom/center).
 - **RF Resilience**: Intelligent range limiting (200 Nm) to filter out unrealistic tropo-propogation data from statistics.
+- **SDR Management UI**: Configure tuner gain and frequency correction (PPM) directly from the dashboard settings.
 - **Mock Mode**: Development-friendly mode to generate simulated AIS traffic without an SDR device.
 
 ## Architecture
@@ -42,8 +43,11 @@ services:
     image: ghcr.io/minglarn/naviscore-sdr:latest
     container_name: naviscore_sdr
     restart: always
-    # devices:
-    #   - /dev/bus/usb:/dev/bus/usb # Required for Linux/Raspberry Pi
+    # Avkommentera 'devices' för att tillåta USB-åtkomst på Linux/Raspberry Pi
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    environment:
+      - SDR_INDEX=0 # Välj vilket USB-gränssnitt/enhet (Standard: 0)
     volumes:
       - ./sdr/udev-rules:/etc/udev/rules.d:ro
     healthcheck:

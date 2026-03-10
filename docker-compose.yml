@@ -9,8 +9,7 @@ services:
     devices:
       - /dev/bus/usb:/dev/bus/usb # Kräver usbipd-win på Windows
     environment:
-      - SDR_PPM=0
-      - SDR_GAIN=auto
+      - SDR_INDEX=0
     volumes:
       - ./sdr/udev-rules:/etc/udev/rules.d:ro
     # Healthcheck to see if the device is found by lsusb and rtl_ais is running

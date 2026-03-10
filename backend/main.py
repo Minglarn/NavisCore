@@ -104,6 +104,8 @@ async def get_all_settings():
         "trail_color": await get_setting("trail_color", "#ff4444"),
         "trail_opacity": await get_setting("trail_opacity", "0.6"),
         "trail_enabled": await get_setting("trail_enabled", "true"),
+        "sdr_ppm": await get_setting("sdr_ppm", "0"),
+        "sdr_gain": await get_setting("sdr_gain", "auto")
     }
 
 # WebSockets

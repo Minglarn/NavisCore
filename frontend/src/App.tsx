@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 function CenterButton({ originLat, originLon }: { originLat: number, originLon: number }) {
@@ -337,6 +337,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
         { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} /> },
         { id: 'trail', label: 'Spårning', icon: <Navigation size={18} /> },
         { id: 'map', label: 'Karta', icon: <Sun size={18} /> },
+        { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} /> },
     ];
 
     return (
@@ -496,6 +497,26 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'sdr' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">SDR Tuning (Kräver omstart)</div>
+                            <div className="form-group">
+                                <div>
+                                    <label>PPM Error (Frekvenskorrigering)</label>
+                                    <div className="description">t.ex. 0 eller 34</div>
+                                </div>
+                                <input type="number" value={settings.sdr_ppm} onChange={e => setSettings({ ...settings, sdr_ppm: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <div>
+                                    <label>Tuner Gain</label>
+                                    <div className="description">t.ex. auto, 49.6, etc</div>
+                                </div>
+                                <input type="text" value={settings.sdr_gain} onChange={e => setSettings({ ...settings, sdr_gain: e.target.value })} />
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ padding: '25px 30px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '15px', background: 'rgba(0,0,0,0.1)' }}>
@@ -538,7 +559,9 @@ export default function App() {
         show_names_on_map: 'true',
         trail_color: '#ff4444',
         trail_opacity: '0.6',
-        trail_enabled: 'true'
+        trail_enabled: 'true',
+        sdr_ppm: '0',
+        sdr_gain: 'auto'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState('general');
@@ -570,7 +593,9 @@ export default function App() {
                     show_names_on_map: data.show_names_on_map || 'true',
                     trail_color: data.trail_color || '#ff4444',
                     trail_opacity: data.trail_opacity || '0.6',
-                    trail_enabled: data.trail_enabled || 'true'
+                    trail_enabled: data.trail_enabled || 'true',
+                    sdr_ppm: data.sdr_ppm || '0',
+                    sdr_gain: data.sdr_gain || 'auto'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');

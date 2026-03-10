@@ -18,7 +18,9 @@ RUN apk add --no-cache \
     librtlsdr \
     libusb \
     usbutils \
-    tzdata
+    tzdata \
+    curl \
+    jq
 
 COPY --from=builder /src/rtl_ais /usr/local/bin/rtl_ais
 
