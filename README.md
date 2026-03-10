@@ -19,7 +19,15 @@
 
 ## Prerequisites
 - **Docker & Docker Compose**
-- **RTL-SDR USB Stick** (unless running in Mock Mode)
+- **RTL-SDR USB Stick** (Optional: only if you want to receive local radio signals)
+- **MQTT Broker** (Optional: NavisCore can also receive AIS data via MQTT)
+
+## Data Sources
+NavisCore is highly flexible and can receive AIS traffic from multiple sources:
+- **Local SDR**: Built-in support for RTL-SDR hardware via the `sdr` container.
+- **MQTT Interface**: Can subscribe to AIS NMEA strings on a remote MQTT broker.
+- **Mock Mode**: Generates simulated traffic for testing and demonstration.
+- **UDP Push**: Accepts NMEA data pushed to port `10110/udp`.
 
 ## Quick Start
 
