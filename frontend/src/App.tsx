@@ -956,7 +956,7 @@ export default function App() {
                             <List size={22} />
                         </button>
                         <button
-                            onClick={() => setShowSettings(true)}
+                            onClick={() => setIsSettingsModalOpen(true)}
                             style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
