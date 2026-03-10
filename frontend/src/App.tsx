@@ -798,7 +798,12 @@ export default function App() {
                                                         </span>
                                                     )}
                                                     {s.imageUrl && (
-                                                        <img src={s.imageUrl} alt={s.name} style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px' }} />
+                                                        <img
+                                                            src={s.imageUrl}
+                                                            onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
+                                                            alt={s.name}
+                                                            style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px' }}
+                                                        />
                                                     )}
                                                 </div>
                                             )}

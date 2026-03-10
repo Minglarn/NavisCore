@@ -436,7 +436,7 @@ async def process_ais_data(data: dict):
         async with db.execute('SELECT image_url, name, type, status_text, country_code FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
-                ship_data["imageUrl"] = row[0]
+                ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
                 if not ship_name and row[1]:
                     ship_data["name"] = row[1]
                 if ship_data["shiptype"] is None and row[2] is not None:
@@ -743,6 +743,8 @@ async def get_ships():
                 d = dict(row)
                 if d.get("image_url"):
                     d["imageUrl"] = d["image_url"]
+                else:
+                    d["imageUrl"] = "/images/0.jpg"
                 
                 # Convert string last_seen to numeric timestamp (epoch seconds)
                 if d.get("last_seen"):
