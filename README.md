@@ -101,5 +101,28 @@ docker-compose up -d --build
 ### Mock Mode
 If you don't have an SDR device connected, set `MOCK_MODE=true` in the `app` service environment variables in `docker-compose.yml` to see simulated ship traffic in the Stockholm archipelago.
 
+### External AIS Source (UDP Only – No Built-in SDR)
+If you already run an external AIS-catcher, `rtl_ais`, or any other AIS decoder, you can skip the `sdr` container entirely and just send NMEA data to NavisCore over UDP port `10110`.
+
+```yaml
+services:
+  app:
+    image: ghcr.io/minglarn/naviscore-app:latest
+    container_name: naviscore_app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "10110:10110/udp"
+    environment:
+      - MOCK_MODE=false
+    volumes:
+      - ./data:/app/data
+```
+
+Then point your external decoder to send NMEA sentences to `<NavisCore-IP>:10110/udp`. Example with AIS-catcher:
+```bash
+AIS-catcher -u <NavisCore-IP> 10110
+```
+
 ## Support & Contributing
 Feel free to open issues or pull requests on [GitHub](https://github.com/Minglarn/NavisCore).
