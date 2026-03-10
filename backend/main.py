@@ -613,6 +613,12 @@ async def process_ais_data(data: dict):
                                     last_updated = CURRENT_TIMESTAMP
                             ''', (sector, rng_24h, rng_all, rng_24h, rng_all))
                             await db.commit()
+                            await broadcast({
+                                "type": "coverage_update",
+                                "sector_id": sector,
+                                "range_km_24h": rng_24h,
+                                "range_km_alltime": rng_all
+                            })
                 elif dist > MAX_VALID_RANGE_KM:
                     # Log tropo/anomaly but don't update range records
                     logging.info(f"Anomalous range detected (TROPO?): {dist:.1f} km for ship {mmsi_str} | ship_pos=({lat},{lon}) station=({olat},{olon})")

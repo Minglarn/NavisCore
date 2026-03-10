@@ -836,6 +836,23 @@ export default function App() {
                 setStatus('Status: ' + data.message);
             } else if (data.type === 'mqtt_status') {
                 setMqttConnected(data.connected);
+            } else if (data.type === 'coverage_update') {
+                setCoverageSectors(prev => {
+                    const idx = prev.findIndex((s: any) => s.sector_id === data.sector_id);
+                    const newSector = {
+                        sector_id: data.sector_id,
+                        range_km_24h: data.range_km_24h,
+                        range_km_alltime: data.range_km_alltime
+                    };
+                    if (idx !== -1) {
+                        // Update existing sector
+                        const next = [...prev];
+                        next[idx] = newSector;
+                        return next;
+                    }
+                    // Insert new sector and keep sorted
+                    return [...prev, newSector].sort((a: any, b: any) => a.sector_id - b.sector_id);
+                });
             } else {
                 setShips((prev: any[]) => {
                     const existing = prev.find((s: any) => s.mmsi === data.mmsi);
@@ -1267,8 +1284,7 @@ export default function App() {
                                                     positions={rangePolygon as any}
                                                     pathOptions={{
                                                         color: '#ff9800', // Orange color
-                                                        fillColor: '#ff9800',
-                                                        fillOpacity: 0.15,
+                                                        fill: false,
                                                         weight: 2
                                                     }}
                                                 />
