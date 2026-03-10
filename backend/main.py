@@ -707,6 +707,26 @@ async def coverage_24h_reset_job():
 @app.on_event("startup")
 async def startup_event():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
+    # Ensure default image 0.jpg exists in IMAGES_DIR
+    default_img_path = os.path.join(IMAGES_DIR, "0.jpg")
+    backup_img_path = "/app/backend/static/0.jpg"
+    if not os.path.exists(default_img_path):
+        if os.path.exists(backup_img_path):
+            try:
+                shutil.copy2(backup_img_path, default_img_path)
+                logger.info("Restored default image 0.jpg from backup")
+            except Exception as e:
+                logger.error(f"Failed to restore 0.jpg: {e}")
+        else:
+            # If no backup, create an empty placeholder to at least avoid 404
+            try:
+                with open(default_img_path, 'wb') as f:
+                    f.write(b"")
+                logger.warning("Placeholder 0.jpg created (backup not found)")
+            except Exception as e:
+                logger.error(f"Failed to create placeholder 0.jpg: {e}")
+
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('''CREATE TABLE IF NOT EXISTS ships (
             mmsi TEXT PRIMARY KEY,

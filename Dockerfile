@@ -16,6 +16,8 @@ COPY backend/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY backend/ ./
+# Backup for default image
+COPY data/images/0.jpg /app/backend/static/0.jpg
 
 # Setup Nginx
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
