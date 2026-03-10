@@ -146,6 +146,44 @@ def calculate_bearing(lat1, lon1, lat2, lon2):
     brng = (math.degrees(theta) + 360) % 360
     return brng
 
+def get_country_code_from_mmsi(mmsi_str: str) -> str:
+    """Returns ISO country code (2 letters) based on MMSI prefix (MID)."""
+    if not mmsi_str or len(mmsi_str) < 3:
+        return None
+    
+    mid = mmsi_str[:3]
+    mid_map = {
+        "265": "se", "266": "se", # Sweden
+        "219": "dk", "220": "dk", # Denmark
+        "257": "no", "258": "no", "259": "no", # Norway
+        "230": "fi", # Finland
+        "211": "de", "218": "de", # Germany
+        "232": "gb", "233": "gb", "234": "gb", "235": "gb", # UK
+        "276": "ee", # Estonia
+        "275": "lv", # Latvia
+        "277": "lt", # Lithuania
+        "261": "pl", # Poland
+        "273": "ru", # Russia
+        "244": "nl", # Netherlands
+        "245": "nl", "246": "nl",
+        "205": "be", # Belgium
+        "226": "fr", "227": "fr", "228": "fr", # France
+        "247": "it", # Italy
+        "224": "es", # Spain
+        "304": "ag", # Antigua & Barbuda
+        "311": "bs", # Bahamas
+        "351": "pa", "352": "pa", "353": "pa", "354": "pa", "355": "pa", "356": "pa", "357": "pa", # Panama
+        "370": "pa", "371": "pa", "372": "pa", "373": "pa", "374": "pa",
+        "412": "cn", "413": "cn", "414": "cn", # China
+        "538": "mh", # Marshall Islands
+        "636": "lr", # Liberia
+        "248": "mt", # Malta
+        "210": "cy", # Cyprus
+        "212": "cy",
+        "215": "mt",
+    }
+    return mid_map.get(mid)
+
 # Image Fetching Logic
 async def handle_fallback_image(mmsi: str):
     source_file = os.path.join(IMAGES_DIR, '0.jpg')
@@ -413,7 +451,7 @@ async def process_ais_data(data: dict):
         "status_text": data.get("status_text") or data.get("status"),
         "ship_type_text": data.get("ship_type_text"),
         "ship_category": data.get("ship_category"),
-        "country_code": data.get("country_code"),
+        "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
         "timestamp": int(datetime.now().timestamp() * 1000),
         "is_meteo": is_meteo,
         "is_aton": is_aton,

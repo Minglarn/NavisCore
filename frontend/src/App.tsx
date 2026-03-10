@@ -102,27 +102,35 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) 
 
 
 function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
-    if (countryCode && typeof countryCode === 'string' && countryCode.length === 2) {
-        return `<img src="https://flagcdn.com/h20/${countryCode.toLowerCase()}.png" alt="${countryCode}" style="height: 14px; width: auto; vertical-align: middle; border-radius: 2px;" />`;
+    const mid = mmsiStr ? mmsiStr.substring(0, 3) : '';
+    let emoji = '📌';
+    if (mid === '265' || mid === '266') emoji = '🇸🇪';
+    else if (mid === '219' || mid === '220') emoji = '🇩🇰';
+    else if (mid === '257' || mid === '258' || mid === '259') emoji = '🇳🇴';
+    else if (mid === '230') emoji = '🇫🇮';
+    else if (mid === '211' || mid === '218') emoji = '🇩🇪';
+    else if (mid === '235' || mid === '232') emoji = '🇬🇧';
+    else if (mid === '276') emoji = '🇪🇪';
+    else if (mid === '275') emoji = '🇱🇻';
+    else if (mid === '277') emoji = '🇱🇹';
+    else if (mid === '261') emoji = '🇵🇱';
+    else if (mid === '273') emoji = '🇷🇺';
+    else if (mid === '244') emoji = '🇳🇱';
+    else if (mid === '205') emoji = '🇧🇪';
+    else if (!mmsiStr) emoji = '🏳️';
+
+    if (countryCode && typeof countryCode === 'string' && countryCode.length === 2 && countryCode !== "00") {
+        const code = countryCode.toLowerCase();
+        return `<span style="display: inline-flex; align-items: center;">
+            <img src="https://flagcdn.com/16x12/${code}.png" 
+                 alt="${countryCode}" 
+                 style="height: 12px; width: 16px; vertical-align: middle; border-radius: 1px; margin-right: 4px; display: inline-block;" 
+                 onerror="this.style.display='none'; this.nextSibling.style.display='inline';" 
+            /><span style="display: none;">${emoji}</span>
+        </span>`;
     }
 
-    // Fallback till vanliga emojin om ingen landskod hunnit dyka upp än
-    if (!mmsiStr) return '🏳️';
-    const mid = mmsiStr.substring(0, 3);
-    if (mid === '265' || mid === '266') return '🇸🇪';
-    if (mid === '219' || mid === '220') return '🇩🇰';
-    if (mid === '257' || mid === '258' || mid === '259') return '🇳🇴';
-    if (mid === '230') return '🇫🇮';
-    if (mid === '211' || mid === '218') return '🇩🇪';
-    if (mid === '235' || mid === '232') return '🇬🇧';
-    if (mid === '276') return '🇪🇪';
-    if (mid === '275') return '🇱🇻';
-    if (mid === '277') return '🇱🇹';
-    if (mid === '261') return '🇵🇱';
-    if (mid === '273') return '🇷🇺';
-    if (mid === '244') return '🇳🇱';
-    if (mid === '205') return '🇧🇪';
-    return '📌'; // Fallback
+    return emoji;
 }
 
 function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number) {
