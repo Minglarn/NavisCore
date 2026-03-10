@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  sdr:
+    image: ghcr.io/minglarn/naviscore-sdr:latest
+    container_name: naviscore_sdr
+    restart: always
+    # devices:
+    #   - /dev/bus/usb:/dev/bus/usb # Required for Linux/Raspberry Pi
+    volumes:
+      - ./sdr/udev-rules:/etc/udev/rules.d:ro
+    healthcheck:
+      test: [ "CMD-SHELL", "lsusb | grep -i 'Realtek' || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - navis_net
+
+  app:
+    image: ghcr.io/minglarn/naviscore-app:latest
+    container_name: naviscore_app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "10110:10110/udp"
+    environment:
+      - MOCK_MODE=false
+      - LOG_LEVEL=info
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      - sdr
+    networks:
+      - navis_net
+
+networks:
+  navis_net:
+    driver: bridge
