@@ -127,12 +127,20 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
 
 function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number) {
     const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
+    const isAircraft = type === 9;
     const color = getShipColor(mmsi, type);
     const borderColor = '#000000'; // Dark border for contrast
 
     let svg = '';
 
-    if (isMoving) {
+    if (isAircraft) {
+        // Airplane icon
+        const rotation = cog !== undefined ? cog : 0;
+        svg = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg);">
+                 <circle cx="12" cy="12" r="11" fill="rgba(255, 0, 0, 0.8)" stroke="white" stroke-width="1.5" />
+                 <path d="M21,16 L21,14 L14,10 L14,3.5 C14,2.67 13.33,2 12.5,2 C11.67,2 11,2.67 11,3.5 L11,10 L4,14 L4,16 L11,14 L11,19 L9,20.5 L9,22 L12.5,21 L16,22 L16,20.5 L14,19 L14,14 L21,16 Z" fill="white" />
+               </svg>`;
+    } else if (isMoving) {
         // Triangel
         svg = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);">
                  <polygon points="12,2 22,20 12,17 2,20" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
@@ -147,8 +155,8 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     return L.divIcon({
         html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%;">${svg}</div>`,
         className: 'ship-custom-icon-container',
-        iconSize: isMoving ? [24, 24] : [16, 16],
-        iconAnchor: isMoving ? [12, 12] : [8, 8]
+        iconSize: isMoving || isAircraft ? [24, 24] : [16, 16],
+        iconAnchor: isMoving || isAircraft ? [12, 12] : [8, 8]
     });
 }
 
@@ -527,7 +535,8 @@ export default function App() {
         map_style: 'light',
         range_type: '24h', // '24h' eller 'alltime'
         base_layer: 'standard',
-        history_length: '50',
+        history_duration: '60',
+        show_names_on_map: 'true',
         trail_color: '#ff4444',
         trail_opacity: '0.6',
         trail_enabled: 'true'
@@ -1040,7 +1049,7 @@ export default function App() {
                                 </>
                             )}
 
-                            {ships.map((s: any, idx: number) => {
+                            {ships.filter((s: any) => !s.is_meteo).map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
 
                                 // Smart Label Logic:
@@ -1168,8 +1177,10 @@ export default function App() {
                                                             <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.sog?.toFixed(1) ?? '--'}kn / {s.cog?.toFixed(0) ?? '--'}°</strong>
                                                         </div>
                                                         <div style={{ padding: '8px' }}>
-                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Dimensions:</div>
-                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.length && s.width ? `${s.length}m x ${s.width}m` : '--'}</strong>
+                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Dimensions / Altitude:</div>
+                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>
+                                                                {s.shiptype === 9 || s.is_sar ? (s.altitude ? `${s.altitude} m` : '--') : (s.length && s.width ? `${s.length}m x ${s.width}m` : '--')}
+                                                            </strong>
                                                         </div>
                                                         <div style={{ padding: '8px', borderRight: `1px solid ${colors.border}`, borderTop: `1px solid ${colors.border}` }}>
                                                             <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Draught / Weight:</div>
