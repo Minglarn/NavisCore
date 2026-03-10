@@ -56,6 +56,21 @@ active_lookups = set()
 forwarding_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 # Settings Helpers
+async def cleanup_history_task():
+    """Background task to remove history entries older than 24 hours"""
+    while True:
+        try:
+            async with aiosqlite.connect(DB_PATH) as db:
+                # Remove history older than 24 hours (86400 seconds)
+                # Note: We use 24h as a hard limit regardless of UI setting to keep DB lean
+                cutoff = int(datetime.now().timestamp() * 1000) - (24 * 3600 * 1000)
+                await db.execute('DELETE FROM ship_history WHERE timestamp < ?', (cutoff,))
+                await db.commit()
+                logger.info("Cleaned up old ship history entries")
+        except Exception as e:
+            logger.error(f"Error in cleanup_history_task: {e}")
+        await asyncio.sleep(3600) # Run once an hour
+
 async def get_setting(key: str, default_val: str = "") -> str:
     async with aiosqlite.connect(DB_PATH) as db:
         async with db.execute('SELECT value FROM settings WHERE key = ?', (key,)) as cursor:
@@ -84,6 +99,11 @@ async def get_all_settings():
         "map_style": await get_setting("map_style", "light"),
         "base_layer": await get_setting("base_layer", "standard"),
         "range_type": await get_setting("range_type", "24h"),
+        "history_duration": await get_setting("history_duration", "60"),
+        "show_names_on_map": await get_setting("show_names_on_map", "true"),
+        "trail_color": await get_setting("trail_color", "#ff4444"),
+        "trail_opacity": await get_setting("trail_opacity", "0.6"),
+        "trail_enabled": await get_setting("trail_enabled", "true"),
     }
 
 # WebSockets
@@ -347,6 +367,21 @@ async def process_ais_data(data: dict):
                 update_values.append(data.get("imo"))
             update_values.append(mmsi_str)
             await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(update_values))
+
+            # Save dimensions if available (usually from Type 5 or 24)
+            to_bow = data.get("to_bow")
+            to_stern = data.get("to_stern")
+            to_port = data.get("to_port")
+            to_starboard = data.get("to_starboard")
+            if to_bow is not None and to_stern is not None:
+                length = to_bow + to_stern
+                if length > 0:
+                    await db.execute("UPDATE ships SET length = ? WHERE mmsi = ?", (length, mmsi_str))
+            if to_port is not None and to_starboard is not None:
+                width = to_port + to_starboard
+                if width > 0:
+                    await db.execute("UPDATE ships SET width = ? WHERE mmsi = ?", (width, mmsi_str))
+            
             await db.commit()
         return
 
@@ -433,7 +468,7 @@ async def process_ais_data(data: dict):
         await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(update_values))
         
         # Read back whatever data we lacked in this specific incoming packet
-        async with db.execute('SELECT image_url, name, type, status_text, country_code FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
@@ -445,6 +480,12 @@ async def process_ais_data(data: dict):
                     ship_data["status_text"] = row[3]
                 if not ship_data["country_code"] and row[4]:
                     ship_data["country_code"] = row[4]
+                ship_data["length"] = row[5]
+                ship_data["width"] = row[6]
+                if not ship_data["destination"] and row[7]:
+                    ship_data["destination"] = row[7]
+                if not ship_data["draught"] and row[8]:
+                    ship_data["draught"] = row[8]
         
         # Ensure ship_type_text is always populated
         if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -704,8 +745,30 @@ async def startup_event():
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN cog REAL")
         except Exception: pass
+        
+        # New: ship_history table
+        await db.execute('''CREATE TABLE IF NOT EXISTS ship_history (
+            mmsi TEXT,
+            latitude REAL,
+            longitude REAL,
+            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+        )''')
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_ship_history_mmsi_ts ON ship_history (mmsi, timestamp)")
+
+        # Settings updates
+        # New settings
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('history_duration', '60')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('show_names_on_map', 'true')")
+        
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN heading REAL")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN length REAL")
+        except Exception: pass
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN width REAL")
         except Exception: pass
         
         await db.execute('''CREATE TABLE IF NOT EXISTS settings (
@@ -736,11 +799,29 @@ async def get_ships():
     timeout_mins = int(settings.get("ship_timeout", 60))
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row
-        async with db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes')") as cursor:
-            rows = await cursor.fetchall()
-            result = []
-            for row in rows:
+        
+        # Get history duration setting
+        cursor = await db.execute("SELECT value FROM settings WHERE key='history_duration'")
+        row = await cursor.fetchone()
+        duration_min = int(row["value"]) if row else 60
+
+        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL")
+        rows = await cursor.fetchall()
+        result = []
+        for row in rows:
+            try:
                 d = dict(row)
+                mmsi = d["mmsi"]
+                
+                # Fetch history for this ship (timestamp is in ms, duration is in min)
+                cutoff_ms = int(datetime.now().timestamp() * 1000) - (duration_min * 60 * 1000)
+                h_cursor = await db.execute(
+                    "SELECT latitude, longitude FROM ship_history WHERE mmsi=? AND timestamp > ? ORDER BY timestamp ASC",
+                    (mmsi, cutoff_ms)
+                )
+                h_rows = await h_cursor.fetchall()
+                d["history"] = [[r["latitude"], r["longitude"]] for r in h_rows]
+                
                 if d.get("image_url"):
                     d["imageUrl"] = d["image_url"]
                 else:
@@ -770,8 +851,18 @@ async def get_ships():
                 if d.get("latitude") is not None and d.get("longitude") is not None:
                     d["lat"] = d["latitude"]
                     d["lon"] = d["longitude"]
+                
+                # Ensure new fields are present
+                d["length"] = row["length"]
+                d["width"] = row["width"]
+                d["destination"] = row["destination"]
+                d["draught"] = row["draught"]
+                
                 result.append(d)
-            return result
+            except Exception as e:
+                logger.error(f"Error processing ship row: {e}")
+                continue
+        return result
 
 @app.get("/api/settings")
 async def get_settings_api():

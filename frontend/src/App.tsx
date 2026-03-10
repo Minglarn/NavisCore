@@ -188,14 +188,86 @@ const extraStyles = `
     color: white;
     border: none;
 }
-@keyframes ship-flash {
-    0% { box-shadow: 0 0 0 0 rgba(0, 200, 255, 0.5); }
-    30% { box-shadow: 0 0 12px 4px rgba(0, 200, 255, 0.4); }
-    100% { box-shadow: none; }
-}
 .ship-flash {
     animation: ship-flash 1.5s ease-out;
 }
+.settings-modal-overlay {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    animation: fadeIn 0.3s ease-out;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.settings-modal {
+    background: var(--bg-card); width: 750px; max-width: 95vw; height: 600px;
+    border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
+    border: 1px solid rgba(255,255,255,0.1);
+    animation: slideUp 0.3s ease-out;
+}
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.settings-tabs {
+    display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-color);
+    padding: 0 10px;
+}
+.settings-tab-btn {
+    padding: 16px 20px; border: none; background: transparent; cursor: pointer;
+    color: var(--text-muted); font-weight: 600; border-bottom: 3px solid transparent;
+    transition: all 0.2s; font-size: 0.95rem;
+}
+.settings-tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
+.settings-tab-btn.active {
+    color: #44aaff; border-bottom-color: #44aaff; background: rgba(68,170,255,0.1);
+}
+.settings-content {
+    flex: 1; padding: 30px; overflow-y: auto; color: var(--text-main);
+    display: flex; flexDirection: column; gap: 25px;
+}
+.settings-section {
+    display: flex; flex-direction: column; gap: 15px;
+    padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.settings-section:last-child { border-bottom: none; }
+.settings-section-title {
+    font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+    color: #44aaff; letter-spacing: 1px; margin-bottom: 5px;
+}
+.form-group { 
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 20px;
+}
+.form-group.vertical { flex-direction: column; align-items: flex-start; gap: 8px; }
+
+.form-group label { font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
+.form-group .description { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
+
+.form-group input[type="text"], 
+.form-group input[type="number"],
+.form-group input[type="password"],
+.form-group select {
+    width: 280px; padding: 10px 14px; border-radius: 8px;
+    border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-main);
+    transition: border-color 0.2s;
+}
+.form-group input:focus { border-color: #44aaff; outline: none; }
+
+/* Toggle Switch Styles */
+.switch {
+  position: relative; display: inline-block; width: 44px; height: 24px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #333; transition: .4s; border-radius: 24px;
+}
+.slider:before {
+  position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
+  background-color: white; transition: .4s; border-radius: 50%;
+}
+input:checked + .slider { background-color: #44aaff; }
+input:checked + .slider:before { transform: translateX(20px); }
 `;
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -240,6 +312,194 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
     return [toDeg(lat2), toDeg(lon2)];
 }
 
+function Toggle({ checked, onChange }: { checked: boolean, onChange: (val: boolean) => void }) {
+    return (
+        <label className="switch">
+            <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+            <span className="slider"></span>
+        </label>
+    );
+}
+
+function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors }: any) {
+    if (!isOpen) return null;
+
+    const tabs = [
+        { id: 'general', label: 'Allmänt', icon: <Info size={18} /> },
+        { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} /> },
+        { id: 'trail', label: 'Spårning', icon: <Navigation size={18} /> },
+        { id: 'map', label: 'Karta', icon: <Sun size={18} /> },
+    ];
+
+    return (
+        <div className="settings-modal-overlay" onClick={onClose}>
+            <div className="settings-modal" onClick={e => e.stopPropagation()}>
+                <div className="settings-tabs">
+                    {tabs.map(t => (
+                        <button
+                            key={t.id}
+                            className={`settings-tab-btn ${activeTab === t.id ? 'active' : ''}`}
+                            onClick={() => setActiveTab(t.id)}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
+                        >
+                            {t.icon} {t.label}
+                        </button>
+                    ))}
+                    <div style={{ flex: 1 }}></div>
+                    <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '10px', color: colors.textMuted }}>
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div className="settings-content">
+                    {activeTab === 'general' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">Grundinställningar</div>
+                            <div className="form-group">
+                                <div>
+                                    <label>Timeout för fartyg</label>
+                                    <div className="description">Hur länge ett fartyg visas efter sista signal (minuter)</div>
+                                </div>
+                                <input
+                                    type="number"
+                                    value={settings.ship_timeout}
+                                    onChange={e => setSettings({ ...settings, ship_timeout: e.target.value })}
+                                />
+                            </div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Stationens Position</div>
+                            <div className="form-group">
+                                <label>Latitude</label>
+                                <input
+                                    type="text"
+                                    placeholder="t.ex. 59.3293"
+                                    value={settings.origin_lat}
+                                    onChange={e => setSettings({ ...settings, origin_lat: e.target.value })}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <label>Longitude</label>
+                                <input
+                                    type="text"
+                                    placeholder="t.ex. 18.0686"
+                                    value={settings.origin_lon}
+                                    onChange={e => setSettings({ ...settings, origin_lon: e.target.value })}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'mqtt' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">Anslutning</div>
+                            <div className="form-group">
+                                <label>MQTT Aktiverad</label>
+                                <Toggle
+                                    checked={settings.mqtt_enabled === 'true'}
+                                    onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
+                                />
+                            </div>
+                            <div className="form-group vertical">
+                                <label>MQTT Broker URL</label>
+                                <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_url} onChange={e => setSettings({ ...settings, mqtt_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                            </div>
+                            <div className="settings-section-title">Kartvy</div>
+                            <div className="form-group">
+                                <div>
+                                    <label>Visa fartygsnamn</label>
+                                    <div className="description">Visar namn direkt ovanför fartygsikonen på kartan</div>
+                                </div>
+                                <Toggle
+                                    checked={settings.show_names_on_map === 'true'}
+                                    onChange={val => setSettings({ ...settings, show_names_on_map: String(val) })}
+                                />
+                            </div>
+                            <div className="form-group vertical">
+                                <label>Kartstil</label>
+                                <input type="text" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                            </div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Autentisering</div>
+                            <div className="form-group">
+                                <label>Användarnamn</label>
+                                <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>Lösenord</label>
+                                <input type="password" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'trail' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">Visualisering</div>
+                            <div className="form-group">
+                                <label>Visa fartygsspår (Breadcrumbs)</label>
+                                <Toggle
+                                    checked={settings.trail_enabled === 'true'}
+                                    onChange={val => setSettings({ ...settings, trail_enabled: String(val) })}
+                                />
+                            </div>
+                            <div className="form-group">
+                                <div>
+                                    <label>Historik (Minuter)</label>
+                                    <div className="description">Hur lång tid bakåt i tiden spår visas (kräver omladdning)</div>
+                                </div>
+                                <input type="number" value={settings.history_duration} onChange={e => setSettings({ ...settings, history_duration: e.target.value })} />
+                            </div>
+                            <div className="form-group">
+                                <label>Färg på spår</label>
+                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                                    <input type="color" value={settings.trail_color} onChange={e => setSettings({ ...settings, trail_color: e.target.value })} style={{ width: '60px', height: '35px', padding: '2px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
+                                    <span style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{settings.trail_color.toUpperCase()}</span>
+                                </div>
+                            </div>
+                            <div className="form-group vertical">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <label>Opacitet</label>
+                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{Math.round(parseFloat(settings.trail_opacity) * 100)}%</span>
+                                </div>
+                                <input type="range" min="0.1" max="1" step="0.1" value={settings.trail_opacity} onChange={e => setSettings({ ...settings, trail_opacity: e.target.value })} style={{ width: '100%' }} />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'map' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">Kartinställningar</div>
+                            <div className="form-group">
+                                <label>Kartstil (Gränssnitt)</label>
+                                <select value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
+                                    <option value="light">Ljust läge</option>
+                                    <option value="dark">Mörkt läge (Natt)</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Kartlager (Bas)</label>
+                                <select value={settings.base_layer} onChange={e => setSettings({ ...settings, base_layer: e.target.value })}>
+                                    <option value="standard">Standard Vektor</option>
+                                    <option value="satellite">Satellitbilder</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label>Visa räckviddsringar</label>
+                                <Toggle
+                                    checked={settings.show_range_rings === 'true'}
+                                    onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                <div style={{ padding: '25px 30px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '15px', background: 'rgba(0,0,0,0.1)' }}>
+                    <button className="styled-button" style={{ padding: '10px 20px', borderRadius: '8px' }} onClick={onClose}>Avbryt</button>
+                    <button className="styled-button primary" style={{ padding: '10px 25px', borderRadius: '8px', background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', boxShadow: '0 4px 15px rgba(0,102,204,0.3)' }} onClick={() => { onSave(); onClose(); }}>Spara ändringar</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function App() {
     const [ships, setShips] = useState<any[]>([]);
     const [status, setStatus] = useState('Ansluter...');
@@ -253,7 +513,6 @@ export default function App() {
     // Theme and Settings State
     const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Light is default now!
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-    const [sidebarTab, setSidebarTab] = useState<'ships' | 'settings'>('ships');
     const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
     const [mqttSettings, setMqttSettings] = useState({
         mqtt_enabled: 'false',
@@ -267,8 +526,15 @@ export default function App() {
         show_range_rings: 'true',
         map_style: 'light',
         range_type: '24h', // '24h' eller 'alltime'
-        base_layer: 'standard'
+        base_layer: 'standard',
+        history_length: '50',
+        trail_color: '#ff4444',
+        trail_opacity: '0.6',
+        trail_enabled: 'true'
     });
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [settingsTab, setSettingsTab] = useState('general');
+    const [currentZoom, setCurrentZoom] = useState(10);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -291,7 +557,12 @@ export default function App() {
                     show_range_rings: data.show_range_rings || 'true',
                     map_style: data.map_style || 'light',
                     range_type: data.range_type || '24h',
-                    base_layer: data.base_layer || 'standard'
+                    base_layer: data.base_layer || 'standard',
+                    history_duration: data.history_duration || '60',
+                    show_names_on_map: data.show_names_on_map || 'true',
+                    trail_color: data.trail_color || '#ff4444',
+                    trail_opacity: data.trail_opacity || '0.6',
+                    trail_enabled: data.trail_enabled || 'true'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -313,6 +584,7 @@ export default function App() {
     // Local timeout garbage collector
     useEffect(() => {
         const timeoutMs = parseInt(localTimeoutStr) * 60000;
+        if (isNaN(timeoutMs) || timeoutMs <= 0) return; // Ensure timeoutMs is a valid positive number
         const interval = setInterval(() => {
             setShips(prev => prev.filter((s: any) => (Date.now() - s.timestamp) < timeoutMs));
         }, 10000); // Check every 10 seconds
@@ -376,10 +648,21 @@ export default function App() {
             } else {
                 setShips((prev: any[]) => {
                     const existing = prev.find((s: any) => s.mmsi === data.mmsi);
+                    const historyMax = 100; // Keep a reasonable buffer in memory
+
                     if (existing) {
-                        return prev.map((s: any) => s.mmsi === data.mmsi ? { ...s, ...data } : s);
+                        let newHistory = existing.history || [];
+                        if (data.lat && data.lon) {
+                            const last = newHistory[newHistory.length - 1];
+                            // Only add to history if moved > 50m
+                            if (!last || haversineDistance(last[0], last[1], data.lat, data.lon) > 0.05) {
+                                newHistory = [...newHistory, [data.lat, data.lon]].slice(-historyMax);
+                            }
+                        }
+                        return prev.map((s: any) => s.mmsi === data.mmsi ? { ...s, ...data, history: newHistory } : s);
                     }
-                    return [...prev, data];
+                    const history = (data.lat && data.lon) ? [[data.lat, data.lon]] : [];
+                    return [...prev, { ...data, history }];
                 });
                 // Flash effect
                 if (data.mmsi) {
@@ -559,12 +842,13 @@ export default function App() {
         });
     };
 
-    function MapLayerTracker() {
+    function ZoomTracker({ setZoom }: { setZoom: (zoom: number) => void }) {
         useMapEvents({
             baselayerchange: (e: any) => handleLayerChange(e.name),
             zoomend: (e: any) => {
                 const z = e.target.getZoom();
                 localStorage.setItem('naviscore_zoom', String(z));
+                setZoom(z);
             },
             moveend: (e: any) => {
                 const c = e.target.getCenter();
@@ -663,18 +947,20 @@ export default function App() {
 
                     <div style={{ display: 'flex', gap: '5px', borderLeft: `1px solid ${colors.border}`, paddingLeft: '15px' }}>
                         <button
-                            onClick={() => { setSidebarTab('ships'); setIsSidebarOpen(true); }}
-                            style={{ background: sidebarTab === 'ships' && isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            style={{ background: isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
-                            onMouseLeave={e => { if (!(sidebarTab === 'ships' && isSidebarOpen)) e.currentTarget.style.background = 'transparent' }}
+                            onMouseLeave={e => { if (!isSidebarOpen) e.currentTarget.style.background = 'transparent' }}
+                            title="Fartygslista"
                         >
                             <List size={22} />
                         </button>
                         <button
-                            onClick={() => { setSidebarTab('settings'); setIsSidebarOpen(true); }}
-                            style={{ background: sidebarTab === 'settings' && isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+                            onClick={() => setShowSettings(true)}
+                            style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
-                            onMouseLeave={e => { if (!(sidebarTab === 'settings' && isSidebarOpen)) e.currentTarget.style.background = 'transparent' }}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            title="Inställningar"
                         >
                             <Settings size={22} />
                         </button>
@@ -692,7 +978,7 @@ export default function App() {
                     ) : (
                         <MapContainer key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
                             <CenterButton originLat={originLat} originLon={originLon} />
-                            <MapLayerTracker />
+                            <ZoomTracker setZoom={setCurrentZoom} />
                             <LayersControl position="topright">
                                 <LayersControl.BaseLayer name="Standard Karta (Minimal)" checked={mqttSettings.base_layer === 'standard' || !mqttSettings.base_layer}>
                                     <TileLayer
@@ -754,8 +1040,21 @@ export default function App() {
                                 </>
                             )}
 
-                            {ships.map((s: any) => {
-                                const mmsiStr = String(s.mmsi); // Define mmsiStr here
+                            {ships.map((s: any, idx: number) => {
+                                const mmsiStr = String(s.mmsi);
+
+                                // Smart Label Logic:
+                                // 1. Zoom > 13: Show all names
+                                // 2. Zoom 11-13: Show every 3rd ship
+                                // 3. Zoom < 11: Show every 10th ship 
+                                // This prevents clutter in busy areas while still showing some activity
+                                let shouldShowName = false;
+                                if (mqttSettings.show_names_on_map === 'true') {
+                                    if (currentZoom > 13) shouldShowName = true;
+                                    else if (currentZoom > 11 && idx % 3 === 0) shouldShowName = true;
+                                    else if (currentZoom <= 11 && idx % 10 === 0) shouldShowName = true;
+                                }
+
                                 return s.lat && s.lon && (
                                     <Marker key={s.mmsi} position={[s.lat, s.lon]} icon={ShipIcon(s.sog, s.cog, s.mmsi, s.shiptype || s.ship_type)}
                                         eventHandlers={{
@@ -763,8 +1062,30 @@ export default function App() {
                                             mouseout: () => setHoveredMmsi(null)
                                         }}
                                     >
-                                        {/* Tooltip on Hover */}
-                                        <Tooltip direction="top" offset={[0, -10]} opacity={0.95} className={s.is_meteo ? "custom-meteo-tooltip" : ""}>
+                                        {/* permanent name label (Smart display) */}
+                                        {shouldShowName && (
+                                            <Tooltip
+                                                permanent
+                                                direction="bottom"
+                                                offset={[0, 10]}
+                                                opacity={0.8}
+                                                className="ship-name-label"
+                                            >
+                                                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#fff', textShadow: '0 1px 2px rgba(0,0,0,0.8)', whiteSpace: 'nowrap' }}>
+                                                    {s.name || s.mmsi}
+                                                </div>
+                                            </Tooltip>
+                                        )}
+
+                                        {/* Hover Tooltip/Card */}
+                                        <Tooltip
+                                            permanent={hoveredMmsi === mmsiStr}
+                                            direction="top"
+                                            offset={[0, -10]}
+                                            opacity={0.95}
+                                            className={s.is_meteo ? "custom-meteo-tooltip" : ""}
+                                        >
+                                            {/* ... rest of existing tooltip content ... */}
                                             {s.is_meteo ? (
                                                 <div style={{
                                                     display: 'flex', flexDirection: 'column',
@@ -843,36 +1164,32 @@ export default function App() {
 
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: `1px solid ${colors.border}`, borderRadius: '4px' }}>
                                                         <div style={{ padding: '8px', borderRight: `1px solid ${colors.border}` }}>
-                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Nav. status:</div>
-                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>Active</strong>
+                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>SOG / COG:</div>
+                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.sog?.toFixed(1) ?? '--'}kn / {s.cog?.toFixed(0) ?? '--'}°</strong>
                                                         </div>
-                                                        {(s.sog === undefined || s.sog === null || s.is_meteo) ? (
-                                                            <div style={{ padding: '8px' }}>
-                                                                <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Object type:</div>
-                                                                <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>Stationary</strong>
-                                                            </div>
-                                                        ) : (
-                                                            <div style={{ padding: '8px' }}>
-                                                                <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>SOG / COG:</div>
-                                                                <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.sog?.toFixed(1) ?? '--'}kn / {s.cog?.toFixed(0) ?? '--'}°</strong>
-                                                            </div>
-                                                        )}
+                                                        <div style={{ padding: '8px' }}>
+                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Dimensions:</div>
+                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.length && s.width ? `${s.length}m x ${s.width}m` : '--'}</strong>
+                                                        </div>
                                                         <div style={{ padding: '8px', borderRight: `1px solid ${colors.border}`, borderTop: `1px solid ${colors.border}` }}>
-                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Latitude:</div>
-                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.lat?.toFixed(5)}</strong>
+                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Draught / Weight:</div>
+                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.draught ? `${s.draught}m` : '--'}</strong>
                                                         </div>
                                                         <div style={{ padding: '8px', borderTop: `1px solid ${colors.border}` }}>
-                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Longitude:</div>
-                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.lon?.toFixed(5)}</strong>
+                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Destination:</div>
+                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'block' }}>{s.destination || '--'}</strong>
                                                         </div>
                                                     </div>
 
                                                     <div style={{ fontSize: '0.85rem', color: colors.textMuted, marginTop: '12px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                            <span>Position:</span> <strong style={{ color: colors.textMain }}>{s.lat?.toFixed(5)}, {s.lon?.toFixed(5)}</strong>
+                                                        </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                                             <span>Last seen:</span> <strong style={{ color: colors.textMain }}>{new Date(s.timestamp).toLocaleTimeString()}</strong>
                                                         </div>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                            <span>Type:</span> <strong style={{ color: colors.textMain }}>{s.ship_type_text || getShipTypeName(mmsiStr, s.shiptype, s.ship_type_text) || 'Unknown'}</strong>
+                                                            <span>Type:</span> <strong style={{ color: colors.textMain }}>{s.ship_type_text || 'Unknown'}</strong>
                                                         </div>
                                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                                             <span>Status:</span> <strong style={{ color: colors.textMain }}>{s.status_text || 'Unknown'}</strong>
@@ -885,15 +1202,33 @@ export default function App() {
                                 )
                             })}
 
-                            {/* COG Course Line on Hover */}
+                            {/* Ship History Trails */}
+                            {ships.map((s: any) => {
+                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2) return null;
+                                const isHovered = hoveredMmsi === String(s.mmsi);
+                                return (
+                                    <Polyline
+                                        key={`trail-${s.mmsi}`}
+                                        positions={s.history}
+                                        pathOptions={{
+                                            color: isHovered ? '#00f0ff' : mqttSettings.trail_color,
+                                            weight: isHovered ? 3 : 2,
+                                            opacity: isHovered ? 1 : parseFloat(mqttSettings.trail_opacity),
+                                            dashArray: isHovered ? undefined : '5, 5'
+                                        }}
+                                    />
+                                );
+                            })}
+
+                            {/* COG Course Line on Hover (Prediction - adjusted to be more subtle) */}
                             {hoveredMmsi && (() => {
                                 const hs = ships.find((s: any) => String(s.mmsi) === hoveredMmsi);
                                 if (hs && hs.lat && hs.lon && hs.cog != null && hs.sog > 0.1) {
                                     const cogRad = (hs.cog * Math.PI) / 180;
-                                    const lineLen = Math.max(0.02, hs.sog * 0.005); // scale line length by speed
+                                    const lineLen = Math.max(0.015, hs.sog * 0.003); // shorter / more subtle
                                     const endLat = hs.lat + lineLen * Math.cos(cogRad);
                                     const endLon = hs.lon + lineLen * Math.sin(cogRad) / Math.cos(hs.lat * Math.PI / 180);
-                                    return <Polyline positions={[[hs.lat, hs.lon], [endLat, endLon]]} pathOptions={{ color: '#ff4444', weight: 2.5, dashArray: '8 6', opacity: 0.85 }} />;
+                                    return <Polyline positions={[[hs.lat, hs.lon], [endLat, endLon]]} pathOptions={{ color: '#aaa', weight: 1.5, dashArray: '4 4', opacity: 0.6 }} />;
                                 }
                                 return null;
                             })()}
@@ -919,252 +1254,77 @@ export default function App() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
                             <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                {sidebarTab === 'ships' ? `Lokala Fartyg (${ships.length})` : 'Inställningar'}
+                                Lokala Fartyg ({ships.length})
                             </h2>
-                            <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer' }}>
-                                <X size={24} />
-                            </button>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                                <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer' }}>
+                                    <X size={24} />
+                                </button>
+                            </div>
                         </div>
 
                         <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box' }}>
-                            {sidebarTab === 'ships' ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {ships.length === 0 ? (
-                                        <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                            Inget fartyg på radarn ännu...
-                                        </div>
-                                    ) : ships.map((ship: any, idx: number) => (
-                                        <div key={ship.mmsi} className={showFlash && flashedMmsis.has(ship.mmsi) ? 'ship-flash' : ''} style={{
-                                            padding: '12px 15px',
-                                            background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
-                                            borderRadius: '6px',
-                                            borderLeft: `4px solid ${getShipColor(ship.mmsi, ship.shiptype || ship.ship_type)}`,
-                                            display: 'flex',
-                                            justifyContent: 'space-between',
-                                            alignItems: 'center',
-                                            cursor: 'pointer',
-                                            transition: 'transform 0.1s',
-                                            boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.05)'
-                                        }}
-                                            onClick={() => setHoveredMmsi(hoveredMmsi === ship.mmsi ? null : ship.mmsi)}
-                                            onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
-                                            onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
-                                        >
-                                            <div style={{ flex: 1 }}>
-                                                <div style={{ fontWeight: 600, fontSize: '0.90rem', marginBottom: '2px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                    <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(ship.mmsi, ship.country_code) }} />
-                                                    <span style={{
-                                                        whiteSpace: 'nowrap',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        maxWidth: '180px'
-                                                    }}>
-                                                        {ship.name || ship.mmsi}
-                                                    </span>
-                                                </div>
-                                                <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
-                                                    {getShipTypeName(ship.mmsi, ship.shiptype, ship.ship_type_text)} • {ship.sog && ship.sog > 0.1 ? `${ship.sog.toFixed(1)} knop` : 'Ankrad/Förtöjd'}
-                                                </div>
-                                            </div>
-                                            <div style={{ textAlign: 'right', fontSize: '0.85rem', color: colors.textMain }}>
-                                                <div style={{ fontWeight: 600 }}>{ship.sog?.toFixed(1) ?? '--'} kn</div>
-                                                <div style={{ color: colors.textMuted }}>{ship.cog?.toFixed(0) ?? '--'}°</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <>
-                                    <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '10px', border: `1px solid ${colors.border}` }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <strong style={{ color: colors.textMain }}>Tema</strong>
-                                            <button
-                                                onClick={toggleTheme}
-                                                style={{
-                                                    background: colors.bgSidebar, border: `1px solid ${colors.border}`, padding: '8px 12px', borderRadius: '8px',
-                                                    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: colors.textMain
-                                                }}
-                                            >
-                                                {isDark ? <Moon size={18} /> : <Sun size={18} />}
-                                                {isDark ? 'Mörkt Läge' : 'Ljust Läge'}
-                                            </button>
-                                        </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {ships.length === 0 ? (
+                                    <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                        Inget fartyg på radarn ännu...
                                     </div>
-
-                                    <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '10px', border: `1px solid ${colors.border}` }}>
-                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <strong style={{ color: colors.textMain }}>Flash vid uppdatering</strong>
-                                            <button
-                                                onClick={() => {
-                                                    const next = !showFlash;
-                                                    setShowFlash(next);
-                                                    localStorage.setItem('naviscore_flash', String(next));
-                                                }}
-                                                style={{
-                                                    background: showFlash ? '#0066cc' : colors.bgSidebar,
-                                                    border: `1px solid ${showFlash ? '#0066cc' : colors.border}`,
-                                                    padding: '8px 16px', borderRadius: '8px',
-                                                    cursor: 'pointer', color: showFlash ? 'white' : colors.textMain,
-                                                    fontWeight: 600, fontSize: '0.85rem', transition: 'all 0.2s'
-                                                }}
-                                            >
-                                                {showFlash ? 'PÅ' : 'AV'}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '10px', border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                        <h3 style={{ margin: 0, color: colors.textMain, fontSize: '1.1rem', borderBottom: `1px solid ${colors.border}`, paddingBottom: '8px' }}>Kartinställningar & Station</h3>
-
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                                <label style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Origin Latitud</label>
-                                                <input
-                                                    type="number" step="0.0001"
-                                                    placeholder="t.ex. 59.329"
-                                                    value={mqttSettings.origin_lat}
-                                                    onChange={(e) => setMqttSettings({ ...mqttSettings, origin_lat: e.target.value })}
-                                                    style={{
-                                                        background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain,
-                                                        padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box'
-                                                    }}
-                                                />
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                                <label style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Origin Longitud</label>
-                                                <input
-                                                    type="number" step="0.0001"
-                                                    placeholder="t.ex. 18.068"
-                                                    value={mqttSettings.origin_lon}
-                                                    onChange={(e) => setMqttSettings({ ...mqttSettings, origin_lon: e.target.value })}
-                                                    style={{
-                                                        background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain,
-                                                        padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box'
-                                                    }}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: colors.textMain, cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={mqttSettings.show_range_rings === 'true'}
-                                                onChange={(e: any) => setMqttSettings({ ...mqttSettings, show_range_rings: e.target.checked ? 'true' : 'false' })}
-                                                style={{ accentColor: isDark ? colors.accent : colors.accentDark, width: '18px', height: '18px' }}
-                                            />
-                                            Visa avståndscirklar (Range Rings)
-                                        </label>
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${colors.border}` }}>
-                                            <label style={{ color: colors.textMain, fontWeight: 'bold' }}>Sektortäckning (Range Polygon)</label>
-                                            <div style={{ display: 'flex', gap: '15px' }}>
-                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: colors.textMain, cursor: 'pointer' }}>
-                                                    <input
-                                                        type="radio" name="rangeType" value="24h"
-                                                        checked={mqttSettings.range_type === '24h'}
-                                                        onChange={() => setMqttSettings({ ...mqttSettings, range_type: '24h' })}
-                                                        style={{ accentColor: isDark ? colors.accent : colors.accentDark }}
-                                                    />
-                                                    Sista 24 Timmarna
-                                                </label>
-                                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', color: colors.textMain, cursor: 'pointer' }}>
-                                                    <input
-                                                        type="radio" name="rangeType" value="alltime"
-                                                        checked={mqttSettings.range_type === 'alltime'}
-                                                        onChange={() => setMqttSettings({ ...mqttSettings, range_type: 'alltime' })}
-                                                        style={{ accentColor: isDark ? colors.accent : colors.accentDark }}
-                                                    />
-                                                    All Time Max
-                                                </label>
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', marginTop: '10px', paddingTop: '10px', borderTop: `1px solid ${colors.border}` }}>
-                                            <label style={{ color: colors.textMain, fontWeight: 'bold' }}>Göm inaktiva fartyg efter (minuter)</label>
-                                            <input
-                                                type="number" min="1" max="1440"
-                                                value={mqttSettings.ship_timeout}
-                                                onChange={(e) => setMqttSettings({ ...mqttSettings, ship_timeout: e.target.value })}
-                                                style={{
-                                                    background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain,
-                                                    padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box'
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '10px', border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', gap: '15px', overflow: 'hidden' }}>
-                                        <h3 style={{ margin: 0, color: colors.textMain, fontSize: '1.1rem', borderBottom: `1px solid ${colors.border}`, paddingBottom: '8px' }}>MQTT Server</h3>
-
-                                        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: colors.textMain, cursor: 'pointer' }}>
-                                            <input
-                                                type="checkbox"
-                                                checked={mqttSettings.mqtt_enabled === 'true'}
-                                                onChange={(e) => setMqttSettings({ ...mqttSettings, mqtt_enabled: e.target.checked ? 'true' : 'false' })}
-                                                style={{ accentColor: isDark ? colors.accent : colors.accentDark, width: '18px', height: '18px' }}
-                                            />
-                                            Aktivera MQTT-mottagning
-                                        </label>
-
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                            <label style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Broker URL & Topic</label>
-                                            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '10px' }}>
-                                                <input
-                                                    type="text" placeholder="mqtt://din-broker:1883"
-                                                    value={mqttSettings.mqtt_url}
-                                                    onChange={(e) => setMqttSettings({ ...mqttSettings, mqtt_url: e.target.value })}
-                                                    style={{ background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain, padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
-                                                />
-                                                <input
-                                                    type="text" placeholder="ais/messages"
-                                                    value={mqttSettings.mqtt_topic}
-                                                    onChange={(e) => setMqttSettings({ ...mqttSettings, mqtt_topic: e.target.value })}
-                                                    style={{ background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain, padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                                <label style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Användarnamn</label>
-                                                <input
-                                                    type="text" placeholder="Frivilligt"
-                                                    value={mqttSettings.mqtt_user}
-                                                    onChange={(e) => setMqttSettings({ ...mqttSettings, mqtt_user: e.target.value })}
-                                                    style={{ background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain, padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
-                                                />
-                                            </div>
-                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                                                <label style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Lösenord</label>
-                                                <input
-                                                    type="password" placeholder="Frivilligt"
-                                                    value={mqttSettings.mqtt_pass}
-                                                    onChange={(e) => setMqttSettings({ ...mqttSettings, mqtt_pass: e.target.value })}
-                                                    style={{ background: colors.bgSidebar, border: `1px solid ${colors.border}`, color: colors.textMain, padding: '10px', borderRadius: '6px', outline: 'none', width: '100%', boxSizing: 'border-box', minWidth: 0 }}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <button
-                                        onClick={saveSettings}
-                                        style={{
-                                            background: isDark ? colors.accent : colors.accentDark,
-                                            color: isDark ? '#000' : '#fff',
-                                            border: 'none', padding: '12px', borderRadius: '6px', fontWeight: 'bold', fontSize: '1rem',
-                                            cursor: 'pointer', marginTop: '10px', transition: 'filter 0.2s'
-                                        }}
-                                        onMouseEnter={e => e.currentTarget.style.filter = 'brightness(1.1)'}
-                                        onMouseLeave={e => e.currentTarget.style.filter = 'brightness(1)'}
+                                ) : ships.map((ship: any, idx: number) => (
+                                    <div key={ship.mmsi} className={showFlash && flashedMmsis.has(ship.mmsi) ? 'ship-flash' : ''} style={{
+                                        padding: '12px 15px',
+                                        background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
+                                        borderRadius: '6px',
+                                        borderLeft: `4px solid ${getShipColor(ship.mmsi, ship.shiptype || ship.ship_type)}`,
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        cursor: 'pointer',
+                                        transition: 'transform 0.1s',
+                                        boxShadow: isDark ? 'none' : '0 1px 3px rgba(0,0,0,0.05)'
+                                    }}
+                                        onClick={() => setHoveredMmsi(hoveredMmsi === String(ship.mmsi) ? null : String(ship.mmsi))}
+                                        onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+                                        onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}
                                     >
-                                        Spara Alla Inställningar
-                                    </button>
-                                </>
-                            )}
+                                        <div style={{ flex: 1 }}>
+                                            <div style={{ fontWeight: 600, fontSize: '0.90rem', marginBottom: '2px', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
+                                                <span style={{
+                                                    whiteSpace: 'nowrap',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    maxWidth: '180px'
+                                                }}>
+                                                    {ship.name || ship.mmsi}
+                                                </span>
+                                            </div>
+                                            <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
+                                                {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)} • {ship.sog && ship.sog > 0.1 ? `${ship.sog.toFixed(1)} knop` : 'Ankrad/Förtöjd'}
+                                            </div>
+                                        </div>
+                                        <div style={{ textAlign: 'right', fontSize: '0.85rem', color: colors.textMain }}>
+                                            <div style={{ fontWeight: 600 }}>{ship.sog?.toFixed(1) ?? '--'} kn</div>
+                                            <div style={{ color: colors.textMuted }}>{ship.cog?.toFixed(0) ?? '--'}°</div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 )}
             </div>
+
+            {/* Settings Modal */}
+            <SettingsModal
+                isOpen={isSettingsModalOpen}
+                onClose={() => setIsSettingsModalOpen(false)}
+                settings={mqttSettings}
+                setSettings={setMqttSettings}
+                onSave={saveSettings}
+                activeTab={settingsTab}
+                setActiveTab={setSettingsTab}
+                colors={colors}
+            />
         </div>
     );
 }
