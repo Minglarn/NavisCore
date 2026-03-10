@@ -1,0 +1,10 @@
+# rtl-sdr udev rules
+# To install, copy this file to /etc/udev/rules.d/ and run:
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+
+# Realtek Semiconductor Corp. RTL2838 DVB-T
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", MODE:="0666", GROUP="plugdev"
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2832", MODE:="0666", GROUP="plugdev"
+
+# Catch-all for other common RTL-SDR devices
+SUBSYSTEMS=="usb", ATTRS{idVendor}=="0bda", ATTRS{idProduct}=="2838", ENV{ID_SOFTWARE_RADIO}="1", MODE="0666", GROUP="plugdev"

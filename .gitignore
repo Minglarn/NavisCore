@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# Node
+node_modules/
+dist/
+.eslintcache
+
+# Docker/Data
+data/
+*.db
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Project specific
+backend/data/
+frontend/dist/
+*.jpg
+!data/images/0.jpg # Keep the fallback image
