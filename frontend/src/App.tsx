@@ -1298,6 +1298,9 @@ export default function App() {
                                                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                                                             <span>Status:</span> <strong style={{ color: colors.textMain }}>{s.status_text || 'Unknown'}</strong>
                                                         </div>
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', borderTop: `1px solid ${colors.border}`, paddingTop: '4px' }}>
+                                                            <span>Messages:</span> <strong style={{ color: colors.textMain }}>{s.message_count || 1}</strong>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1403,7 +1406,7 @@ export default function App() {
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
-                                                {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)} • {ship.sog && ship.sog > 0.1 ? formatSpeed(ship.sog, mqttSettings.units) : 'Ankrad/Förtöjd'}
+                                                {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)} • {ship.sog && ship.sog > 0.1 ? formatSpeed(ship.sog, mqttSettings.units) : 'Ankrad/Förtöjd'} • {ship.message_count || 1} msg
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right', fontSize: '0.85rem', color: colors.textMain }}>

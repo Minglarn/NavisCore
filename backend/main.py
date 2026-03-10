@@ -430,10 +430,10 @@ async def process_ais_data(data: dict):
     }
 
     async with aiosqlite.connect(DB_PATH) as db:
-        await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen) VALUES (?, ?, ?, CURRENT_TIMESTAMP)', (mmsi_str, ship_name, data.get("callsign")))
+        await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
         
         # Build update query dynamically
-        update_fields = ["last_seen = CURRENT_TIMESTAMP"]
+        update_fields = ["last_seen = CURRENT_TIMESTAMP", "message_count = message_count + 1"]
         update_values = []
         if ship_name:
             update_fields.append("name = ?")
@@ -470,7 +470,7 @@ async def process_ais_data(data: dict):
         await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(update_values))
         
         # Read back whatever data we lacked in this specific incoming packet
-        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
@@ -488,6 +488,7 @@ async def process_ais_data(data: dict):
                     ship_data["destination"] = row[7]
                 if not ship_data["draught"] and row[8]:
                     ship_data["draught"] = row[8]
+                ship_data["message_count"] = row[9]
         
         # Ensure ship_type_text is always populated
         if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -779,6 +780,10 @@ async def startup_event():
 
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN length REAL")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN message_count INTEGER DEFAULT 0")
         except Exception: pass
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN width REAL")
