@@ -771,6 +771,7 @@ async def startup_event():
         # New settings
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('history_duration', '60')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('show_names_on_map', 'true')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('units', 'nautical')")
         
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN heading REAL")

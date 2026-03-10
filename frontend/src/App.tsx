@@ -302,6 +302,24 @@ function calculateBearing(lat1: number, lon1: number, lat2: number, lon2: number
     return (brng + 360) % 360;
 }
 
+// Unit Helpers
+function formatSpeed(knots: number | undefined, units: string) {
+    if (knots === undefined || knots === null) return '--';
+    if (units === 'metric') {
+        return `${(knots * 1.852).toFixed(1)} km/h`;
+    }
+    return `${knots.toFixed(1)} kn`;
+}
+
+function formatDistance(km: number | undefined, units: string) {
+    if (km === undefined || km === null) return '--';
+    if (units === 'metric') {
+        return `${km.toFixed(1)} km`;
+    }
+    return `${(km / 1.852).toFixed(1)} nm`;
+}
+
+
 function calculateDestinationPoint(lat: number, lon: number, distance: number, bearing: number) {
     const toRad = (x: number) => x * Math.PI / 180;
     const toDeg = (x: number) => x * 180 / Math.PI;
@@ -375,6 +393,16 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     value={settings.ship_timeout}
                                     onChange={e => setSettings({ ...settings, ship_timeout: e.target.value })}
                                 />
+                            </div>
+                            <div className="form-group">
+                                <div>
+                                    <label>Enheter (Units)</label>
+                                    <div className="description">Välj mellan Nautiska (Sjömil/Knop) eller Metriska (km/km/h)</div>
+                                </div>
+                                <select value={settings.units} onChange={e => setSettings({ ...settings, units: e.target.value })}>
+                                    <option value="nautical">Nautiska (nm, kn)</option>
+                                    <option value="metric">Metriska (km, km/h)</option>
+                                </select>
                             </div>
                             <div className="settings-section-title" style={{ marginTop: '10px' }}>Stationens Position</div>
                             <div className="form-group">
@@ -600,7 +628,8 @@ export default function App() {
         trail_opacity: '0.6',
         trail_enabled: 'true',
         sdr_ppm: '0',
-        sdr_gain: 'auto'
+        sdr_gain: 'auto',
+        units: 'nautical'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState('general');
@@ -634,7 +663,8 @@ export default function App() {
                     trail_opacity: data.trail_opacity || '0.6',
                     trail_enabled: data.trail_enabled || 'true',
                     sdr_ppm: data.sdr_ppm || '0',
-                    sdr_gain: data.sdr_gain || 'auto'
+                    sdr_gain: data.sdr_gain || 'auto',
+                    units: data.units || 'nautical'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -967,7 +997,7 @@ export default function App() {
                             gap: '8px'
                         }}>
                             <Navigation size={16} />
-                            Station Range: {maxDistance.toFixed(1)} km
+                            Station Range: {formatDistance(maxDistance, mqttSettings.units)}
                         </div>
                     )}
 
@@ -1084,7 +1114,7 @@ export default function App() {
                                         <Tooltip direction="top" offset={[0, -20]} opacity={0.9}>
                                             <div style={{ fontWeight: 'bold' }}>SDR Station</div>
                                             <div style={{ fontSize: '0.8rem' }}>{originLat.toFixed(4)}, {originLon.toFixed(4)}</div>
-                                            {maxDistance > 0 && <div style={{ fontSize: '0.8rem', color: '#0066cc', marginTop: '4px' }}>Range: {maxDistance.toFixed(1)} km</div>}
+                                            {maxDistance > 0 && <div style={{ fontSize: '0.8rem', color: '#0066cc', marginTop: '4px' }}>Range: {formatDistance(maxDistance, mqttSettings.units)}</div>}
                                         </Tooltip>
                                     </Marker>
 
@@ -1237,7 +1267,7 @@ export default function App() {
                                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0', border: `1px solid ${colors.border}`, borderRadius: '4px' }}>
                                                         <div style={{ padding: '8px', borderRight: `1px solid ${colors.border}` }}>
                                                             <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>SOG / COG:</div>
-                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{s.sog?.toFixed(1) ?? '--'}kn / {s.cog?.toFixed(0) ?? '--'}°</strong>
+                                                            <strong style={{ color: colors.textMain, fontSize: '0.9rem' }}>{formatSpeed(s.sog, mqttSettings.units)} / {s.cog?.toFixed(0) ?? '--'}°</strong>
                                                         </div>
                                                         <div style={{ padding: '8px' }}>
                                                             <div style={{ fontSize: '0.8rem', color: colors.textMuted }}>Dimensions / Altitude:</div>
@@ -1373,11 +1403,11 @@ export default function App() {
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: '0.80rem', color: 'var(--text-muted)' }}>
-                                                {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)} • {ship.sog && ship.sog > 0.1 ? `${ship.sog.toFixed(1)} knop` : 'Ankrad/Förtöjd'}
+                                                {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)} • {ship.sog && ship.sog > 0.1 ? formatSpeed(ship.sog, mqttSettings.units) : 'Ankrad/Förtöjd'}
                                             </div>
                                         </div>
                                         <div style={{ textAlign: 'right', fontSize: '0.85rem', color: colors.textMain }}>
-                                            <div style={{ fontWeight: 600 }}>{ship.sog?.toFixed(1) ?? '--'} kn</div>
+                                            <div style={{ fontWeight: 600 }}>{formatSpeed(ship.sog, mqttSettings.units)}</div>
                                             <div style={{ color: colors.textMuted }}>{ship.cog?.toFixed(0) ?? '--'}°</div>
                                         </div>
                                     </div>
