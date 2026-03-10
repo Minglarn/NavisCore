@@ -25,6 +25,9 @@ COPY --from=builder /src/rtl_ais /usr/local/bin/rtl_ais
 # Ensure we have the udev rules available in container just in case, though host handles devices
 COPY ./udev-rules/rtl-sdr.rules /etc/udev/rules.d/
 
-# Run rtl_ais: push UDP to the app container.
-# -n: NMEA output, -h: host, -P: port
-ENTRYPOINT ["/usr/local/bin/rtl_ais", "-n", "-h", "app", "-P", "10110"]
+# Add our custom startup script that handles ENV variables
+COPY ./start.sh /start.sh
+RUN chmod +x /start.sh
+
+# Run the wrapper script instead of rtl_ais directly
+ENTRYPOINT ["/start.sh"]

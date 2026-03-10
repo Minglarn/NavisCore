@@ -6,8 +6,11 @@ services:
       context: ./sdr
     container_name: naviscore_sdr
     restart: always # or unless-stopped
-    # devices:
-    #  - /dev/bus/usb:/dev/bus/usb # Avkommentera detta på Linux (t.ex. Raspberry Pi) för riktig SDR-åtkomst
+    devices:
+      - /dev/bus/usb:/dev/bus/usb # Kräver usbipd-win på Windows
+    environment:
+      - SDR_PPM=0
+      - SDR_GAIN=auto
     volumes:
       - ./sdr/udev-rules:/etc/udev/rules.d:ro
     # Healthcheck to see if the device is found by lsusb and rtl_ais is running
