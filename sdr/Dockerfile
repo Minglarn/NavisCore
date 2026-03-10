@@ -21,6 +21,8 @@ FROM alpine:3.19
 RUN apk add --no-cache \
     librtlsdr \
     libusb \
+    libstdc++ \
+    libgcc \
     usbutils \
     tzdata \
     curl \

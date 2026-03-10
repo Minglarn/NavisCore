@@ -234,7 +234,7 @@ def validate_checksum(nmea_sentence: str) -> bool:
 def to_6_bit_string(payload_char: str) -> str:
     """Converts a single ASCII payload character to its 6-bit binary representation."""
     val = ord(payload_char) - 48
-    if val > 40:
+    if val >= 40:
         val -= 8
     return f"{val:06b}"
 
@@ -277,10 +277,10 @@ def _decode_type_1_2_3(bitstr: str, data: dict):
         return
     nav_status = get_int_from_bits(bitstr, 38, 4)
     rot = get_int_from_bits(bitstr, 42, 8, signed=True)
-    sog = get_int_from_bits(bitstr, 46, 10) / 10.0
-    accuracy = get_int_from_bits(bitstr, 56, 1)
-    lon = get_int_from_bits(bitstr, 57, 28, signed=True) / 600000.0
-    lat = get_int_from_bits(bitstr, 85, 27, signed=True) / 600000.0
+    sog = get_int_from_bits(bitstr, 50, 10) / 10.0
+    accuracy = get_int_from_bits(bitstr, 60, 1)
+    lon = get_int_from_bits(bitstr, 61, 28, signed=True) / 600000.0
+    lat = get_int_from_bits(bitstr, 89, 27, signed=True) / 600000.0
     cog = get_int_from_bits(bitstr, 116, 12) / 10.0
     heading = get_int_from_bits(bitstr, 128, 9)
     timestamp = get_int_from_bits(bitstr, 137, 6)
