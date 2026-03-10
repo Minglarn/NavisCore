@@ -541,7 +541,7 @@ async def process_ais_data(data: dict):
                             await db.commit()
                 elif dist > MAX_VALID_RANGE_KM:
                     # Log tropo/anomaly but don't update range records
-                    logging.info(f"Anomalous range detected (TROPO?): {dist:.1f} km for ship {mmsi_str}")
+                    logging.info(f"Anomalous range detected (TROPO?): {dist:.1f} km for ship {mmsi_str} | ship_pos=({lat},{lon}) station=({olat},{olon})")
             except ValueError:
                 pass
 
