@@ -575,8 +575,12 @@ class UDPProtocol(asyncio.DatagramProtocol):
         
         message = data.decode('utf-8', errors='ignore').strip()
         
-        # Custom decoder handles ALL AIS message types (1-27)
-        self.stream_manager.process_sentence(message)
+        # AIS-catcher may send multiple NMEA sentences in a single UDP packet
+        for line in message.splitlines():
+            line = line.strip()
+            if line:
+                # Custom decoder handles ALL AIS message types (1-27)
+                self.stream_manager.process_sentence(line)
         
         # Forwarding logic
         if self.settings.get("forward_enabled") == "true":
