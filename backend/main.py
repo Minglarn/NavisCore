@@ -545,7 +545,8 @@ async def process_ais_data(data: dict):
             except ValueError:
                 pass
 
-    await broadcast(ship_data)
+    if not is_meteo:
+        await broadcast(ship_data)
 
 
 # UDP NMEA Listener & Forwarder
@@ -876,18 +877,32 @@ async def get_settings_api():
 
 @app.post("/api/settings")
 async def set_settings_api(settings: dict):
+    old_settings = await get_all_settings()
     for key, value in settings.items():
         if value is not None:
             await set_setting(key, str(value))
             
-    # Reset 24h range if origin is changed
-    if "origin_lat" in settings or "origin_lon" in settings:
-         async with aiosqlite.connect(DB_PATH) as db:
-            await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
-            await db.commit()
+    # Reset 24h range ONLY if origin has actually changed
+    new_lat = settings.get("origin_lat")
+    new_lon = settings.get("origin_lon")
+    
+    if new_lat is not None or new_lon is not None:
+        if str(new_lat) != old_settings.get("origin_lat") or str(new_lon) != old_settings.get("origin_lon"):
+             logger.info(f"[Settings] Station origin changed from ({old_settings.get('origin_lat')},{old_settings.get('origin_lon')}) to ({new_lat},{new_lon}). Resetting coverage.")
+             async with aiosqlite.connect(DB_PATH) as db:
+                await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
+                await db.commit()
             
     restart_mqtt()
     return {"success": True, "settings": await get_all_settings()}
+
+@app.post("/api/coverage/reset")
+async def reset_coverage():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
+        await db.commit()
+    logger.info("[Coverage] Manual reset of all range data")
+    return {"success": True}
 
 @app.get("/api/coverage")
 async def get_coverage():

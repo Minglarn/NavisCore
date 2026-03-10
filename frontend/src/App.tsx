@@ -337,6 +337,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
         { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} /> },
         { id: 'trail', label: 'Spårning', icon: <Navigation size={18} /> },
         { id: 'map', label: 'Karta', icon: <Sun size={18} /> },
+        { id: 'coverage', label: 'Räckvidd', icon: <Navigation size={18} /> },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} /> },
     ];
 
@@ -494,6 +495,44 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     checked={settings.show_range_rings === 'true'}
                                     onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
                                 />
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'coverage' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">Statistik & Räckvidd</div>
+                            <div className="form-group" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '15px' }}>
+                                <div className="description" style={{ fontSize: '0.9rem' }}>
+                                    Här kan du nollställa all sparad räckviddsdata för stationen. Detta tar bort både 24h-statistik och "All-time high".
+                                </div>
+                                <button
+                                    className="styled-button"
+                                    style={{
+                                        color: '#ff4444',
+                                        borderColor: '#ff4444',
+                                        padding: '10px 20px',
+                                        fontWeight: 'bold',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}
+                                    onClick={async () => {
+                                        if (window.confirm('Är du säker på att du vill nollställa all räckviddsstatistik?')) {
+                                            try {
+                                                const isDev = window.location.port === '5173';
+                                                const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
+                                                await fetch(fetchPath, { method: 'POST' });
+                                                alert('Statistik nollställd!');
+                                                window.location.reload();
+                                            } catch (e) {
+                                                alert('Ett fel uppstod.');
+                                            }
+                                        }
+                                    }}
+                                >
+                                    <X size={18} /> Nollställ all räckviddsdata
+                                </button>
                             </div>
                         </div>
                     )}
@@ -1289,7 +1328,7 @@ export default function App() {
                     }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
                             <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                Lokala Fartyg ({ships.length})
+                                Lokala Fartyg ({ships.filter(s => !s.is_meteo).length})
                             </h2>
                             <div style={{ display: 'flex', gap: '8px' }}>
                                 <button onClick={() => setIsSidebarOpen(false)} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer' }}>
@@ -1304,7 +1343,7 @@ export default function App() {
                                     <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                                         Inget fartyg på radarn ännu...
                                     </div>
-                                ) : ships.map((ship: any, idx: number) => (
+                                ) : ships.filter(s => !s.is_meteo).map((ship: any, idx: number) => (
                                     <div key={ship.mmsi} className={showFlash && flashedMmsis.has(ship.mmsi) ? 'ship-flash' : ''} style={{
                                         padding: '12px 15px',
                                         background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
