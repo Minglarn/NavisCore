@@ -105,7 +105,10 @@ async def get_all_settings():
         "trail_opacity": await get_setting("trail_opacity", "0.6"),
         "trail_enabled": await get_setting("trail_enabled", "true"),
         "sdr_ppm": await get_setting("sdr_ppm", "0"),
-        "sdr_gain": await get_setting("sdr_gain", "auto")
+        "sdr_gain": await get_setting("sdr_gain", "auto"),
+        "ship_size": await get_setting("ship_size", "1.0"),
+        "circle_size": await get_setting("circle_size", "1.0"),
+        "trail_size": await get_setting("trail_size", "2.0")
     }
 
 # WebSockets
@@ -356,8 +359,13 @@ async def process_ais_data(data: dict):
     mmsi_val = data.get("mmsi")
     if not mmsi_val:
         return
-    mmsi_str = str(mmsi_val)
     msg_type = data.get("type", 0)
+    
+    # ── IMMEDIATE DISCARD for Type 8 (Binary Broadcast / Meteo) ──
+    if msg_type == 8:
+        return
+
+    mmsi_str = str(mmsi_val)
     lat = data.get("lat")
     lon = data.get("lon")
 
@@ -434,6 +442,9 @@ async def process_ais_data(data: dict):
     origin_lon_str = settings.get("origin_lon")
 
     is_meteo = data.get("is_meteo", False) or msg_type in [4, 8]
+    if is_meteo:
+        return
+        
     is_aton = data.get("is_aton", False)
     
     asyncio.create_task(enrich_ship_data(mmsi_str))
@@ -849,6 +860,9 @@ async def startup_event():
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('history_duration', '60')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('show_names_on_map', 'true')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('units', 'nautical')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ship_size', '1.0')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('circle_size', '1.0')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('trail_size', '2.0')")
         
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN heading REAL")
@@ -894,7 +908,7 @@ async def get_ships():
         row = await cursor.fetchone()
         duration_min = int(row["value"]) if row else 60
 
-        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL")
+        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL AND (name NOT LIKE '%METEO%' AND name NOT LIKE '%VÄDER%')")
         rows = await cursor.fetchall()
         result = []
         for row in rows:

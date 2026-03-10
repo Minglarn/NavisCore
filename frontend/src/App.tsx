@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio } from 'lucide-react';
@@ -133,30 +133,35 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     return emoji;
 }
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean) {
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0) {
     const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
     const isAircraft = type === 9;
     const color = getShipColor(mmsi, type);
-    const borderColor = '#000000'; // Dark border for contrast
+    const borderColor = '#000000';
 
     let svg = '';
+    // Increase hit area: Use a larger container size but keep SVG centered and correctly scaled
+    const baseHitArea = 44; // Standard touch/click target size
+    const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
     if (isAircraft) {
-        // Airplane icon
         const rotation = cog !== undefined ? cog : 0;
-        svg = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg);">
+        const size = 24 * shipScale;
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg);">
                  <circle cx="12" cy="12" r="11" fill="rgba(255, 0, 0, 0.8)" stroke="white" stroke-width="1.5" />
                  <path d="M21,16 L21,14 L14,10 L14,3.5 C14,2.67 13.33,2 12.5,2 C11.67,2 11,2.67 11,3.5 L11,10 L4,14 L4,16 L11,14 L11,19 L9,20.5 L9,22 L12.5,21 L16,22 L16,20.5 L14,19 L14,14 L21,16 Z" fill="white" />
                </svg>`;
     } else if (isMoving) {
-        // Triangel
-        svg = `<svg width="24" height="24" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);">
-                 <polygon points="12,2 22,20 12,17 2,20" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
+        // Enlongated Ship-like Polygon (Pointer at 12,2)
+        const size = 26 * shipScale;
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);">
+                 <polygon points="12,2 19,10 17,22 7,22 5,10" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
                           class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
     } else {
-        // Cirkel
-        svg = `<svg width="16" height="16" viewBox="0 0 16 16">
+        // Circle for stationary
+        const size = 16 * circleScale;
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 16 16">
                  <circle cx="8" cy="8" r="6" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
                          class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
@@ -165,8 +170,8 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     return L.divIcon({
         html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%;">${svg}</div>`,
         className: 'ship-custom-icon-container',
-        iconSize: isMoving || isAircraft ? [24, 24] : [16, 16],
-        iconAnchor: isMoving || isAircraft ? [12, 12] : [8, 8]
+        iconSize: [hitAreaSize, hitAreaSize],
+        iconAnchor: [hitAreaSize / 2, hitAreaSize / 2]
     });
 }
 
@@ -549,6 +554,28 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
                                 />
                             </div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Storlek på objekt</div>
+                            <div className="form-group vertical">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <label>Fartyg (Moving)</label>
+                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.ship_size}x</span>
+                                </div>
+                                <input type="range" min="0.5" max="3" step="0.1" value={settings.ship_size} onChange={e => setSettings({ ...settings, ship_size: e.target.value })} style={{ width: '100%' }} />
+                            </div>
+                            <div className="form-group vertical">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <label>Stationära / Meteo</label>
+                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
+                                </div>
+                                <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
+                            </div>
+                            <div className="form-group vertical">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <label>Spårtjocklek (Trail)</label>
+                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
+                                </div>
+                                <input type="range" min="1" max="10" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
+                            </div>
                         </div>
                     )}
 
@@ -654,7 +681,10 @@ export default function App() {
         trail_enabled: 'true',
         sdr_ppm: '0',
         sdr_gain: 'auto',
-        units: 'nautical'
+        units: 'nautical',
+        ship_size: '1.0',
+        circle_size: '1.0',
+        trail_size: '2.0'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState('general');
@@ -665,6 +695,7 @@ export default function App() {
         return saved ? parseInt(saved) : 380;
     });
     const [isResizing, setIsResizing] = useState(false);
+    const hoverTimerRef = useRef<number | null>(null);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -695,7 +726,10 @@ export default function App() {
                     trail_enabled: data.trail_enabled || 'true',
                     sdr_ppm: data.sdr_ppm || '0',
                     sdr_gain: data.sdr_gain || 'auto',
-                    units: data.units || 'nautical'
+                    units: data.units || 'nautical',
+                    ship_size: data.ship_size || '1.0',
+                    circle_size: data.circle_size || '1.0',
+                    trail_size: data.trail_size || '2.0'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -765,7 +799,10 @@ export default function App() {
             .then(r => r.json())
             .then((data: any[]) => {
                 if (Array.isArray(data) && data.length > 0) {
-                    setShips(data.filter((s: any) => s.lat && s.lon));
+                    setShips(data.filter((s: any) => {
+                        const nameUpper = (s.name || "").toUpperCase();
+                        return s.lat && s.lon && !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+                    }));
                 }
             })
             .catch(console.error);
@@ -774,6 +811,9 @@ export default function App() {
         ws.onopen = () => setStatus('Ansluten till NavisCore');
         ws.onmessage = (event: MessageEvent) => {
             const data = JSON.parse(event.data);
+            const nameUpper = (data.name || "").toUpperCase();
+            if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER')) return;
+
             if (data.type === 'status') {
                 setStatus('Status: ' + data.message);
             } else if (data.type === 'mqtt_status') {
@@ -1211,7 +1251,8 @@ export default function App() {
 
                             {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
-                                if (!s.lat || !s.lon) return null;
+                                const nameUpper = (s.name || "").toUpperCase();
+                                if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER')) return null;
 
                                 // Smart Label Logic:
                                 // 1. Zoom > 13: Show all names
@@ -1225,11 +1266,40 @@ export default function App() {
                                     else if (currentZoom <= 11 && idx % 10 === 0) shouldShowName = true;
                                 }
 
+                                const cog = s.course ?? s.cog;
+                                const icon = ShipIcon(
+                                    s.sog,
+                                    cog,
+                                    mmsiStr,
+                                    s.shiptype || s.ship_type,
+                                    showFlash && flashedMmsis.has(mmsiStr),
+                                    parseFloat(mqttSettings.ship_size),
+                                    parseFloat(mqttSettings.circle_size)
+                                );
+
                                 return (
-                                    <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={ShipIcon(s.sog, s.cog, mmsiStr, s.shiptype || s.ship_type, showFlash && flashedMmsis.has(mmsiStr))}
+                                    <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={icon}
                                         eventHandlers={{
-                                            mouseover: () => setHoveredMmsi(mmsiStr),
-                                            mouseout: () => setHoveredMmsi(null)
+                                            mouseover: () => {
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                hoverTimerRef.current = setTimeout(() => {
+                                                    setHoveredMmsi(mmsiStr);
+                                                }, 1000);
+                                            },
+                                            mouseout: () => {
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                setHoveredMmsi(null);
+                                            },
+                                            click: (e) => {
+                                                // If we have a tooltip open, clear it when clicking (opening popup)
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                setHoveredMmsi(null);
+                                            },
+                                            dblclick: (e) => {
+                                                // Explicitly for double click as requested
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                setHoveredMmsi(null);
+                                            }
                                         }}
                                     >
                                         {/* Smart Label (Fast text under ship) */}
@@ -1364,7 +1434,8 @@ export default function App() {
 
                             {/* Ship History Trails */}
                             {ships.map((s: any) => {
-                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2) return null;
+                                const nameUpper = (s.name || "").toUpperCase();
+                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2 || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER')) return null;
                                 const isHovered = hoveredMmsi === String(s.mmsi);
                                 return (
                                     <Polyline
@@ -1372,7 +1443,7 @@ export default function App() {
                                         positions={s.history}
                                         pathOptions={{
                                             color: isHovered ? '#00f0ff' : mqttSettings.trail_color,
-                                            weight: isHovered ? 3 : 2,
+                                            weight: isHovered ? Math.max(parseFloat(mqttSettings.trail_size) + 2, 4) : parseFloat(mqttSettings.trail_size),
                                             opacity: isHovered ? 1 : parseFloat(mqttSettings.trail_opacity),
                                             dashArray: isHovered ? undefined : '5, 5'
                                         }}
@@ -1431,7 +1502,10 @@ export default function App() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
                                 <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                    Lokala Fartyg ({ships.filter(s => !s.is_meteo).length})
+                                    Lokala Fartyg ({ships.filter(s => {
+                                        const nameUpper = (s.name || "").toUpperCase();
+                                        return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+                                    }).length})
                                 </h2>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <select
@@ -1472,7 +1546,10 @@ export default function App() {
                                             Inget fartyg på radarn ännu...
                                         </div>
                                     ) : ships
-                                        .filter(s => !s.is_meteo)
+                                        .filter(s => {
+                                            const nameUpper = (s.name || "").toUpperCase();
+                                            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+                                        })
                                         .map(s => {
                                             const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
                                                 ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
