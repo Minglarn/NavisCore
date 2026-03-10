@@ -575,6 +575,12 @@ async def process_ais_data(data: dict):
                 olon = float(origin_lon_str)
                 dist = haversine_distance(olat, olon, lat, lon)
                 
+                # NEW: Noise filter for Range. 
+                # We only count objects that have sent at least 2 messages.
+                msg_count = ship_data.get("message_count", 0)
+                if msg_count < 2:
+                    return # Stop here for range tracking, but ship is still processed for map
+
                 # Max valid range is 200 Nm (approx 370.4 km). Anything over is TROPO or noise.
                 MAX_VALID_RANGE_KM = 370.4
                 if dist >= 1.0 and dist <= MAX_VALID_RANGE_KM:

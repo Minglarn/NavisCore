@@ -700,7 +700,18 @@ export default function App() {
     const filteredShipsCount = useMemo(() => {
         return ships.filter(s => {
             const nameUpper = (s.name || "").toUpperCase();
-            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+            const mmsiStr = String(s.mmsi || "");
+            const type = s.shiptype || s.ship_type;
+            const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER');
+            if (isMeteo) return false;
+
+            // Exclude ATONs (Buoys/Beacons/etc)
+            if (mmsiStr.startsWith('99') || (type >= 91 && type <= 99)) return false;
+
+            // Exclude Aircraft (SAR typically type 18)
+            if (type === 18) return false;
+
+            return true;
         }).length;
     }, [ships]);
 
@@ -1183,7 +1194,7 @@ export default function App() {
                             style={{ background: isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => { if (!isSidebarOpen) e.currentTarget.style.background = 'transparent' }}
-                            title="Fartygslista"
+                            title="Objektlista"
                         >
                             <List size={22} />
                         </button>
@@ -1525,7 +1536,7 @@ export default function App() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
                                 <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                    Lokala Fartyg ({ships.filter(s => {
+                                    Lokala Objekt ({ships.filter(s => {
                                         const nameUpper = (s.name || "").toUpperCase();
                                         return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
                                     }).length})
@@ -1566,7 +1577,7 @@ export default function App() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {ships.length === 0 ? (
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                            Inget fartyg på radarn ännu...
+                                            Inget objekt på radarn ännu...
                                         </div>
                                     ) : ships
                                         .filter(s => {
