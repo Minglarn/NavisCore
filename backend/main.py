@@ -757,6 +757,11 @@ async def startup_event():
         )''')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_ship_history_mmsi_ts ON ship_history (mmsi, timestamp)")
 
+        await db.execute('''CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT
+        )''')
+
         # Settings updates
         # New settings
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('history_duration', '60')")
@@ -772,11 +777,6 @@ async def startup_event():
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN width REAL")
         except Exception: pass
-        
-        await db.execute('''CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )''')
         
         await db.execute('''CREATE TABLE IF NOT EXISTS coverage_sectors (
             sector_id INTEGER PRIMARY KEY,

@@ -34,8 +34,7 @@ fi
 # Build command
 CMD="/usr/local/bin/rtl_ais -n -h app -P 10110 -d $INDEX -p $PPM"
 
-if [ "$GAIN" = "auto" ] || [ "$GAIN" = "AGC" ] || [ -z "$GAIN" ]; then
-    CMD="$CMD -a"
+    # Do nothing, auto is default when -g is omitted
 else
     CMD="$CMD -g $GAIN"
 fi
