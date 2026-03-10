@@ -467,6 +467,16 @@ async def process_ais_data(data: dict):
         "draught": data.get("draught"),
     }
 
+    # Validate Navigational Status against Speed (SOG)
+    # If reporting "Under way" (0 or 8) but SOG is essentially 0, override to "Moored" (5)
+    sog_val = ship_data.get("sog")
+    if sog_val is not None and sog_val < 0.1:
+        # 0 = Under way using engine, 8 = Under way sailing
+        current_status = data.get("nav_status")
+        if current_status in [0, 8]:
+            ship_data["status_text"] = "Moored (Stationary)"
+            ship_data["nav_status"] = 5
+
     async with aiosqlite.connect(DB_PATH) as db:
         await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
         
