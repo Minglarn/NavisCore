@@ -11,7 +11,7 @@ import aiomqtt
 import socket
 import math
 from datetime import datetime
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from ais_logic import AisStreamManager, get_ship_type_name, get_ship_category
@@ -282,11 +282,18 @@ async def enrich_ship_data(mmsi: str):
 
     try:
         async with aiosqlite.connect(DB_PATH) as db:
-            async with db.execute('SELECT image_fetched_at, image_url FROM ships WHERE mmsi = ?', (mmsi,)) as cursor:
+            async with db.execute('SELECT image_fetched_at, image_url, manual_image FROM ships WHERE mmsi = ?', (mmsi,)) as cursor:
                 row = await cursor.fetchone()
-                if row and row[0]:
-                    fetch_date = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                    image_url = row[1]
+                if row:
+                    manual_image = row[2]
+                    # If user uploaded manually, skip further automatic fetching
+                    if manual_image:
+                        active_lookups.remove(mmsi)
+                        return
+
+                    if row[0]:
+                        fetch_date = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                        image_url = row[1]
                     
                     # If we have a REAL image (not the placeholder 0.jpg and not empty)
                     if image_url and image_url != "/images/0.jpg":
@@ -423,6 +430,7 @@ async def process_ais_data(data: dict):
             )
             update_fields = ["last_seen = CURRENT_TIMESTAMP"]
             if reset_count:
+                update_fields.append("previous_seen = last_seen")
                 update_fields.append("message_count = 1")
             else:
                 update_fields.append("message_count = message_count + 1")
@@ -544,6 +552,7 @@ async def process_ais_data(data: dict):
         # Build update query dynamically
         update_fields = ["last_seen = CURRENT_TIMESTAMP"]
         if reset_count:
+            update_fields.append("previous_seen = last_seen")
             update_fields.append("message_count = 1")
         else:
             update_fields.append("message_count = message_count + 1")
@@ -594,8 +603,27 @@ async def process_ais_data(data: dict):
                 # Limit history to prevent excessive growth (e.g. keep last 200 points per ship in DB)
                 await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, now_ms))
         
+        # ── Statistics Tracking (Daily) ──
+        today_date = datetime.utcnow().strftime('%Y-%m-%d')
+        
+        # Increment total messages for today
+        await db.execute('''
+            INSERT INTO daily_stats (date, total_messages) VALUES (?, 1)
+            ON CONFLICT(date) DO UPDATE SET total_messages = total_messages + 1
+        ''', (today_date,))
+        
+        # Track unique ships
+        try:
+            await db.execute('INSERT INTO daily_mmsi (date, mmsi) VALUES (?, ?)', (today_date, mmsi_str))
+            # If successful (no UNIQUE constraint violation), increment unique_ships
+            await db.execute('''
+                UPDATE daily_stats SET unique_ships = unique_ships + 1 WHERE date = ?
+            ''', (today_date,))
+        except Exception:
+            pass # MMSI already counted for today
+        
         # Read back whatever data we lacked in this specific incoming packet
-        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
@@ -618,6 +646,15 @@ async def process_ais_data(data: dict):
                 ship_data["rot"] = row[11]
                 ship_data["imo"] = row[12]
                 ship_data["callsign"] = row[13]
+                
+                # Previous Seen
+                if row[14]:
+                    try:
+                        ps_dt = datetime.strptime(row[14], "%Y-%m-%d %H:%M:%S")
+                        ship_data["previous_seen"] = ps_dt.timestamp() * 1000
+                    except Exception: pass
+                    
+                ship_data["manual_image"] = bool(row[15])
         
         # Ensure ship_type_text is always populated
         if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -678,6 +715,14 @@ async def process_ais_data(data: dict):
                                     range_km_alltime = ?,
                                     last_updated = CURRENT_TIMESTAMP
                             ''', (sector, rng_24h, rng_all, rng_24h, rng_all))
+                            
+                            # Update max_range_km in daily_stats if this is a new daily record
+                            await db.execute('''
+                                UPDATE daily_stats 
+                                SET max_range_km = ? 
+                                WHERE date = ? AND ? > max_range_km
+                            ''', (dist, today_date, dist))
+                            
                             await db.commit()
                             await broadcast({
                                 "type": "coverage_update",
@@ -828,6 +873,11 @@ async def purge_job():
                                 logger.info(f"[Purge] Deleted old image: {filename}")
                                 
                 await db.execute("DELETE FROM ships WHERE last_seen < datetime('now', '-30 days')")
+                
+                # Clean up old daily_mmsi records (older than 7 days is enough to prevent huge DB)
+                logger.info("[Purge] Cleaning up old daily_mmsi records (>7 days)")
+                await db.execute("DELETE FROM daily_mmsi WHERE date < date('now', '-7 days')")
+                
                 await db.commit()
         except Exception as e:
             logger.error(f"[Purge] Error: {e}")
@@ -964,6 +1014,14 @@ async def startup_event():
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN rot REAL")
         except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN previous_seen DATETIME")
+        except Exception: pass
+        
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN manual_image BOOLEAN DEFAULT 0")
+        except Exception: pass
         
         await db.execute('''CREATE TABLE IF NOT EXISTS coverage_sectors (
             sector_id INTEGER PRIMARY KEY,
@@ -971,6 +1029,21 @@ async def startup_event():
             range_km_alltime REAL DEFAULT 0.0,
             last_updated DATETIME
         )''')
+        
+        # New: Statistics tracking tables
+        await db.execute('''CREATE TABLE IF NOT EXISTS daily_stats (
+            date TEXT PRIMARY KEY,
+            unique_ships INTEGER DEFAULT 0,
+            total_messages INTEGER DEFAULT 0,
+            max_range_km REAL DEFAULT 0.0
+        )''')
+        
+        await db.execute('''CREATE TABLE IF NOT EXISTS daily_mmsi (
+            date TEXT,
+            mmsi TEXT,
+            PRIMARY KEY (date, mmsi)
+        )''')
+        
         await db.commit()
 
     loop = asyncio.get_running_loop()
@@ -1050,6 +1123,13 @@ async def get_ships():
                 d["rot"] = row["rot"]
                 d["imo"] = row["imo"]
                 d["callsign"] = row["callsign"]
+                d["manual_image"] = bool(row["manual_image"])
+                
+                if d.get("previous_seen"):
+                    try:
+                        ps_dt = datetime.strptime(d["previous_seen"], "%Y-%m-%d %H:%M:%S")
+                        d["previous_seen"] = ps_dt.timestamp() * 1000
+                    except Exception: pass
                 
                 result.append(d)
             except Exception as e:
@@ -1097,6 +1177,76 @@ async def get_coverage():
         async with db.execute("SELECT sector_id, range_km_24h, range_km_alltime FROM coverage_sectors ORDER BY sector_id ASC") as cursor:
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
+
+@app.post("/api/ships/{mmsi}/image")
+async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
+    if not mmsi.isdigit():
+        return {"success": False, "error": "Invalid MMSI"}
+        
+    local_filename = f"{mmsi}.jpg"
+    local_path = os.path.join(IMAGES_DIR, local_filename)
+    
+    try:
+        with open(local_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        async with aiosqlite.connect(DB_PATH) as db:
+            await db.execute('''
+                UPDATE ships 
+                SET image_url = ?, manual_image = 1, image_fetched_at = CURRENT_TIMESTAMP
+                WHERE mmsi = ?
+            ''', (f"/images/{local_filename}", mmsi))
+            await db.commit()
+            
+        logger.info(f"[API] Manual image uploaded for {mmsi}")
+        
+        # We broadcast the new image URL immediately so connected clients update
+        # We need to construct a minimal ship update message via broadcast
+        await broadcast({
+            "type": "ais_data",
+            "mmsi": mmsi,
+            "imageUrl": f"/images/{local_filename}",
+            "manual_image": True,
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        })
+        
+        return {"success": True, "imageUrl": f"/images/{local_filename}"}
+        
+    except Exception as e:
+        logger.error(f"[API] Error uploading image for {mmsi}: {e}")
+        return {"success": False, "error": str(e)}
+
+@app.get("/api/statistics")
+async def get_statistics():
+    today_date = datetime.utcnow().strftime('%Y-%m-%d')
+    async with aiosqlite.connect(DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        
+        # 1. Get today's stats
+        cursor = await db.execute("SELECT unique_ships, total_messages, max_range_km FROM daily_stats WHERE date = ?", (today_date,))
+        today_row = await cursor.fetchone()
+        today_stats = dict(today_row) if today_row else {"unique_ships": 0, "total_messages": 0, "max_range_km": 0.0}
+        
+        # 2. Get all-time records
+        cursor = await db.execute("SELECT MAX(unique_ships) as max_ships, MAX(total_messages) as max_msgs, MAX(max_range_km) as max_rng FROM daily_stats")
+        all_row = await cursor.fetchone()
+        all_time_stats = {
+            "unique_ships": all_row["max_ships"] if all_row["max_ships"] else 0,
+            "total_messages": all_row["max_msgs"] if all_row["max_msgs"] else 0,
+            "max_range_km": round(all_row["max_rng"] if all_row["max_rng"] else 0.0, 1)
+        }
+        
+        # 3. Get recent history (last 14 days)
+        cursor = await db.execute("SELECT date, unique_ships, total_messages FROM daily_stats ORDER BY date DESC LIMIT 14")
+        history_rows = await cursor.fetchall()
+        history = [dict(row) for row in history_rows]
+        history.reverse() # Chronological order
+        
+        return {
+            "today": today_stats,
+            "all_time": all_time_stats,
+            "history": history
+        }
 
 @app.get("/api/status")
 async def get_status():

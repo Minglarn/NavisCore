@@ -6,3 +6,4 @@ aiosqlite
 httpx
 aiomqtt
 websockets
+python-multipart

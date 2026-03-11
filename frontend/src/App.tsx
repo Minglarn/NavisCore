@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 function CenterButton({ originLat, originLon }: { originLat: number, originLon: number }) {
@@ -431,7 +431,135 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
     return [toDeg(lat2), toDeg(lon2)];
 }
 
+function StatisticsModal({ isOpen, onClose, colors }: any) {
+    const [stats, setStats] = useState<any>(null);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setLoading(true);
+            const isDev = window.location.port === '5173';
+            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/statistics' : '/api/statistics';
+            fetch(fetchPath)
+                .then(r => r.json())
+                .then(data => {
+                    setStats(data);
+                    setLoading(false);
+                })
+                .catch(err => {
+                    console.error("Failed to fetch stats", err);
+                    setLoading(false);
+                });
+        }
+    }, [isOpen]);
+
+    if (!isOpen) return null;
+
+    const today = stats?.today || { unique_ships: 0, total_messages: 0, max_range_km: 0.0 };
+    const allTime = stats?.all_time || { unique_ships: 0, total_messages: 0, max_range_km: 0.0 };
+    const history = stats?.history || [];
+
+    // Calculate max values for the simple bar chart
+    const maxHistoryShips = Math.max(...history.map((h: any) => h.unique_ships), 1);
+
+    return (
+        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1200 }}>
+            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ width: '500px', padding: '0' }}>
+                <div style={{ padding: '20px 25px', borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(0,0,0,0.05)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <BarChart2 size={24} color="#44aaff" />
+                        <h2 style={{ margin: 0, fontSize: '1.2rem' }}>Traffic Statistics</h2>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: colors.textMuted }}>
+                        <X size={24} />
+                    </button>
+                </div>
+
+                <div style={{ padding: '25px', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                    {loading ? (
+                        <div style={{ textAlign: 'center', color: colors.textMuted, padding: '40px 0' }}>Loading statistics...</div>
+                    ) : (
+                        <>
+                            {/* Current vs All Time Grid */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
+                                {/* Unique Ships */}
+                                <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, textTransform: 'uppercase', marginBottom: '8px' }}>Unique Ships</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#44aaff' }}>{today.unique_ships}</div>
+                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, marginTop: '5px' }}>
+                                        All-Time: <strong>{allTime.unique_ships}</strong>
+                                    </div>
+                                </div>
+
+                                {/* Messages */}
+                                <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, textTransform: 'uppercase', marginBottom: '8px' }}>Messages</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#44aaff' }}>{today.total_messages.toLocaleString()}</div>
+                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, marginTop: '5px' }}>
+                                        All-Time: <strong>{allTime.total_messages.toLocaleString()}</strong>
+                                    </div>
+                                </div>
+
+                                {/* Max Range */}
+                                <div style={{ background: colors.bgCard, padding: '15px', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, textTransform: 'uppercase', marginBottom: '8px' }}>Max Range</div>
+                                    <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#44aaff' }}>{today.max_range_km.toFixed(1)} <span style={{fontSize: '1rem'}}>km</span></div>
+                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, marginTop: '5px' }}>
+                                        All-Time: <strong>{allTime.max_range_km.toFixed(1)} km</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* History Chart */}
+                            <div>
+                                <div className="settings-section-title" style={{ marginBottom: '15px' }}>7-Day History (Unique Ships)</div>
+                                {history.length > 0 ? (
+                                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '8px', height: '120px', padding: '10px 0', borderBottom: `1px solid ${colors.border}` }}>
+                                        {history.map((h: any, i: number) => {
+                                            const heightPct = Math.max((h.unique_ships / maxHistoryShips) * 100, 5); // Minimum 5% height
+                                            const isToday = h.date === new Date().toISOString().split('T')[0];
+                                            
+                                            // Format date short (e.g., "Mar 11")
+                                            const dateObj = new Date(h.date);
+                                            const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                                            return (
+                                                <div key={h.date} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px' }} title={`${h.date}: ${h.unique_ships} ships`}>
+                                                    <div style={{ 
+                                                        width: '100%', 
+                                                        height: `${heightPct}%`, 
+                                                        background: isToday ? 'linear-gradient(to top, #44aaff, #00d2ff)' : colors.border,
+                                                        borderRadius: '4px 4px 0 0',
+                                                        transition: 'height 0.3s ease'
+                                                    }}></div>
+                                                    <div style={{ fontSize: '0.65rem', color: isToday ? '#44aaff' : colors.textMuted, textAlign: 'center', whiteSpace: 'nowrap' }}>
+                                                        {dateStr}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div style={{ color: colors.textMuted, fontStyle: 'italic', fontSize: '0.9rem' }}>Not enough data yet.</div>
+                                )}
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+    const [localImage, setLocalImage] = useState<string | null>(null);
+
+    useEffect(() => {
+        setLocalImage(ship ? ship.imageUrl : null);
+    }, [ship]);
+
     if (!isOpen || !ship) return null;
 
     const mmsiStr = String(ship.mmsi);
@@ -461,19 +589,67 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'Length', value: ship.length ? `${ship.length}m` : '--' },
         { label: 'Width', value: ship.width ? `${ship.width}m` : '--' },
         { label: 'Messages', value: ship.message_count || '--' },
-        { label: 'Last Seen', value: getTimeAgo(ship.timestamp) },
+        { label: 'Last Signal', value: getTimeAgo(ship.timestamp) },
+        { label: 'Previous Seen', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
     ];
 
     return (
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ height: 'auto', maxHeight: '90vh', width: '600px' }}>
                 <div style={{ position: 'relative', width: '100%', height: '250px', background: colors.bgMain }}>
-                    {ship.imageUrl && ship.imageUrl !== "/images/0.jpg" ? (
-                        <div style={{ width: '100%', height: '100%', backgroundImage: `url(${ship.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        accept="image/jpeg, image/png, image/webp"
+                        onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            
+                            setUploading(true);
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            
+                            try {
+                                const isDev = window.location.port === '5173';
+                                const uploadUrl = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/image` : `/api/ships/${mmsiStr}/image`;
+                                
+                                const res = await fetch(uploadUrl, {
+                                    method: 'POST',
+                                    body: formData
+                                });
+                                
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    const newUrl = `${data.image_url}?t=${Date.now()}`;
+                                    setLocalImage(newUrl);
+                                    ship.imageUrl = newUrl;
+                                    ship.manual_image = true;
+                                } else {
+                                    alert("Image upload failed");
+                                }
+                            } catch (err) {
+                                console.error(err);
+                                alert("Upload error");
+                            } finally {
+                                setUploading(false);
+                            }
+                        }}
+                    />
+                    
+                    {localImage && localImage !== "/images/0.jpg" ? (
+                        <div 
+                            title="Click to upload custom image"
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{ width: '100%', height: '100%', backgroundImage: `url(${localImage})`, backgroundSize: 'cover', backgroundPosition: 'center', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }} 
+                        />
                     ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, gap: '10px' }}>
+                        <div 
+                            title="Click to upload custom image"
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
                             <Ship size={64} />
-                            <span>No image available</span>
+                            <span>{uploading ? 'Uploading...' : 'Click to upload custom image'}</span>
                         </div>
                     )}
                     <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(4px)' }}>
@@ -864,6 +1040,7 @@ export default function App() {
         trail_size: '2.0'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState('general');
 
     const [selectedShipMmsi, setSelectedShipMmsi] = useState<string | null>(null);
@@ -1388,6 +1565,15 @@ export default function App() {
 
                     <div style={{ display: 'flex', gap: '5px', borderLeft: `1px solid ${colors.border}`, paddingLeft: '15px' }}>
                         <button
+                            onClick={() => setIsStatsModalOpen(true)}
+                            style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            title="Statistics"
+                        >
+                            <BarChart2 size={22} />
+                        </button>
+                        <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                             style={{ background: isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
@@ -1612,7 +1798,8 @@ export default function App() {
                                                             {s.callsign && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{s.callsign}</span>}
                                                         </div>
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                            Messages: {s.message_count || 1} • Last Seen: {getTimeAgo(s.timestamp)}
+                                                            Messages: {s.message_count || 1} • Last Signal: {getTimeAgo(s.timestamp)}
+                                                            {s.previous_seen && <span> • Prev. Seen: {getTimeAgo(s.previous_seen)}</span>}
                                                         </div>
                                                         {s.status_text && (
                                                             <div style={{ fontSize: '0.75rem', color: '#44aaff', fontWeight: 'bold', marginTop: '2px' }}>
@@ -1909,13 +2096,18 @@ export default function App() {
                 colors={colors}
             />
 
-            {/* Vessel Detail Modal */}
             <VesselDetailModal
                 isOpen={!!selectedShipMmsi}
                 onClose={() => setSelectedShipMmsi(null)}
                 ship={ships.find((s: any) => String(s.mmsi) === selectedShipMmsi)}
                 colors={colors}
                 mqttSettings={mqttSettings}
+            />
+
+            <StatisticsModal
+                isOpen={isStatsModalOpen}
+                onClose={() => setIsStatsModalOpen(false)}
+                colors={colors}
             />
         </div>
     );
