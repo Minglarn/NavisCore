@@ -368,6 +368,120 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
     return [toDeg(lat2), toDeg(lon2)];
 }
 
+function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any) {
+    if (!isOpen || !ship) return null;
+
+    const mmsiStr = String(ship.mmsi);
+    const infoBlocks = [
+        { label: 'MMSI', value: mmsiStr },
+        { label: 'IMO', value: ship.imo || '--' },
+        { label: 'Callsign', value: ship.callsign || '--' },
+        { label: 'Fartygstyp', value: ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'N/A') },
+    ];
+
+    const navBlocks = [
+        { label: 'Position', value: `${ship.lat.toFixed(4)}, ${ship.lon.toFixed(4)}` },
+        { label: 'Hastighet (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
+        { label: 'Kurs (COG)', value: ship.cog != null ? `${ship.cog.toFixed(1)}°` : '--' },
+        { label: 'Heading', value: ship.heading != null ? `${ship.heading}°` : '--' },
+        { label: 'ROT (Turn)', value: ship.rot != null ? `${ship.rot}°/min` : '--' },
+        { label: 'Status', value: ship.status_text || 'Okänd' },
+    ];
+
+    const voyageBlocks = [
+        { label: 'Destination', value: ship.destination || '--' },
+        { label: 'ETA', value: ship.eta || '--' },
+        { label: 'Djupgående', value: ship.draught ? `${ship.draught}m` : '--' },
+    ];
+
+    const specBlocks = [
+        { label: 'Längd', value: ship.length ? `${ship.length}m` : '--' },
+        { label: 'Bredd', value: ship.width ? `${ship.width}m` : '--' },
+        { label: 'Meddelanden', value: ship.message_count || '--' },
+        { label: 'Senast sedd', value: getTimeAgo(ship.timestamp) },
+    ];
+
+    return (
+        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
+            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ height: 'auto', maxHeight: '90vh', width: '600px' }}>
+                <div style={{ position: 'relative', width: '100%', height: '250px', background: colors.bgMain }}>
+                    {ship.imageUrl && ship.imageUrl !== "/images/0.jpg" ? (
+                        <div style={{ width: '100%', height: '100%', backgroundImage: `url(${ship.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
+                    ) : (
+                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, gap: '10px' }}>
+                            <Ship size={64} />
+                            <span>Ingen bild tillgänglig</span>
+                        </div>
+                    )}
+                    <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(4px)' }}>
+                        <X size={20} />
+                    </button>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '2.5rem' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                            <div>
+                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{ship.name || 'Okänt Fartyg'}</h1>
+                                <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>{ship.ship_type_text}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="settings-content" style={{ padding: '25px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                        <div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>Information</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
+                                {infoBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Resa</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
+                                {voyageBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>Navigation</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
+                                {navBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600, color: b.label === 'Status' && b.value.includes('Moored') ? '#ffaa00' : 'inherit' }}>{b.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Specifikation & Statistik</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
+                                {specBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style={{ padding: '15px 25px', borderTop: `1px solid ${colors.border}`, textAlign: 'right', background: 'rgba(0,0,0,0.1)' }}>
+                    <button className="styled-button primary" onClick={onClose} style={{ borderRadius: '8px', padding: '10px 25px' }}>Stäng</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function Toggle({ checked, onChange }: { checked: boolean, onChange: (val: boolean) => void }) {
     return (
         <label className="switch">
@@ -688,13 +802,17 @@ export default function App() {
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState('general');
+
+    const [selectedShipMmsi, setSelectedShipMmsi] = useState<string | null>(null);
+
+    const [isResizing, setIsResizing] = useState(false);
+    const isResizingRef = useRef(isResizing);
     const [currentZoom, setCurrentZoom] = useState(10);
     const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'last_seen', direction: 'desc' });
     const [sidebarWidth, setSidebarWidth] = useState(() => {
         const saved = localStorage.getItem('naviscore_sidebar_width');
         return saved ? parseInt(saved) : 380;
     });
-    const [isResizing, setIsResizing] = useState(false);
     const hoverTimerRef = useRef<number | null>(null);
 
     const filteredShipsCount = useMemo(() => {
@@ -1638,7 +1756,10 @@ export default function App() {
                                                     border: `1px solid ${colors.border}`,
                                                     marginBottom: '8px'
                                                 }}
-                                                onClick={() => setHoveredMmsi(hoveredMmsi === String(ship.mmsi) ? null : String(ship.mmsi))}
+                                                onClick={() => {
+                                                    setHoveredMmsi(String(ship.mmsi));
+                                                    setSelectedShipMmsi(String(ship.mmsi));
+                                                }}
                                                 onMouseEnter={e => {
                                                     e.currentTarget.style.transform = 'translateX(-4px)';
                                                     e.currentTarget.style.borderColor = '#44aaff';
@@ -1713,6 +1834,15 @@ export default function App() {
                 activeTab={settingsTab}
                 setActiveTab={setSettingsTab}
                 colors={colors}
+            />
+
+            {/* Vessel Detail Modal */}
+            <VesselDetailModal
+                isOpen={!!selectedShipMmsi}
+                onClose={() => setSelectedShipMmsi(null)}
+                ship={ships.find((s: any) => String(s.mmsi) === selectedShipMmsi)}
+                colors={colors}
+                mqttSettings={mqttSettings}
             />
         </div>
     );

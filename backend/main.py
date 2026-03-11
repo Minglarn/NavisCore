@@ -410,6 +410,9 @@ async def process_ais_data(data: dict):
             if data.get("destination"):
                 update_fields.append("destination = ?")
                 update_values.append(data.get("destination"))
+            if data.get("eta"):
+                update_fields.append("eta = ?")
+                update_values.append(data.get("eta"))
             if data.get("imo"):
                 update_fields.append("imo = ?")
                 update_values.append(data.get("imo"))
@@ -524,6 +527,9 @@ async def process_ais_data(data: dict):
         if ship_data.get("heading") is not None:
             update_fields.append("heading = ?")
             update_values.append(ship_data["heading"])
+        if data.get("rot") is not None:
+            update_fields.append("rot = ?")
+            update_values.append(data.get("rot"))
             
         update_values.append(mmsi_str)
         await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(update_values))
@@ -537,7 +543,7 @@ async def process_ais_data(data: dict):
                 await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, now_ms))
         
         # Read back whatever data we lacked in this specific incoming packet
-        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
@@ -556,6 +562,10 @@ async def process_ais_data(data: dict):
                 if not ship_data["draught"] and row[8]:
                     ship_data["draught"] = row[8]
                 ship_data["message_count"] = row[9]
+                ship_data["eta"] = row[10]
+                ship_data["rot"] = row[11]
+                ship_data["imo"] = row[12]
+                ship_data["callsign"] = row[13]
         
         # Ensure ship_type_text is always populated
         if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -894,6 +904,14 @@ async def startup_event():
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN width REAL")
         except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN eta TEXT")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN rot REAL")
+        except Exception: pass
         
         await db.execute('''CREATE TABLE IF NOT EXISTS coverage_sectors (
             sector_id INTEGER PRIMARY KEY,
@@ -976,6 +994,10 @@ async def get_ships():
                 d["width"] = row["width"]
                 d["destination"] = row["destination"]
                 d["draught"] = row["draught"]
+                d["eta"] = row["eta"]
+                d["rot"] = row["rot"]
+                d["imo"] = row["imo"]
+                d["callsign"] = row["callsign"]
                 
                 result.append(d)
             except Exception as e:

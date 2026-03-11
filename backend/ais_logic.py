@@ -328,7 +328,17 @@ def _decode_type_5(bitstr: str, data: dict):
     data["to_stern"] = get_int_from_bits(bitstr, 249, 9)
     data["to_port"] = get_int_from_bits(bitstr, 258, 6)
     data["to_starboard"] = get_int_from_bits(bitstr, 264, 6)
-    data["draught"] = get_int_from_bits(bitstr, 274, 8) / 10.0
+    
+    # ETA: Month(4), Day(5), Hour(5), Minute(6) starting at bit 274
+    eta_month = get_int_from_bits(bitstr, 274, 4)
+    eta_day = get_int_from_bits(bitstr, 278, 5)
+    eta_hour = get_int_from_bits(bitstr, 283, 5)
+    eta_minute = get_int_from_bits(bitstr, 288, 6)
+    
+    if 1 <= eta_month <= 12 and 1 <= eta_day <= 31:
+        data["eta"] = f"{eta_month:02d}-{eta_day:02d} {eta_hour:02d}:{eta_minute:02d}"
+    
+    data["draught"] = get_int_from_bits(bitstr, 294, 8) / 10.0
     data["destination"] = decode_6bit_string(bitstr, 302, 20)
     ship_info = get_ship_type_info(data["ship_type"])
     data["ship_type_text"] = ship_info["description"]
@@ -489,6 +499,7 @@ def _decode_type_18(bitstr: str, data: dict):
     data["cog"] = cog if cog < 360.0 else None
     data["heading"] = heading if heading < 511 else None
     data["status_text"] = "Class B"
+    # Class B Type 18 doesn't have ROT.
 
 
 def _decode_type_19(bitstr: str, data: dict):
