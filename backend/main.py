@@ -156,34 +156,46 @@ def get_country_code_from_mmsi(mmsi_str: str) -> str:
     
     mid = mmsi_str[:3]
     mid_map = {
-        "265": "se", "266": "se", # Sweden
-        "219": "dk", "220": "dk", # Denmark
-        "257": "no", "258": "no", "259": "no", # Norway
-        "230": "fi", # Finland
-        "211": "de", "218": "de", # Germany
-        "232": "gb", "233": "gb", "234": "gb", "235": "gb", # UK
-        "276": "ee", # Estonia
-        "275": "lv", # Latvia
-        "277": "lt", # Lithuania
-        "261": "pl", # Poland
-        "273": "ru", # Russia
-        "244": "nl", # Netherlands
-        "245": "nl", "246": "nl",
-        "205": "be", # Belgium
-        "226": "fr", "227": "fr", "228": "fr", # France
-        "247": "it", # Italy
-        "224": "es", # Spain
-        "304": "ag", # Antigua & Barbuda
-        "311": "bs", # Bahamas
-        "351": "pa", "352": "pa", "353": "pa", "354": "pa", "355": "pa", "356": "pa", "357": "pa", # Panama
-        "370": "pa", "371": "pa", "372": "pa", "373": "pa", "374": "pa",
-        "412": "cn", "413": "cn", "414": "cn", # China
-        "538": "mh", # Marshall Islands
-        "636": "lr", # Liberia
-        "248": "mt", # Malta
-        "210": "cy", # Cyprus
-        "212": "cy",
-        "215": "mt",
+        # Europe
+        "201": "al", "202": "ad", "203": "at", "204": "pt", "205": "be", "206": "by", "207": "bg", "208": "va",
+        "209": "cy", "210": "cy", "212": "cy", "229": "mt", "215": "mt", "248": "mt", "249": "mt", "256": "mt",
+        "211": "de", "218": "de", "213": "ge", "214": "md", "216": "am", "219": "dk", "220": "dk", "231": "fo",
+        "224": "es", "225": "es", "226": "fr", "227": "fr", "228": "fr", "230": "fi", "232": "gb", "233": "gb",
+        "234": "gb", "235": "gb", "236": "gi", "237": "gr", "239": "gr", "240": "gr", "241": "gr", "238": "hr",
+        "242": "ma", "243": "hu", "244": "nl", "245": "nl", "246": "nl", "247": "it", "250": "ie", "251": "is",
+        "252": "li", "253": "lu", "254": "mc", "255": "pt", "257": "no", "258": "no", "259": "no", "261": "pl",
+        "262": "me", "263": "pt", "264": "ro", "265": "se", "266": "se", "267": "sk", "268": "sm", "269": "ch",
+        "270": "cz", "271": "tr", "272": "ua", "273": "ru", "274": "mk", "275": "lv", "276": "ee", "277": "lt",
+        "278": "si", "279": "rs",
+        # North / Central America
+        "301": "ai", "303": "us", "304": "ag", "305": "ag", "306": "bq", "307": "aw", "308": "bs", "309": "bs",
+        "311": "bs", "310": "bm", "312": "bz", "314": "bb", "316": "ca", "319": "ky", "321": "cr", "323": "cu",
+        "325": "dm", "327": "do", "329": "gp", "330": "gd", "331": "gl", "332": "gt", "334": "hn", "336": "ht",
+        "338": "us", "366": "us", "367": "us", "368": "us", "369": "us", "339": "jm", "341": "kn", "343": "lc",
+        "345": "mx", "347": "mq", "348": "ms", "350": "ni", "351": "pa", "352": "pa", "353": "pa", "354": "pa",
+        "355": "pa", "356": "pa", "357": "pa", "370": "pa", "371": "pa", "372": "pa", "373": "pa", "358": "pr",
+        "359": "sv", "361": "pm", "362": "tt", "378": "vg", "379": "vi",
+        # Asia
+        "401": "af", "405": "bd", "408": "bh", "410": "bt", "412": "cn", "413": "cn", "414": "cn", "416": "cn",
+        "417": "ck", "418": "fj", "419": "pf", "421": "in", "423": "az", "427": "ir", "428": "iq", "431": "jp",
+        "432": "jp", "434": "jp", "436": "jp", "437": "kr", "438": "kp", "440": "mo", "441": "my", "443": "mv",
+        "445": "mu", "447": "mn", "449": "mm", "451": "np", "453": "om", "455": "pk", "457": "ph", "459": "qa",
+        "461": "sa", "463": "sg", "466": "lk", "468": "sy", "470": "tw", "471": "th", "473": "tl", "475": "ae",
+        "477": "vn", "478": "ba",
+        # Oceania / SE Asia
+        "501": "tf", "503": "au", "508": "bn", "514": "kh", "515": "kh", "536": "mp", "559": "as",
+        # Africa / Atlantic
+        "601": "za", "603": "ao", "605": "dz", "608": "sh", "609": "bi", "610": "bj", "611": "bw", "613": "cm",
+        "616": "km", "617": "cv", "618": "cf", "619": "td", "620": "cg", "621": "dj", "622": "eg", "624": "et",
+        "625": "er", "626": "gq", "627": "ga", "629": "gm", "630": "gh", "631": "gn", "632": "gw", "633": "bf",
+        "634": "ke", "635": "ls", "636": "lr", "637": "ly", "642": "mg", "644": "mw", "645": "ml", "647": "mr",
+        "649": "mu", "650": "mz", "654": "na", "655": "ne", "656": "ng", "657": "rw", "659": "sn", "660": "sc",
+        "661": "sl", "662": "so", "663": "sd", "664": "sz", "665": "tz", "666": "tg", "667": "tn", "668": "ug",
+        "669": "cd", "670": "zm", "671": "zw", "672": "na", "674": "tz", "675": "et", "676": "so", "677": "tz",
+        "678": "st", "679": "ci",
+        # South America
+        "701": "ar", "710": "br", "720": "bo", "725": "cl", "730": "co", "735": "ec", "740": "fk", "745": "gy",
+        "750": "py", "755": "pe", "760": "sr", "765": "uy", "770": "ve"
     }
     return mid_map.get(mid)
 
@@ -370,6 +382,7 @@ async def process_ais_data(data: dict):
     lon = data.get("lon")
 
     ship_name = data.get("shipname") or data.get("name")
+    settings = await get_all_settings()
 
     # ── Safety Messages (Type 12 & 14) — broadcast to all WebSocket clients ──
     if data.get("is_safety"):
@@ -391,11 +404,28 @@ async def process_ais_data(data: dict):
     if msg_type in [5, 24] and lat is None:
         asyncio.create_task(enrich_ship_data(mmsi_str))
         async with aiosqlite.connect(DB_PATH) as db:
+            # Check if ship exists and when it was last seen for reset_count
+            async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+                row = await cursor.fetchone()
+                reset_count = False
+                if row:
+                    try:
+                        last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                        diff_seconds = (datetime.utcnow() - last_seen_dt).total_seconds()
+                        timeout_mins = int(settings.get("ship_timeout", 60))
+                        if diff_seconds > (timeout_mins * 60):
+                            reset_count = True
+                    except Exception: pass
+
             await db.execute(
-                'INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+                'INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)',
                 (mmsi_str, ship_name, data.get("callsign"))
             )
             update_fields = ["last_seen = CURRENT_TIMESTAMP"]
+            if reset_count:
+                update_fields.append("message_count = 1")
+            else:
+                update_fields.append("message_count = message_count + 1")
             update_values = []
             if ship_name:
                 update_fields.append("name = ?")
@@ -440,7 +470,6 @@ async def process_ais_data(data: dict):
     if lat is None or lon is None:
         return
         
-    settings = await get_all_settings()
     origin_lat_str = settings.get("origin_lat")
     origin_lon_str = settings.get("origin_lon")
 
@@ -492,10 +521,33 @@ async def process_ais_data(data: dict):
             ship_data["nav_status"] = 5
 
     async with aiosqlite.connect(DB_PATH) as db:
+        # Check if ship exists and when it was last seen
+        async with db.execute('SELECT last_seen, message_count FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            row = await cursor.fetchone()
+            reset_count = False
+            if row:
+                last_seen_str = row[0]
+                try:
+                    # Current timestamp in UTC for comparison with DB last_seen
+                    last_seen_dt = datetime.strptime(last_seen_str, "%Y-%m-%d %H:%M:%S")
+                    diff_seconds = (datetime.utcnow() - last_seen_dt).total_seconds()
+                    
+                    timeout_mins = int(settings.get("ship_timeout", 60))
+                    if diff_seconds > (timeout_mins * 60):
+                        reset_count = True
+                        logger.info(f"Vessel {mmsi_str} re-acquired after timeout ({int(diff_seconds)}s > {timeout_mins}m). Resetting Seen count.")
+                except Exception as e:
+                    logger.error(f"Error checking last_seen for {mmsi_str}: {e}")
+
         await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
         
         # Build update query dynamically
-        update_fields = ["last_seen = CURRENT_TIMESTAMP", "message_count = message_count + 1"]
+        update_fields = ["last_seen = CURRENT_TIMESTAMP"]
+        if reset_count:
+            update_fields.append("message_count = 1")
+        else:
+            update_fields.append("message_count = message_count + 1")
+            
         update_values = []
         if ship_name:
             update_fields.append("name = ?")
@@ -942,7 +994,7 @@ async def get_ships():
         row = await cursor.fetchone()
         duration_min = int(row["value"]) if row else 60
 
-        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL AND (name NOT LIKE '%METEO%' AND name NOT LIKE '%VÄDER%')")
+        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL AND (name NOT LIKE '%METEO%' AND name NOT LIKE '%WEATHER%')")
         rows = await cursor.fetchall()
         result = []
         for row in rows:

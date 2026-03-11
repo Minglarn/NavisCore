@@ -63,8 +63,8 @@ function getShipColor(mmsiStr: string, type?: number) {
 }
 
 function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) {
-    if (mmsiStr.startsWith('99')) return 'Navigationshjälpmedel (Fyr/Boj)';
-    if (mmsiStr.startsWith('00')) return 'Basstation';
+    if (mmsiStr.startsWith('99')) return 'Aid to Navigation (Light/Buoy)';
+    if (mmsiStr.startsWith('00')) return 'Base Station';
 
     // Prefer backend-supplied text
     if (typeText) return typeText;
@@ -101,35 +101,98 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) 
 }
 
 
+function getCountryName(countryCode?: string) {
+    if (!countryCode || countryCode === "00") return "";
+    const names: { [key: string]: string } = {
+        "ad": "Andorra", "ae": "U.A.E.", "af": "Afghanistan", "ag": "Antigua & Barbuda", "ai": "Anguilla", "al": "Albania", "am": "Armenia", "ao": "Angola", "ar": "Argentina", "as": "American Samoa", "at": "Austria", "au": "Australia", "aw": "Aruba", "az": "Azerbaijan",
+        "ba": "Bosnia", "bb": "Barbados", "bd": "Bangladesh", "be": "Belgium", "bf": "Burkina Faso", "bg": "Bulgaria", "bh": "Bahrain", "bi": "Burundi", "bj": "Benin", "bm": "Bermuda", "bn": "Brunei", "bo": "Bolivia", "bq": "Bonaire", "br": "Brazil", "bs": "Bahamas", "bt": "Bhutan", "bw": "Botswana", "by": "Belarus", "bz": "Belize",
+        "ca": "Canada", "cd": "Congo (DRC)", "cf": "Central Africa", "cg": "Congo", "ch": "Switzerland", "ci": "Ivory Coast", "ck": "Cook Islands", "cl": "Chile", "cm": "Cameroon", "cn": "China", "co": "Colombia", "cr": "Costa Rica", "cu": "Cuba", "cv": "Cape Verde", "cw": "Curaçao", "cy": "Cyprus", "cz": "Czech Rep.",
+        "de": "Germany", "dj": "Djibouti", "dk": "Denmark", "dm": "Dominica", "do": "Dominican Rep.", "dz": "Algeria",
+        "ec": "Ecuador", "ee": "Estonia", "eg": "Egypt", "er": "Eritrea", "es": "Spain", "et": "Ethiopia",
+        "fi": "Finland", "fj": "Fiji", "fk": "Falkland Is.", "fo": "Faroe Is.", "fr": "France",
+        "ga": "Gabon", "gb": "UK", "gd": "Grenada", "ge": "Georgia", "gf": "French Guiana", "gh": "Ghana", "gi": "Gibraltar", "gl": "Greenland", "gm": "Gambia", "gn": "Guinea", "gp": "Guadeloupe", "gq": "Equatorial Guinea", "gr": "Greece", "gt": "Guatemala", "gu": "Guam", "gw": "Guinea-Bissau", "gy": "Guyana",
+        "hk": "Hong Kong", "hn": "Honduras", "hr": "Croatia", "ht": "Haiti", "hu": "Hungary",
+        "id": "Indonesia", "ie": "Ireland", "il": "Israel", "in": "India", "iq": "Iraq", "ir": "Iran", "is": "Iceland", "it": "Italy",
+        "jm": "Jamaica", "jo": "Jordan", "jp": "Japan",
+        "ke": "Kenya", "kg": "Kyrgyzstan", "kh": "Cambodia", "kn": "St Kitts & Nevis", "kp": "North Korea", "kr": "South Korea", "kw": "Kuwait", "ky": "Cayman Is.", "kz": "Kazakhstan",
+        "lb": "Lebanon", "lc": "St Lucia", "li": "Liechtenstein", "lk": "Sri Lanka", "lr": "Liberia", "ls": "Lesotho", "lt": "Lithuania", "lu": "Luxembourg", "lv": "Latvia", "ly": "Libya",
+        "ma": "Morocco", "mc": "Monaco", "md": "Moldova", "me": "Montenegro", "mg": "Madagascar", "mh": "Marshall Is.", "mk": "North Macedonia", "ml": "Mali", "mm": "Myanmar", "mn": "Mongolia", "mo": "Macao", "mp": "N. Mariana Is.", "mq": "Martinique", "mr": "Mauritania", "ms": "Montserrat", "mt": "Malta", "mu": "Mauritius", "mv": "Maldives", "mw": "Malawi", "mx": "Mexico", "my": "Malaysia", "mz": "Mozambique",
+        "na": "Namibia", "ne": "Niger", "ng": "Nigeria", "ni": "Nicaragua", "nl": "Netherlands", "no": "Norway", "np": "Nepal", "nz": "New Zealand",
+        "om": "Oman",
+        "pa": "Panama", "pe": "Peru", "pf": "Fr. Polynesia", "pg": "P.N.G.", "ph": "Philippines", "pk": "Pakistan", "pl": "Poland", "pm": "St Pierre", "pr": "Puerto Rico", "pt": "Portugal", "py": "Paraguay",
+        "qa": "Qatar",
+        "ro": "Romania", "rs": "Serbia", "ru": "Russia", "rw": "Rwanda",
+        "sa": "Saudi Arabia", "sb": "Solomon Is.", "sc": "Seychelles", "sd": "Sudan", "se": "Sweden", "sg": "Singapore", "sh": "St Helena", "si": "Slovenia", "sk": "Slovakia", "sl": "Sierra Leone", "sm": "San Marino", "sn": "Senegal", "so": "Somalia", "sr": "Suriname", "st": "Sao Tome", "sv": "El Salvador", "sy": "Syria", "sz": "Eswatini",
+        "tc": "Turks & Caicos", "td": "Chad", "tf": "Fr. S. Terr.", "tg": "Togo", "th": "Thailand", "tj": "Tajikistan", "tl": "Timor-Leste", "tm": "Turkmenistan", "tn": "Tunisia", "tr": "Turkey", "tt": "Trinidad", "tw": "Taiwan", "tz": "Tanzania",
+        "ua": "Ukraine", "ug": "Uganda", "us": "USA", "uy": "Uruguay", "uz": "Uzbekistan",
+        "va": "Vatican City", "vc": "St Vincent", "ve": "Venezuela", "vg": "Brit. Virgin Is.", "vi": "U.S. Virgin Is.", "vn": "Vietnam", "vu": "Vanuatu",
+        "ws": "Samoa",
+        "ye": "Yemen",
+        "za": "South Africa", "zm": "Zambia", "zw": "Zimbabwe"
+    };
+    return names[countryCode.toLowerCase()] || countryCode.toUpperCase();
+}
+
 function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     const mid = mmsiStr ? mmsiStr.substring(0, 3) : '';
     let emoji = '📌';
-    if (mid === '265' || mid === '266') emoji = '🇸🇪';
-    else if (mid === '219' || mid === '220') emoji = '🇩🇰';
-    else if (mid === '257' || mid === '258' || mid === '259') emoji = '🇳🇴';
-    else if (mid === '230') emoji = '🇫🇮';
-    else if (mid === '211' || mid === '218') emoji = '🇩🇪';
-    else if (mid === '235' || mid === '232') emoji = '🇬🇧';
-    else if (mid === '276') emoji = '🇪🇪';
-    else if (mid === '275') emoji = '🇱🇻';
-    else if (mid === '277') emoji = '🇱🇹';
-    else if (mid === '261') emoji = '🇵🇱';
-    else if (mid === '273') emoji = '🇷🇺';
-    else if (mid === '244') emoji = '🇳🇱';
-    else if (mid === '205') emoji = '🇧🇪';
+    
+    const midToEmoji: { [key: string]: string } = {
+        // Europe
+        "201": "🇦🇱", "202": "🇦🇩", "203": "🇦🇹", "204": "🇵🇹", "205": "🇧🇪", "206": "🇧🇾", "207": "🇧🇬", "208": "🇻🇦",
+        "209": "🇨🇾", "210": "🇨🇾", "212": "🇨🇾", "229": "🇲🇹", "215": "🇲🇹", "248": "🇲🇹", "249": "🇲🇹", "256": "🇲🇹",
+        "211": "🇩🇪", "218": "🇩🇪", "213": "🇬🇪", "214": "🇲🇩", "216": "🇦🇲", "219": "🇩🇰", "220": "🇩🇰", "231": "🇫🇴",
+        "224": "🇪🇸", "225": "🇪🇸", "226": "🇫🇷", "227": "🇫🇷", "228": "🇫🇷", "230": "🇫🇮", "232": "🇬🇧", "233": "🇬🇧",
+        "234": "🇬🇧", "235": "🇬🇧", "236": "🇬🇮", "237": "🇬🇷", "239": "🇬🇷", "240": "🇬🇷", "241": "🇬🇷", "238": "🇭🇷",
+        "242": "🇲🇦", "243": "🇭🇺", "244": "🇳🇱", "245": "🇳🇱", "246": "🇳🇱", "247": "🇮🇹", "250": "🇮🇪", "251": "🇮🇸",
+        "252": "🇱🇮", "253": "🇱🇺", "254": "🇲🇨", "255": "🇵🇹", "257": "🇳🇴", "258": "🇳🇴", "259": "🇳🇴", "261": "🇵🇱",
+        "262": "🇲🇪", "263": "🇵🇹", "264": "🇷🇴", "265": "🇸🇪", "266": "🇸🇪", "267": "🇸🇰", "268": "🇸🇲", "269": "🇨🇭",
+        "270": "🇨🇿", "271": "🇹🇷", "272": "🇺🇦", "273": "🇷🇺", "274": "🇲🇰", "275": "🇱🇻", "276": "🇪🇪", "277": "🇱🇹",
+        "278": "🇸🇮", "279": "🇷🇸",
+        // North / Central America
+        "301": "🇦🇮", "303": "🇺🇸", "304": "🇦🇬", "305": "🇦🇬", "306": "🇧🇶", "307": "🇦🇼", "308": "🇧🇸", "309": "🇧🇸",
+        "311": "🇧🇸", "310": "🇧🇲", "312": "🇧🇿", "314": "🇧🇧", "316": "🇨🇦", "319": "🇰🇾", "321": "🇨🇷", "323": "🇨🇺",
+        "325": "🇩🇲", "327": "🇩🇴", "329": "🇬🇵", "330": "🇬🇩", "331": "🇬🇱", "332": "🇬🇹", "334": "🇭🇳", "336": "🇭🇹",
+        "338": "🇺🇸", "366": "🇺🇸", "367": "🇺🇸", "368": "🇺🇸", "369": "🇺🇸", "339": "🇯🇲", "341": "🇰🇳", "343": "🇱🇨",
+        "345": "🇲🇽", "347": "🇲🇶", "348": "🇲🇸", "350": "🇳🇮", "351": "🇵🇦", "352": "🇵🇦", "353": "🇵🇦", "354": "🇵🇦",
+        "355": "🇵🇦", "356": "🇵🇦", "357": "🇵🇦", "370": "🇵🇦", "371": "🇵🇦", "372": "🇵🇦", "373": "🇵🇦", "358": "🇵🇷",
+        "359": "🇸🇻", "361": "🇵🇲", "362": "🇹🇹", "378": "🇻🇬", "379": "🇻🇮",
+        // Asia
+        "401": "🇦🇫", "405": "🇧🇩", "408": "🇧🇭", "410": "🇧🇹", "412": "🇨🇳", "413": "🇨🇳", "414": "🇨🇳", "416": "🇨🇳",
+        "417": "🇨🇰", "418": "🇫🇯", "419": "🇵🇫", "421": "🇮🇳", "423": "🇦🇿", "427": "🇮🇷", "428": "🇮🇶", "431": "🇯🇵",
+        "432": "🇯🇵", "434": "🇯🇵", "436": "🇯🇵", "437": "🇰🇷", "438": "🇰🇵", "440": "🇲🇴", "441": "🇲🇾", "443": "🇲🇻",
+        "445": "🇲🇺", "447": "🇲🇳", "449": "🇲🇲", "451": "🇳🇵", "453": "🇴🇲", "455": "🇵🇰", "457": "🇵🇭", "459": "🇶🇦",
+        "461": "🇸🇦", "463": "🇸🇬", "466": "🇱🇰", "468": "🇸🇾", "470": "🇹🇼", "471": "🇹🇭", "473": "🇹🇱", "475": "🇦🇪",
+        "477": "🇻🇳", "478": "🇧🇦",
+        // Oceania / SE Asia
+        "501": "🇹🇫", "503": "🇦🇺", "508": "🇧🇳", "514": "🇰🇭", "515": "🇰🇭", "536": "🇲🇵", "559": "🇦🇸",
+        // Africa / Atlantic
+        "601": "🇿🇦", "603": "🇦🇴", "605": "🇩🇿", "608": "🇸🇭", "609": "🇧🇮", "610": "🇧🇯", "611": "🇧🇼", "613": "🇨🇲",
+        "616": "🇰🇲", "617": "🇨🇻", "618": "🇨🇫", "619": "🇹🇩", "620": "🇨🇬", "621": "🇩🇯", "622": "🇪🇬", "624": "🇪🇹",
+        "625": "🇪🇷", "626": "🇬🇶", "627": "🇬🇦", "629": "🇬🇲", "630": "🇬🇭", "631": "🇬🇳", "632": "🇬🇼", "633": "🇧🇫",
+        "634": "🇰🇪", "635": "🇱🇸", "636": "🇱🇷", "637": "🇱🇾", "642": "🇲🇬", "644": "🇲🇼", "645": "🇲🇱", "647": "🇲🇷",
+        "649": "🇲🇺", "650": "🇲🇿", "654": "🇳🇦", "655": "🇳🇪", "656": "🇳🇬", "657": "🇷🇼", "659": "🇸🇳", "660": "🇸🇨",
+        "661": "🇸🇱", "662": "🇸🇴", "663": "🇸🇩", "664": "🇸🇿", "665": "🇹🇿", "666": "🇹🇬", "667": "🇹🇳", "668": "🇺🇬",
+        "669": "🇨🇩", "670": "🇿🇲", "671": "🇿🇼", "672": "🇳🇦", "674": "🇹🇿", "675": "🇪🇹", "676": "🇸🇴", "677": "🇹🇿",
+        "678": "🇸🇹", "679": "🇨🇮",
+        // South America
+        "701": "🇦🇷", "710": "🇧🇷", "720": "🇧🇴", "725": "🇨🇱", "730": "🇨🇴", "735": "🇪🇨", "740": "🇫🇰", "745": "🇬🇾",
+        "750": "🇵🇾", "755": "🇵🇪", "760": "🇸🇷", "765": "🇺🇾", "770": "🇻🇪"
+    };
+
+    if (midToEmoji[mid]) emoji = midToEmoji[mid];
     else if (!mmsiStr) emoji = '🏳️';
 
     if (countryCode && typeof countryCode === 'string' && countryCode.length === 2 && countryCode !== "00") {
         const code = countryCode.toLowerCase();
         return `<span style="display: inline-flex; align-items: center;">
-            <img src="https://flagcdn.com/w40/${code}.png" 
+            <img src="https://flagcdn.com/w80/${code}.png" 
                  alt="${countryCode}" 
-                 style="height: 1.2em; width: auto; vertical-align: middle; border-radius: 2px; margin-right: 6px; display: inline-block; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" 
+                 style="height: 1.4em; width: auto; vertical-align: middle; border-radius: 2px; display: inline-block; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" 
                  onerror="this.style.display='none'; this.nextSibling.style.display='inline';" 
             /><span style="display: none;">${emoji}</span>
         </span>`;
     }
-
     return emoji;
 }
 
@@ -341,7 +404,7 @@ function formatDistance(km: number | undefined, units: string) {
 function getTimeAgo(timestamp: number) {
     const diffMs = Date.now() - timestamp;
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'Nu';
+    if (diffMins < 1) return 'Now';
     if (diffMins < 60) return `${diffMins}min`;
     const diffHours = Math.floor(diffMins / 60);
     const remainingMins = diffMins % 60;
@@ -376,29 +439,29 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'MMSI', value: mmsiStr },
         { label: 'IMO', value: ship.imo || '--' },
         { label: 'Callsign', value: ship.callsign || '--' },
-        { label: 'Fartygstyp', value: ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'N/A') },
+        { label: 'Ship Type', value: ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'N/A') },
     ];
 
     const navBlocks = [
         { label: 'Position', value: `${ship.lat.toFixed(4)}, ${ship.lon.toFixed(4)}` },
-        { label: 'Hastighet (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
-        { label: 'Kurs (COG)', value: ship.cog != null ? `${ship.cog.toFixed(1)}°` : '--' },
+        { label: 'Speed (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
+        { label: 'Course (COG)', value: ship.cog != null ? `${ship.cog.toFixed(1)}°` : '--' },
         { label: 'Heading', value: ship.heading != null ? `${ship.heading}°` : '--' },
         { label: 'ROT (Turn)', value: ship.rot != null ? `${ship.rot}°/min` : '--' },
-        { label: 'Status', value: ship.status_text || 'Okänd' },
+        { label: 'Status', value: ship.status_text || 'Unknown' },
     ];
 
     const voyageBlocks = [
         { label: 'Destination', value: ship.destination || '--' },
         { label: 'ETA', value: ship.eta || '--' },
-        { label: 'Djupgående', value: ship.draught ? `${ship.draught}m` : '--' },
+        { label: 'Draught', value: ship.draught ? `${ship.draught}m` : '--' },
     ];
 
     const specBlocks = [
-        { label: 'Längd', value: ship.length ? `${ship.length}m` : '--' },
-        { label: 'Bredd', value: ship.width ? `${ship.width}m` : '--' },
-        { label: 'Meddelanden', value: ship.message_count || '--' },
-        { label: 'Senast sedd', value: getTimeAgo(ship.timestamp) },
+        { label: 'Length', value: ship.length ? `${ship.length}m` : '--' },
+        { label: 'Width', value: ship.width ? `${ship.width}m` : '--' },
+        { label: 'Messages', value: ship.message_count || '--' },
+        { label: 'Last Seen', value: getTimeAgo(ship.timestamp) },
     ];
 
     return (
@@ -410,7 +473,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                     ) : (
                         <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, gap: '10px' }}>
                             <Ship size={64} />
-                            <span>Ingen bild tillgänglig</span>
+                            <span>No image available</span>
                         </div>
                     )}
                     <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(4px)' }}>
@@ -420,7 +483,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <span style={{ fontSize: '2.5rem' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
                             <div>
-                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{ship.name || 'Okänt Fartyg'}</h1>
+                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{ship.name || 'Unknown Vessel'}</h1>
                                 <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>{ship.ship_type_text}</div>
                             </div>
                         </div>
@@ -430,7 +493,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                 <div className="settings-content" style={{ padding: '25px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
                         <div>
-                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>Information</div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>General Info</div>
                             <div style={{ display: 'grid', gap: '12px' }}>
                                 {infoBlocks.map(b => (
                                     <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -440,7 +503,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                                 ))}
                             </div>
 
-                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Resa</div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Voyage</div>
                             <div style={{ display: 'grid', gap: '12px' }}>
                                 {voyageBlocks.map(b => (
                                     <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -462,7 +525,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                                 ))}
                             </div>
 
-                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Specifikation & Statistik</div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Specifications & Stats</div>
                             <div style={{ display: 'grid', gap: '12px' }}>
                                 {specBlocks.map(b => (
                                     <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
@@ -475,7 +538,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                     </div>
                 </div>
                 <div style={{ padding: '15px 25px', borderTop: `1px solid ${colors.border}`, textAlign: 'right', background: 'rgba(0,0,0,0.1)' }}>
-                    <button className="styled-button primary" onClick={onClose} style={{ borderRadius: '8px', padding: '10px 25px' }}>Stäng</button>
+                    <button className="styled-button primary" onClick={onClose} style={{ borderRadius: '8px', padding: '10px 25px' }}>Close</button>
                 </div>
             </div>
         </div>
@@ -495,11 +558,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
     if (!isOpen) return null;
 
     const tabs = [
-        { id: 'general', label: 'Allmänt', icon: <Info size={18} /> },
+        { id: 'general', label: 'General', icon: <Info size={18} /> },
         { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} /> },
-        { id: 'trail', label: 'Spårning', icon: <Navigation size={18} /> },
-        { id: 'map', label: 'Karta', icon: <Sun size={18} /> },
-        { id: 'coverage', label: 'Räckvidd', icon: <Navigation size={18} /> },
+        { id: 'trail', label: 'Tracking', icon: <Navigation size={18} /> },
+        { id: 'map', label: 'Map', icon: <Sun size={18} /> },
+        { id: 'coverage', label: 'Coverage', icon: <Navigation size={18} /> },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} /> },
     ];
 
@@ -526,11 +589,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                 <div className="settings-content">
                     {activeTab === 'general' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Grundinställningar</div>
+                            <div className="settings-section-title">General Settings</div>
                             <div className="form-group">
                                 <div>
-                                    <label>Timeout för fartyg</label>
-                                    <div className="description">Hur länge ett fartyg visas efter sista signal (minuter)</div>
+                                    <label>Vessel Timeout</label>
+                                    <div className="description">How long a vessel remains visible after last signal (minutes)</div>
                                 </div>
                                 <input
                                     type="number"
@@ -540,20 +603,20 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group">
                                 <div>
-                                    <label>Enheter (Units)</label>
-                                    <div className="description">Välj mellan Nautiska (Sjömil/Knop) eller Metriska (km/km/h)</div>
+                                    <label>Units</label>
+                                    <div className="description">Choose between Nautical (nm/kn) or Metric (km/km/h)</div>
                                 </div>
                                 <select value={settings.units} onChange={e => setSettings({ ...settings, units: e.target.value })}>
-                                    <option value="nautical">Nautiska (nm, kn)</option>
-                                    <option value="metric">Metriska (km, km/h)</option>
+                                    <option value="nautical">Nautical (nm, kn)</option>
+                                    <option value="metric">Metric (km, km/h)</option>
                                 </select>
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Stationens Position</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Station Position</div>
                             <div className="form-group">
                                 <label>Latitude</label>
                                 <input
                                     type="text"
-                                    placeholder="t.ex. 59.3293"
+                                    placeholder="e.g. 59.3293"
                                     value={settings.origin_lat}
                                     onChange={e => setSettings({ ...settings, origin_lat: e.target.value })}
                                 />
@@ -562,7 +625,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 <label>Longitude</label>
                                 <input
                                     type="text"
-                                    placeholder="t.ex. 18.0686"
+                                    placeholder="e.g. 18.0686"
                                     value={settings.origin_lon}
                                     onChange={e => setSettings({ ...settings, origin_lon: e.target.value })}
                                 />
@@ -572,9 +635,9 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'mqtt' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Anslutning</div>
+                            <div className="settings-section-title">Connection</div>
                             <div className="form-group">
-                                <label>MQTT Aktiverad</label>
+                                <label>MQTT Enabled</label>
                                 <Toggle
                                     checked={settings.mqtt_enabled === 'true'}
                                     onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
@@ -588,13 +651,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 <label>MQTT Topic</label>
                                 <input type="text" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Autentisering (Frivilligt)</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Authentication (Optional)</div>
                             <div className="form-group">
-                                <label>Användarnamn</label>
+                                <label>Username</label>
                                 <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>Lösenord</label>
+                                <label>Password</label>
                                 <input type="password" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} />
                             </div>
                         </div>
@@ -602,9 +665,9 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'trail' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Visualisering</div>
+                            <div className="settings-section-title">Visualization</div>
                             <div className="form-group">
-                                <label>Visa fartygsspår (Breadcrumbs)</label>
+                                <label>Show Vessel Trails (Breadcrumbs)</label>
                                 <Toggle
                                     checked={settings.trail_enabled === 'true'}
                                     onChange={val => setSettings({ ...settings, trail_enabled: String(val) })}
@@ -612,13 +675,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group">
                                 <div>
-                                    <label>Historik (Minuter)</label>
-                                    <div className="description">Hur lång tid bakåt i tiden spår visas (kräver omladdning)</div>
+                                    <label>History (Minutes)</label>
+                                    <div className="description">How far back trails are shown (requires reload)</div>
                                 </div>
                                 <input type="number" value={settings.history_duration} onChange={e => setSettings({ ...settings, history_duration: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>Färg på spår</label>
+                                <label>Trail Color</label>
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                     <input type="color" value={settings.trail_color} onChange={e => setSettings({ ...settings, trail_color: e.target.value })} style={{ width: '60px', height: '35px', padding: '2px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
                                     <span style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{settings.trail_color.toUpperCase()}</span>
@@ -626,7 +689,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Opacitet</label>
+                                    <label>Opacity</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{Math.round(parseFloat(settings.trail_opacity) * 100)}%</span>
                                 </div>
                                 <input type="range" min="0.1" max="1" step="0.1" value={settings.trail_opacity} onChange={e => setSettings({ ...settings, trail_opacity: e.target.value })} style={{ width: '100%' }} />
@@ -636,11 +699,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'map' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Kartinställningar</div>
+                            <div className="settings-section-title">Map Settings</div>
                             <div className="form-group">
                                 <div>
-                                    <label>Visa fartygsnamn</label>
-                                    <div className="description">Visar namn direkt ovanför fartygsikonen på kartan</div>
+                                    <label>Show Vessel Names</label>
+                                    <div className="description">Displays name directly above the vessel icon on the map</div>
                                 </div>
                                 <Toggle
                                     checked={settings.show_names_on_map === 'true'}
@@ -648,44 +711,44 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Kartstil (Gränssnitt)</label>
+                                <label>UI Theme</label>
                                 <select value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
-                                    <option value="light">Ljust läge</option>
-                                    <option value="dark">Mörkt läge (Natt)</option>
+                                    <option value="light">Light Mode</option>
+                                    <option value="dark">Dark Mode (Night)</option>
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Kartlager (Bas)</label>
+                                <label>Map Layer (Base)</label>
                                 <select value={settings.base_layer} onChange={e => setSettings({ ...settings, base_layer: e.target.value })}>
-                                    <option value="standard">Standard Vektor</option>
-                                    <option value="satellite">Satellitbilder</option>
+                                    <option value="standard">Standard Vector</option>
+                                    <option value="satellite">Satellite Imagery</option>
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Visa räckviddsringar</label>
+                                <label>Show Range Rings</label>
                                 <Toggle
                                     checked={settings.show_range_rings === 'true'}
                                     onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
                                 />
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Storlek på objekt</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Object Sizes</div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Fartyg (Moving)</label>
+                                    <label>Vessels (Moving)</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.ship_size}x</span>
                                 </div>
                                 <input type="range" min="0.5" max="3" step="0.1" value={settings.ship_size} onChange={e => setSettings({ ...settings, ship_size: e.target.value })} style={{ width: '100%' }} />
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Stationära / Meteo</label>
+                                    <label>Stationary / Meteo</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
                                 </div>
                                 <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Spårtjocklek (Trail)</label>
+                                    <label>Trail Thickness</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
                                 </div>
                                 <input type="range" min="1" max="10" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
@@ -695,10 +758,10 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'coverage' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Statistik & Räckvidd</div>
+                            <div className="settings-section-title">Statistics & Coverage</div>
                             <div className="form-group" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '15px' }}>
                                 <div className="description" style={{ fontSize: '0.9rem' }}>
-                                    Här kan du nollställa all sparad räckviddsdata för stationen. Detta tar bort både 24h-statistik och "All-time high".
+                                    Here you can reset all saved coverage data. This removes 24h stats and "All-time high".
                                 </div>
                                 <button
                                     className="styled-button"
@@ -712,20 +775,20 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                         gap: '8px'
                                     }}
                                     onClick={async () => {
-                                        if (window.confirm('Är du säker på att du vill nollställa all räckviddsstatistik?')) {
+                                        if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
                                             try {
                                                 const isDev = window.location.port === '5173';
                                                 const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
                                                 await fetch(fetchPath, { method: 'POST' });
-                                                alert('Statistik nollställd!');
+                                                alert('Statistics reset!');
                                                 window.location.reload();
                                             } catch (e) {
-                                                alert('Ett fel uppstod.');
+                                                alert('An error occurred.');
                                             }
                                         }
                                     }}
                                 >
-                                    <X size={18} /> Nollställ all räckviddsdata
+                                    <X size={18} /> Reset All Coverage Data
                                 </button>
                             </div>
                         </div>
@@ -733,18 +796,18 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'sdr' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">SDR Tuning (Kräver omstart)</div>
+                            <div className="settings-section-title">SDR Tuning (Requires Restart)</div>
                             <div className="form-group">
                                 <div>
-                                    <label>PPM Error (Frekvenskorrigering)</label>
-                                    <div className="description">t.ex. 0 eller 34</div>
+                                    <label>PPM Error (Frequency Correction)</label>
+                                    <div className="description">e.g. 0 or 34</div>
                                 </div>
                                 <input type="number" value={settings.sdr_ppm} onChange={e => setSettings({ ...settings, sdr_ppm: e.target.value })} />
                             </div>
                             <div className="form-group">
                                 <div>
                                     <label>Tuner Gain</label>
-                                    <div className="description">t.ex. auto, 49.6, etc</div>
+                                    <div className="description">e.g. auto, 49.6, etc</div>
                                 </div>
                                 <input type="text" value={settings.sdr_gain} onChange={e => setSettings({ ...settings, sdr_gain: e.target.value })} />
                             </div>
@@ -753,8 +816,8 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                 </div>
 
                 <div style={{ padding: '25px 30px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '15px', background: 'rgba(0,0,0,0.1)' }}>
-                    <button className="styled-button" style={{ padding: '10px 20px', borderRadius: '8px' }} onClick={onClose}>Avbryt</button>
-                    <button className="styled-button primary" style={{ padding: '10px 25px', borderRadius: '8px', background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', boxShadow: '0 4px 15px rgba(0,102,204,0.3)' }} onClick={() => { onSave(); onClose(); }}>Spara ändringar</button>
+                    <button className="styled-button" style={{ padding: '10px 20px', borderRadius: '8px' }} onClick={onClose}>Cancel</button>
+                    <button className="styled-button primary" style={{ padding: '10px 25px', borderRadius: '8px', background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', boxShadow: '0 4px 15px rgba(0,102,204,0.3)' }} onClick={() => { onSave(); onClose(); }}>Save Changes</button>
                 </div>
             </div>
         </div>
@@ -820,7 +883,7 @@ export default function App() {
             const nameUpper = (s.name || "").toUpperCase();
             const mmsiStr = String(s.mmsi || "");
             const type = s.shiptype || s.ship_type;
-            const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER');
+            const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER');
             if (isMeteo) return false;
 
             // Exclude ATONs (Buoys/Beacons/etc)
@@ -913,10 +976,10 @@ export default function App() {
                 .then(data => setCoverageSectors(data))
                 .catch(console.error);
 
-            alert('Inställningar sparade!');
+            alert('Settings saved!');
         } catch (err) {
             console.error(err);
-            alert('Kunde inte spara inställningar');
+            alert('Could not save settings');
         }
     };
 
@@ -937,18 +1000,18 @@ export default function App() {
                 if (Array.isArray(data) && data.length > 0) {
                     setShips(data.filter((s: any) => {
                         const nameUpper = (s.name || "").toUpperCase();
-                        return s.lat && s.lon && !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+                        return s.lat && s.lon && !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
                     }));
                 }
             })
             .catch(console.error);
 
         const ws = new WebSocket(wsUrl);
-        ws.onopen = () => setStatus('Ansluten till NavisCore');
-        ws.onmessage = (event: MessageEvent) => {
+            ws.onopen = () => setStatus('Connected to NavisCore');
+            ws.onmessage = (event: MessageEvent) => {
             const data = JSON.parse(event.data);
             const nameUpper = (data.name || "").toUpperCase();
-            if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER')) return;
+            if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return;
 
             if (data.type === 'status') {
                 setStatus('Status: ' + data.message);
@@ -1003,7 +1066,7 @@ export default function App() {
                 }
             }
         };
-        ws.onclose = () => setStatus('Nedkopplad');
+        ws.onclose = () => setStatus('Disconnected');
         ws.onerror = () => setStatus('WebSocket Error');
 
         return () => {
@@ -1182,8 +1245,8 @@ export default function App() {
     // Tracker for user switching map layers
     const handleLayerChange = (layerName: string) => {
         let mode = 'standard';
-        if (layerName.includes('Satellit')) mode = 'satellite';
-        else if (layerName.includes('Sjökort')) mode = 'osm';
+        if (layerName.includes('Satellite')) mode = 'satellite';
+        else if (layerName.includes('Sea Chart')) mode = 'osm';
 
         setMqttSettings(prev => {
             const next = { ...prev, base_layer: mode };
@@ -1256,7 +1319,7 @@ export default function App() {
                         gap: '8px'
                     }}>
                         <Ship size={16} />
-                        Fartyg: {filteredShipsCount}
+                        Vessels: {filteredShipsCount}
                     </div>
 
                     {!isNaN(originLat) && !isNaN(originLon) && maxDistance > 0 && (
@@ -1329,7 +1392,7 @@ export default function App() {
                             style={{ background: isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => { if (!isSidebarOpen) e.currentTarget.style.background = 'transparent' }}
-                            title="Objektlista"
+                            title="Object List"
                         >
                             <List size={22} />
                         </button>
@@ -1338,7 +1401,7 @@ export default function App() {
                             style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                            title="Inställningar"
+                            title="Settings"
                         >
                             <Settings size={22} />
                         </button>
@@ -1351,26 +1414,26 @@ export default function App() {
                 <div style={{ flex: 1, position: 'relative' }}>
                     {!isSettingsLoaded ? (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: colors.bgMain, color: colors.textMuted }}>
-                            Laddar karta...
+                            Loading map...
                         </div>
                     ) : (
                         <MapContainer key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
                             <CenterButton originLat={originLat} originLon={originLon} />
                             <ZoomTracker setZoom={setCurrentZoom} />
                             <LayersControl position="topright">
-                                <LayersControl.BaseLayer name="Standard Karta (Minimal)" checked={mqttSettings.base_layer === 'standard' || !mqttSettings.base_layer}>
+                                <LayersControl.BaseLayer name="Standard Map (Minimal)" checked={mqttSettings.base_layer === 'standard' || !mqttSettings.base_layer}>
                                     <TileLayer
                                         url={tileUrl}
                                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
                                     />
                                 </LayersControl.BaseLayer>
-                                <LayersControl.BaseLayer name="Satellit (Esri)" checked={mqttSettings.base_layer === 'satellite'}>
+                                <LayersControl.BaseLayer name="Satellite (Esri)" checked={mqttSettings.base_layer === 'satellite'}>
                                     <TileLayer
                                         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                                         attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                                     />
                                 </LayersControl.BaseLayer>
-                                <LayersControl.BaseLayer name="Sjökort / OSM" checked={mqttSettings.base_layer === 'osm'}>
+                                <LayersControl.BaseLayer name="Sea Chart / OSM" checked={mqttSettings.base_layer === 'osm'}>
                                     <TileLayer
                                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -1420,7 +1483,7 @@ export default function App() {
                             {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
                                 const nameUpper = (s.name || "").toUpperCase();
-                                if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER')) return null;
+                                if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
 
                                 // Smart Label Logic:
                                 // 1. Zoom > 13: Show all names
@@ -1502,12 +1565,12 @@ export default function App() {
                                                         </div>
                                                         <div style={{ background: '#22282d', padding: '12px', color: '#fff' }}>
                                                             <div style={{ textAlign: 'center', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                                                                {new Date(s.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
+                                                                {new Date(s.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
                                                             </div>
                                                             <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '8px 0' }}></div>
                                                             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.9rem' }}>
-                                                                <span>Vind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
-                                                                <span>Byar: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
+                                                                <span>Wind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
+                                                                <span>Gusts: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1536,16 +1599,26 @@ export default function App() {
                                         {!s.is_meteo && <Popup className="custom-detailed-popup" offset={[0, -20]}>
                                             <div style={{ display: 'flex', flexDirection: 'column', width: '460px' }}>
                                                 {/* SHIP NAME HEADER */}
-                                                <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)' }}>
-                                                    <span style={{ fontSize: '1.6rem', display: 'flex' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'var(--bg-card)' }}>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '45px' }}>
+                                                        <span style={{ fontSize: '1.6rem', display: 'flex' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: '1', fontWeight: 'bold' }}>
+                                                            {getCountryName(s.country_code)}
+                                                        </span>
+                                                    </div>
                                                     <div style={{ flex: 1, overflow: 'hidden' }}>
                                                         <div style={{ fontWeight: '700', fontSize: '1.05rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <span>{s.name || 'Unknown Vessel'}</span>
+                                                            <span>{s.name || 'Unknown Vessel'} ({mmsiStr})</span>
                                                             {s.callsign && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{s.callsign}</span>}
                                                         </div>
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                            MMSI: {mmsiStr} • Sett: {s.message_count || 1} ggr • Last Seen: {getTimeAgo(s.timestamp)}
+                                                            Messages: {s.message_count || 1} • Last Seen: {getTimeAgo(s.timestamp)}
                                                         </div>
+                                                        {s.status_text && (
+                                                            <div style={{ fontSize: '0.75rem', color: '#44aaff', fontWeight: 'bold', marginTop: '2px' }}>
+                                                                {s.status_text}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
 
@@ -1603,7 +1676,7 @@ export default function App() {
                             {/* Ship History Trails */}
                             {ships.map((s: any) => {
                                 const nameUpper = (s.name || "").toUpperCase();
-                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2 || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('VÄDER')) return null;
+                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2 || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
                                 const isHovered = hoveredMmsi === String(s.mmsi);
                                 return (
                                     <Polyline
@@ -1670,9 +1743,9 @@ export default function App() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
                                 <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                    Lokala Objekt ({ships.filter(s => {
+                                    Local Objects ({ships.filter(s => {
                                         const nameUpper = (s.name || "").toUpperCase();
-                                        return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+                                        return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
                                     }).length})
                                 </h2>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
@@ -1689,11 +1762,11 @@ export default function App() {
                                             cursor: 'pointer'
                                         }}
                                     >
-                                        <option value="name">Namn</option>
-                                        <option value="last_seen">Senast sedd</option>
-                                        <option value="shiptype">Typ</option>
-                                        <option value="distance">Distans</option>
-                                        <option value="message_count">Meddelanden</option>
+                                        <option value="name">Name</option>
+                                        <option value="last_seen">Last Seen</option>
+                                        <option value="shiptype">Type</option>
+                                        <option value="distance">Distance</option>
+                                        <option value="message_count">Messages</option>
                                     </select>
                                     <button onClick={() => setSortConfig({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                                         <Navigation size={16} style={{
@@ -1711,12 +1784,12 @@ export default function App() {
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {ships.length === 0 ? (
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                            Inget objekt på radarn ännu...
+                                            No objects on the radar yet...
                                         </div>
                                     ) : ships
                                         .filter(s => {
                                             const nameUpper = (s.name || "").toUpperCase();
-                                            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('VÄDER');
+                                            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
                                         })
                                         .map(s => {
                                             const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)

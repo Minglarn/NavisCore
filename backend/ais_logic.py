@@ -389,7 +389,7 @@ def _decode_type_8(bitstr: str, data: dict):
         data["wind_gust"] = wind_gust
         data["wind_direction"] = wind_dir
         data["is_meteo"] = True
-        data["name"] = f"METEO VÄDER {data['mmsi']}"
+        data["name"] = f"METEO WEATHER {data['mmsi']}"
 
 
 def _decode_type_9(bitstr: str, data: dict):
