@@ -569,7 +569,11 @@ async def process_ais_data(data: dict):
         await db.commit()
         
         # Sektor Range Tracking
-        if origin_lat_str and origin_lon_str and not is_meteo:
+        stype = ship_data.get("shiptype")
+        is_aton_val = ship_data.get("is_aton", False)
+        is_aircraft = stype == 9 or stype == 18 or data.get("is_sar", False)
+
+        if origin_lat_str and origin_lon_str and not is_meteo and not is_aton_val and not is_aircraft and not mmsi_str.startswith("99"):
             try:
                 olat = float(origin_lat_str)
                 olon = float(origin_lon_str)

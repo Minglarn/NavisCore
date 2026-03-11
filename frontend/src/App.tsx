@@ -706,7 +706,7 @@ export default function App() {
             if (isMeteo) return false;
 
             // Exclude ATONs (Buoys/Beacons/etc)
-            if (mmsiStr.startsWith('99') || (type >= 91 && type <= 99)) return false;
+            if (mmsiStr.startsWith('99') || (type >= 91 && type <= 99) || type === 21) return false;
 
             // Exclude Aircraft (SAR typically type 18)
             if (type === 18) return false;
