@@ -403,24 +403,25 @@ async def enrich_ship_data(mmsi: str):
         async with aiosqlite.connect(DB_PATH) as db:
             async with db.execute('SELECT image_fetched_at, image_url, manual_image FROM ships WHERE mmsi = ?', (mmsi,)) as cursor:
                 row = await cursor.fetchone()
+                image_url = None
+                fetch_date = None
                 if row:
                     manual_image = row[2]
-                    # If user uploaded manually, skip further automatic fetching
                     if manual_image:
                         active_lookups.remove(mmsi)
                         return
 
                     if row[0]:
                         fetch_date = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                        image_url = row[1]
+                    image_url = row[1]
                     
                     # If we have a REAL image (not the placeholder 0.jpg and not empty)
-                    if image_url and image_url != "/images/0.jpg":
+                    if image_url and image_url != "/images/0.jpg" and fetch_date:
                         # Refresh real images every 30 days
                         if (datetime.now() - fetch_date).days < 30:
                             active_lookups.remove(mmsi)
                             return
-                    else:
+                    elif fetch_date:
                         # Placeholder or no image. Retry every 24 hours.
                         if (datetime.now() - fetch_date).days < 1:
                             active_lookups.remove(mmsi)
