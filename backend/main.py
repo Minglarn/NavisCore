@@ -439,8 +439,13 @@ async def enrich_ship_data(mmsi: str):
                 headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'},
                 timeout=10.0
             )
-            data = res.json()
-            if data and len(data) > 0:
+            try:
+                data = res.json()
+            except (json.JSONDecodeError, AttributeError):
+                logger.warning(f"[Enrichment] MyShipTracking returned invalid JSON for {mmsi}")
+                data = []
+
+            if data and isinstance(data, list) and len(data) > 0:
                 ship = data[0]
                 name = ship.get("NAME")
                 portrait_id = ship.get("PORTRAIT")
