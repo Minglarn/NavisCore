@@ -567,37 +567,37 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'MMSI', value: mmsiStr },
         { label: 'IMO', value: ship.imo || '--' },
         { label: 'Callsign', value: ship.callsign || '--' },
-        { label: 'Ship Type', value: ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'N/A') },
+        { label: 'Fartygstyp', value: ship.ship_type_text || (ship.shiptype ? `Typ ${ship.shiptype}` : 'N/A') },
     ];
 
     const navBlocks = [
-        { label: 'Position', value: `${ship.lat.toFixed(4)}, ${ship.lon.toFixed(4)}` },
-        { label: 'Speed (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
-        { label: 'Course (COG)', value: ship.cog != null ? `${ship.cog.toFixed(1)}°` : '--' },
-        { label: 'Heading', value: ship.heading != null ? `${ship.heading}°` : '--' },
-        { label: 'ROT (Turn)', value: ship.rot != null ? `${ship.rot}°/min` : '--' },
-        { label: 'Status', value: ship.status_text || 'Unknown' },
+        { label: 'Position', value: `${ship.lat.toFixed(3)}, ${ship.lon.toFixed(3)}` },
+        { label: 'Fart (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
+        { label: 'Kurs (COG)', value: ship.cog != null ? `${ship.cog.toFixed(0)}°` : '--' },
+        { label: 'Styrning', value: ship.heading != null ? `${ship.heading}°` : '--' },
+        { label: 'ROT', value: ship.rot != null ? `${ship.rot}°/min` : '--' },
+        { label: 'Status', value: ship.status_text || 'Okänd' },
     ];
 
     const voyageBlocks = [
         { label: 'Destination', value: ship.destination || '--' },
         { label: 'ETA', value: ship.eta || '--' },
-        { label: 'Draught', value: ship.draught ? `${ship.draught}m` : '--' },
+        { label: 'Djupgående', value: ship.draught ? `${ship.draught}m` : '--' },
     ];
 
     const specBlocks = [
-        { label: 'Length', value: ship.length ? `${ship.length}m` : '--' },
-        { label: 'Width', value: ship.width ? `${ship.width}m` : '--' },
-        { label: 'Messages', value: ship.message_count || '--' },
-        { label: 'Last Signal', value: getTimeAgo(ship.timestamp) },
-        { label: 'Data Source', value: ship.source === 'aisstream' ? 'AisStream.io' : 'Local SDR' },
-        { label: 'Previous Seen', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
+        { label: 'Längd', value: ship.length ? `${ship.length}m` : '--' },
+        { label: 'Bredd', value: ship.width ? `${ship.width}m` : '--' },
+        { label: 'Meddelanden', value: ship.message_count || '--' },
+        { label: 'Senaste', value: getTimeAgo(ship.timestamp) },
+        { label: 'Källa', value: ship.source === 'aisstream' ? 'Stream' : 'Lokal' },
+        { label: 'Sett tidigare', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
     ];
 
     return (
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
-            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ height: 'auto', maxHeight: '90vh', width: '600px' }}>
-                <div style={{ position: 'relative', width: '100%', height: '250px', background: colors.bgMain }}>
+            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ height: 'auto', maxHeight: '95vh', width: '950px', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
+                <div style={{ position: 'relative', width: '100%', height: '450px', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <input 
                         type="file" 
                         ref={fileInputRef} 
@@ -640,96 +640,165 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                     
                     {localImage && localImage !== "/images/0.jpg" ? (
                         <div 
-                            title="Click to upload custom image"
+                            title="Klicka för att ladda upp egen bild"
                             onClick={() => fileInputRef.current?.click()}
-                            style={{ width: '100%', height: '100%', backgroundImage: `url(${localImage})`, backgroundSize: 'cover', backgroundPosition: 'center', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }} 
+                            style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                backgroundImage: `url(${localImage})`, 
+                                backgroundSize: 'contain', 
+                                backgroundPosition: 'center', 
+                                backgroundRepeat: 'no-repeat',
+                                cursor: 'pointer', 
+                                opacity: uploading ? 0.5 : 1, 
+                                transition: 'opacity 0.2s',
+                                zIndex: 1
+                            }} 
                         />
                     ) : (
                         <div 
-                            title="Click to upload custom image"
+                            title="Klicka för att ladda upp egen bild"
                             onClick={() => fileInputRef.current?.click()}
-                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
-                            <Ship size={64} />
-                            <span>{uploading ? 'Uploading...' : 'Click to upload custom image'}</span>
+                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
+                            <Ship size={80} strokeWidth={1} />
+                            <span style={{ fontSize: '0.9rem' }}>{uploading ? 'Laddar upp...' : 'Klicka för att ladda upp egen bild'}</span>
                         </div>
                     )}
-                    <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(4px)' }}>
+                    
+                    {/* Gradient Overlay for Text Readability */}
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))', zIndex: 2, pointerEvents: 'none' }}></div>
+                    
+                    <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(10px)', zIndex: 10, transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
                         <X size={20} />
                     </button>
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <span style={{ fontSize: '2.5rem' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
-                            <div>
-                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{ship.name || 'Unknown Vessel'}</h1>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                    <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>{ship.ship_type_text}</div>
+                    
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '25px 30px', color: 'white', zIndex: 3 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                            <span style={{ fontSize: '3.5rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                            <div style={{ flex: 1 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
+                                    <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{ship.name || 'Okänt Fartyg'}</h1>
                                     <div style={{
-                                        background: ship.source === 'aisstream' ? 'rgba(68, 170, 255, 0.2)' : 'rgba(0, 255, 128, 0.2)',
+                                        background: ship.source === 'aisstream' ? '#44aaff33' : '#00ff8033',
                                         color: ship.source === 'aisstream' ? '#44aaff' : '#00ff80',
-                                        padding: '2px 8px',
-                                        borderRadius: '4px',
+                                        padding: '2px 10px',
+                                        borderRadius: '20px',
                                         fontSize: '0.7rem',
-                                        fontWeight: 'bold',
+                                        fontWeight: 800,
+                                        letterSpacing: '0.5px',
                                         textTransform: 'uppercase',
-                                        border: `1px solid ${ship.source === 'aisstream' ? 'rgba(68, 170, 255, 0.4)' : 'rgba(0, 255, 128, 0.4)'}`
+                                        border: `1px solid ${ship.source === 'aisstream' ? '#44aaff66' : '#00ff8066'}`,
+                                        backdropFilter: 'blur(4px)'
                                     }}>
-                                        {ship.source === 'aisstream' ? 'STREAM' : 'Live SDR'}
+                                        {ship.source === 'aisstream' ? 'STREAM' : 'LIVE'}
                                     </div>
+                                </div>
+                                <div style={{ opacity: 0.9, fontSize: '1rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Anchor size={16} />
+                                    {ship.ship_type_text || (ship.shiptype ? `Typ ${ship.shiptype}` : 'Okänd Typ')}
+                                    <span style={{ opacity: 0.5 }}>•</span>
+                                    <span>MMSI: {mmsiStr}</span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="settings-content" style={{ padding: '25px' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
-                        <div>
-                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>General Info</div>
-                            <div style={{ display: 'grid', gap: '12px' }}>
-                                {infoBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
-                                    </div>
-                                ))}
+                <div className="settings-content" style={{ padding: '35px 40px', background: colors.bgCard, flex: 1, display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) auto minmax(180px, 1fr) auto minmax(180px, 1fr) auto minmax(180px, 1fr)', gap: '0', width: '100%', maxWidth: '1000px' }}>
+                        {/* Section 1: Info */}
+                        <div style={{ padding: '0 15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
+                                <Info size={16} />
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>INFO</span>
                             </div>
-
-                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Voyage</div>
-                            <div style={{ display: 'grid', gap: '12px' }}>
-                                {voyageBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
+                            <div style={{ display: 'grid', gap: '14px' }}>
+                                {infoBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', textAlign: 'right' }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        <div>
-                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>Navigation</div>
-                            <div style={{ display: 'grid', gap: '12px' }}>
-                                {navBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600, color: b.label === 'Status' && b.value.includes('Moored') ? '#ffaa00' : 'inherit' }}>{b.value}</span>
+                        {/* Divider */}
+                        <div style={{ width: '2px', background: colors.border, opacity: 0.5, margin: '0 5px', height: '100%', alignSelf: 'stretch' }}></div>
+
+                        {/* Section 2: Resa */}
+                        <div style={{ padding: '0 15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
+                                <Navigation size={16} />
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>RESA</span>
+                            </div>
+                            <div style={{ display: 'grid', gap: '14px' }}>
+                                {voyageBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', textAlign: 'right' }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
+                        </div>
 
-                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Specifications & Stats</div>
-                            <div style={{ display: 'grid', gap: '12px' }}>
+                        {/* Divider */}
+                        <div style={{ width: '2px', background: colors.border, opacity: 0.5, margin: '0 5px', height: '100%', alignSelf: 'stretch' }}></div>
+
+                        {/* Section 3: Navigation */}
+                        <div style={{ padding: '0 15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
+                                <Signal size={16} />
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>NAVIGATION</span>
+                            </div>
+                            <div style={{ display: 'grid', gap: '14px' }}>
+                                {navBlocks.map(b => (
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 700, fontSize: '0.95rem', textAlign: 'right', color: b.label === 'Status' && b.value.includes('anchor') ? '#ffaa00' : 'inherit' }}>{b.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div style={{ width: '1px', background: `linear-gradient(to bottom, transparent, ${colors.border}33, transparent)`, margin: '0 5px' }}></div>
+
+                        {/* Section 4: Stats */}
+                        <div style={{ padding: '0 15px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
+                                <Radio size={16} />
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>STATS</span>
+                            </div>
+                            <div style={{ display: 'grid', gap: '14px' }}>
                                 {specBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', textAlign: 'right' }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
                 </div>
-                <div style={{ padding: '15px 25px', borderTop: `1px solid ${colors.border}`, textAlign: 'right', background: 'rgba(0,0,0,0.1)' }}>
-                    <button className="styled-button primary" onClick={onClose} style={{ borderRadius: '8px', padding: '10px 25px' }}>Close</button>
+
+                <div style={{ padding: '20px 30px', borderTop: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'flex-end', background: colors.bgCard }}>
+                    <button 
+                        className="styled-button primary" 
+                        onClick={onClose} 
+                        style={{ 
+                            borderRadius: '12px', 
+                            padding: '10px 40px', 
+                            fontSize: '1rem', 
+                            fontWeight: 700, 
+                            background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)',
+                            boxShadow: '0 4px 15px rgba(0,102,204,0.3)',
+                            border: 'none',
+                            color: 'white',
+                            cursor: 'pointer'
+                        }}
+                    >
+                        Stäng
+                    </button>
                 </div>
             </div>
         </div>
@@ -864,6 +933,24 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     checked={settings.trail_enabled === 'true'}
                                     onChange={val => setSettings({ ...settings, trail_enabled: String(val) })}
                                 />
+                            </div>
+                            <div className="form-group">
+                                <label>Tracking Mode</label>
+                                <select 
+                                    value={settings.trail_mode || 'all'} 
+                                    onChange={e => setSettings({ ...settings, trail_mode: e.target.value })}
+                                    style={{
+                                        background: settings.map_style === 'dark' ? 'rgba(0,0,0,0.2)' : '#fff',
+                                        color: colors.textMain,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '6px',
+                                        padding: '6px 8px',
+                                        fontSize: '0.85rem'
+                                    }}
+                                >
+                                    <option value="all">Show All Trails</option>
+                                    <option value="selected">Only Selected/Hovered</option>
+                                </select>
                             </div>
                             <div className="form-group">
                                 <div>
@@ -1030,6 +1117,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     Get your free key at <a href="https://aisstream.io" target="_blank" rel="noreferrer" style={{color: '#44aaff'}}>aisstream.io</a>.
                                 </div>
                             </div>
+                            <div className="form-group" style={{ marginTop: '10px' }}>
+                                <label>Show internet vessels on main map</label>
+                                <Toggle
+                                    checked={settings.show_aisstream_on_map !== 'false'}
+                                    onChange={val => setSettings({ ...settings, show_aisstream_on_map: String(val) })}
+                                />
+                            </div>
                         </div>
                     )}
                 </div>
@@ -1068,7 +1162,7 @@ export default function App() {
         origin_lon: '',
         show_range_rings: 'true',
         map_style: 'light',
-        range_type: '24h', // '24h' eller 'alltime'
+        range_type: '24h',
         base_layer: 'standard',
         history_duration: '60',
         show_names_on_map: 'true',
@@ -1082,7 +1176,9 @@ export default function App() {
         circle_size: '1.0',
         trail_size: '2.0',
         aisstream_enabled: 'false',
-        aisstream_api_key: ''
+        aisstream_api_key: '',
+        trail_mode: 'all',
+        show_aisstream_on_map: 'true'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
@@ -1105,13 +1201,21 @@ export default function App() {
     const [filterShipType, setFilterShipType] = useState('all');
     const hoverTimerRef = useRef<number | null>(null);
 
+    // Performance & Hybrid Visibility
+    const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, mmsi: string } | null>(null);
+
     const filteredShipsCount = useMemo(() => {
+        const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
         return ships.filter(s => {
             const nameUpper = (s.name || "").toUpperCase();
             const mmsiStr = String(s.mmsi || "");
             const type = s.shiptype || s.ship_type;
             const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER');
             if (isMeteo) return false;
+
+            // Internet vessel filtering
+            if (!showAisStream && (s.source === 'aisstream')) return false;
 
             // Exclude ATONs (Buoys/Beacons/etc)
             if (mmsiStr.startsWith('99') || (type >= 91 && type <= 99) || type === 21) return false;
@@ -1121,7 +1225,7 @@ export default function App() {
 
             return true;
         }).length;
-    }, [ships]);
+    }, [ships, mqttSettings.show_aisstream_on_map]);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -1157,7 +1261,9 @@ export default function App() {
                     circle_size: data.circle_size || '1.0',
                     trail_size: data.trail_size || '2.0',
                     aisstream_enabled: data.aisstream_enabled || 'false',
-                    aisstream_api_key: data.aisstream_api_key || ''
+                    aisstream_api_key: data.aisstream_api_key || '',
+                    trail_mode: data.trail_mode || 'all',
+                    show_aisstream_on_map: data.show_aisstream_on_map || 'true'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -1363,6 +1469,7 @@ export default function App() {
         : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
     const isDark = theme === 'dark';
+
     const colors = {
         bgMain: isDark ? '#0f0f1a' : '#f4f6f8',
         bgSidebar: isDark ? '#161625' : '#ffffff',
@@ -1723,6 +1830,10 @@ export default function App() {
                                 const nameUpper = (s.name || "").toUpperCase();
                                 if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
 
+                                // Internet vessel filtering
+                                const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
+                                if (!showAisStream && (s.source === 'aisstream')) return null;
+
                                 // Smart Label Logic:
                                 // 1. Zoom > 13: Show all names
                                 // 2. Zoom 11-13: Show every 3rd ship
@@ -1749,28 +1860,35 @@ export default function App() {
                                 return (
                                     <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={icon}
                                         riseOnHover={true}
-                                        eventHandlers={{
-                                            mouseover: () => {
-                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                                hoverTimerRef.current = setTimeout(() => {
-                                                    setHoveredMmsi(mmsiStr);
-                                                }, 1000);
-                                            },
-                                            mouseout: () => {
-                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                                setHoveredMmsi(null);
-                                            },
-                                            click: (e) => {
-                                                // If we have a tooltip open, clear it when clicking (opening popup)
-                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                                setHoveredMmsi(null);
-                                            },
-                                            dblclick: (e) => {
-                                                // Explicitly for double click as requested
-                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                                setHoveredMmsi(null);
-                                            }
-                                        }}
+                                    eventHandlers={{
+                                        mouseover: () => {
+                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                            hoverTimerRef.current = setTimeout(() => {
+                                                setHoveredMmsi(mmsiStr);
+                                            }, 1000);
+                                        },
+                                        mouseout: () => {
+                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                            setHoveredMmsi(null);
+                                        },
+                                        click: (e) => {
+                                            // If we have a tooltip open, clear it when clicking (opening popup)
+                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                            setHoveredMmsi(null);
+                                        },
+                                        dblclick: (e) => {
+                                            // Explicitly for double click as requested
+                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                            setHoveredMmsi(null);
+                                        },
+                                        contextmenu: (e) => {
+                                            setContextMenu({
+                                                x: e.originalEvent.clientX,
+                                                y: e.originalEvent.clientY,
+                                                mmsi: mmsiStr
+                                            });
+                                        }
+                                    }}
                                     >
                                         {/* Smart Label (Fast text under ship) */}
                                         {shouldShowName && (
@@ -1917,16 +2035,26 @@ export default function App() {
                             {ships.map((s: any) => {
                                 const nameUpper = (s.name || "").toUpperCase();
                                 if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2 || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
-                                const isHovered = hoveredMmsi === String(s.mmsi);
+                                
+                                const mmsiStr = String(s.mmsi);
+                                const isHovered = hoveredMmsi === mmsiStr;
+                                const isSelected = selectedShipMmsi === mmsiStr;
+                                const isPinned = pinnedMmsis.has(mmsiStr);
+
+                                // Logic for selective tracking & Internet vessel filtering
+                                const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
+                                if (!showAisStream && (s.source === 'aisstream')) return null;
+                                if (mqttSettings.trail_mode === 'selected' && !isHovered && !isSelected && !isPinned) return null;
+
                                 return (
                                     <Polyline
                                         key={`trail-${s.mmsi}`}
                                         positions={s.history}
                                         pathOptions={{
-                                            color: isHovered ? '#00f0ff' : mqttSettings.trail_color,
-                                            weight: isHovered ? Math.max(parseFloat(mqttSettings.trail_size) + 2, 4) : parseFloat(mqttSettings.trail_size),
-                                            opacity: isHovered ? 1 : parseFloat(mqttSettings.trail_opacity),
-                                            dashArray: isHovered ? undefined : '5, 5'
+                                            color: (isHovered || isSelected || isPinned) ? '#00f0ff' : mqttSettings.trail_color,
+                                            weight: (isHovered || isSelected || isPinned) ? Math.max(parseFloat(mqttSettings.trail_size) + 2, 4) : parseFloat(mqttSettings.trail_size),
+                                            opacity: (isHovered || isSelected || isPinned) ? 1 : parseFloat(mqttSettings.trail_opacity),
+                                            dashArray: (isHovered || isSelected || isPinned) ? undefined : '5, 5'
                                         }}
                                     />
                                 );
@@ -2107,6 +2235,10 @@ export default function App() {
                                             // Basic exclusions (AtoN, Meteo, etc)
                                             if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
 
+                                            // Internet vessel filtering
+                                            const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
+                                            if (!showAisStream && (s.source === 'aisstream')) return false;
+
                                             // Search Filter
                                             if (searchTerm) {
                                                 const term = searchTerm.toUpperCase();
@@ -2175,6 +2307,14 @@ export default function App() {
                                                 onClick={() => {
                                                     setHoveredMmsi(String(ship.mmsi));
                                                     setSelectedShipMmsi(String(ship.mmsi));
+                                                }}
+                                                onContextMenu={(e) => {
+                                                    e.preventDefault();
+                                                    setContextMenu({
+                                                        x: e.clientX,
+                                                        y: e.clientY,
+                                                        mmsi: String(ship.mmsi)
+                                                    });
                                                 }}
                                                 onMouseEnter={e => {
                                                     e.currentTarget.style.transform = 'translateX(-4px)';
@@ -2268,6 +2408,101 @@ export default function App() {
                 onClose={() => setIsStatsModalOpen(false)}
                 colors={colors}
             />
+
+            {contextMenu && (
+                <ContextMenu
+                    x={contextMenu.x}
+                    y={contextMenu.y}
+                    onClose={() => setContextMenu(null)}
+                    colors={colors}
+                    isDark={isDark}
+                    options={[
+                        {
+                            label: pinnedMmsis.has(contextMenu.mmsi) ? 'Stop Tracking' : 'Track Specifically',
+                            icon: pinnedMmsis.has(contextMenu.mmsi) ? <X size={16} /> : <Navigation size={16} />,
+                            onClick: () => {
+                                setPinnedMmsis(prev => {
+                                    const next = new Set(prev);
+                                    if (next.has(contextMenu.mmsi)) next.delete(contextMenu.mmsi);
+                                    else next.add(contextMenu.mmsi);
+                                    return next;
+                                });
+                            }
+                        },
+                        {
+                            label: 'Focus on Map',
+                            icon: <Search size={16} />,
+                            onClick: () => {
+                                setSelectedShipMmsi(contextMenu.mmsi);
+                                // Forcing map to re-center is handled by popup/marker usually,
+                                // but we could trigger it here if needed.
+                            },
+                            separator: true
+                        },
+                        {
+                            label: 'Vessel Details',
+                            icon: <Info size={16} />,
+                            onClick: () => setSelectedShipMmsi(contextMenu.mmsi)
+                        }
+                    ]}
+                />
+            )}
+        </div>
+    );
+}
+
+function ContextMenu({ x, y, options, onClose, colors, isDark }: any) {
+    useEffect(() => {
+        const handleClick = () => onClose();
+        window.addEventListener('click', handleClick);
+        window.addEventListener('scroll', handleClick);
+        return () => {
+            window.removeEventListener('click', handleClick);
+            window.removeEventListener('scroll', handleClick);
+        };
+    }, [onClose]);
+
+    return (
+        <div 
+            style={{
+                position: 'fixed',
+                left: x,
+                top: y,
+                background: colors.bgCard,
+                border: `1px solid ${colors.border}`,
+                borderRadius: '10px',
+                padding: '6px 0',
+                zIndex: 10000,
+                boxShadow: isDark ? '0 10px 25px rgba(0,0,0,0.6)' : '0 10px 25px rgba(0,0,0,0.15)',
+                minWidth: '180px',
+                backdropFilter: 'blur(10px)',
+                animation: 'contextFadeIn 0.15s ease-out'
+            }}
+            onClick={e => e.stopPropagation()}
+        >
+            {options.map((opt: any, i: number) => (
+                <div
+                    key={i}
+                    onClick={() => { opt.onClick(); onClose(); }}
+                    style={{
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        fontSize: '0.9rem',
+                        color: opt.danger ? '#ff5555' : colors.textMain,
+                        transition: 'background 0.2s',
+                        borderBottom: opt.separator ? `1px solid ${colors.border}` : 'none',
+                        marginBottom: opt.separator ? '6px' : '0'
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                >
+                    <span style={{ color: opt.danger ? '#ff5555' : colors.accent, display: 'flex' }}>{opt.icon}</span>
+                    <span style={{ fontWeight: 500 }}>{opt.label}</span>
+                </div>
+            ))}
         </div>
     );
 }
