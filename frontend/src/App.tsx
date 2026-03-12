@@ -204,7 +204,7 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
 
     let svg = '';
     // Increase hit area: Use a larger container size but keep SVG centered and correctly scaled
-    const baseHitArea = 44; // Standard touch/click target size
+    const baseHitArea = 56; // Increased from 44 for better clickability on small markers
     const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
     if (isAircraft) {
@@ -1098,6 +1098,11 @@ export default function App() {
         const saved = localStorage.getItem('naviscore_sidebar_width');
         return saved ? parseInt(saved) : 380;
     });
+
+    // Sidebar Filters
+    const [searchTerm, setSearchTerm] = useState('');
+    const [filterSource, setFilterSource] = useState('all'); // all, sdr, stream
+    const [filterShipType, setFilterShipType] = useState('all');
     const hoverTimerRef = useRef<number | null>(null);
 
     const filteredShipsCount = useMemo(() => {
@@ -1625,7 +1630,7 @@ export default function App() {
                             style={{ background: isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => { if (!isSidebarOpen) e.currentTarget.style.background = 'transparent' }}
-                            title="Object List"
+                            title="Seen Objects"
                         >
                             <List size={22} />
                         </button>
@@ -1743,6 +1748,7 @@ export default function App() {
 
                                 return (
                                     <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={icon}
+                                        riseOnHover={true}
                                         eventHandlers={{
                                             mouseover: () => {
                                                 if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -1975,33 +1981,11 @@ export default function App() {
                             transition: isResizing ? 'none' : 'width 0.3s ease',
                             overflow: 'hidden'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
-                                <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
-                                    Local Objects ({ships.filter(s => {
-                                        const nameUpper = (s.name || "").toUpperCase();
-                                        return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
-                                    }).length})
-                                </h2>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: `1px solid ${colors.border}` }}>
+                                <h1 style={{ margin: 0, fontSize: '1.1rem', color: colors.textMain, fontWeight: 700 }}>
+                                    Seen Objects
+                                </h1>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <select
-                                        value={sortConfig.key}
-                                        onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
-                                        style={{
-                                            background: 'rgba(0,0,0,0.2)',
-                                            color: colors.textMain,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '4px',
-                                            padding: '4px 8px',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        <option value="name">Name</option>
-                                        <option value="last_seen">Last Seen</option>
-                                        <option value="shiptype">Type</option>
-                                        <option value="distance">Distance</option>
-                                        <option value="message_count">Messages</option>
-                                    </select>
                                     <button onClick={() => setSortConfig({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                                         <Navigation size={16} style={{
                                             transform: sortConfig.direction === 'asc' ? 'rotate(0deg)' : 'rotate(180deg)',
@@ -2014,8 +1998,102 @@ export default function App() {
                                 </div>
                             </div>
 
-                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                            {/* Sidebar Filter Bar */}
+                            <div style={{ padding: '12px 20px', borderBottom: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', gap: '10px', background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
+                                <div style={{ position: 'relative' }}>
+                                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
+                                    <input 
+                                        type="text" 
+                                        placeholder="Search name or MMSI..." 
+                                        value={searchTerm}
+                                        onChange={e => setSearchTerm(e.target.value)}
+                                        style={{ 
+                                            width: '100%', 
+                                            padding: '8px 10px 8px 32px', 
+                                            borderRadius: '6px', 
+                                            border: `1px solid ${colors.border}`,
+                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                                            color: colors.textMain,
+                                            fontSize: '0.85rem',
+                                            boxSizing: 'border-box'
+                                        }}
+                                    />
+                                    {searchTerm && (
+                                        <button 
+                                            onClick={() => setSearchTerm('')}
+                                            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px' }}
+                                        >
+                                            <X size={14} />
+                                        </button>
+                                    )}
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                    <select
+                                        value={filterSource}
+                                        onChange={(e) => setFilterSource(e.target.value)}
+                                        style={{
+                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                                            color: colors.textMain,
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '6px',
+                                            padding: '6px 8px',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer',
+                                            width: '100%'
+                                        }}
+                                    >
+                                        <option value="all">Any Source</option>
+                                        <option value="sdr">Local SDR</option>
+                                        <option value="stream">AisStream</option>
+                                    </select>
+                                    <select
+                                        value={sortConfig.key}
+                                        onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
+                                        style={{
+                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                                            color: colors.textMain,
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '6px',
+                                            padding: '6px 8px',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <option value="last_seen">Sort: Last Seen</option>
+                                        <option value="name">Sort: Name</option>
+                                        <option value="shiptype">Sort: Type</option>
+                                        <option value="distance">Sort: Distance</option>
+                                        <option value="message_count">Sort: Messages</option>
+                                    </select>
+                                </div>
+                                <select
+                                    value={filterShipType}
+                                    onChange={(e) => setFilterShipType(e.target.value)}
+                                    style={{
+                                        background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                                        color: colors.textMain,
+                                        border: `1px solid ${colors.border}`,
+                                        borderRadius: '6px',
+                                        padding: '6px 8px',
+                                        fontSize: '0.8rem',
+                                        cursor: 'pointer',
+                                        width: '100%'
+                                    }}
+                                >
+                                    <option value="all">All Ship Types</option>
+                                    <option value="cargo">Cargo Vessels</option>
+                                    <option value="tanker">Tankers</option>
+                                    <option value="passenger">Passenger Ships</option>
+                                    <option value="fishing">Fishing</option>
+                                    <option value="pleasure">Pleasure/Sailing</option>
+                                    <option value="tug">Tugs/Towing</option>
+                                    <option value="highspeed">High Speed Craft</option>
+                                    <option value="other">Other Types</option>
+                                </select>
+                            </div>
+
+                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     {ships.length === 0 ? (
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                                             No objects on the radar yet...
@@ -2023,7 +2101,38 @@ export default function App() {
                                     ) : ships
                                         .filter(s => {
                                             const nameUpper = (s.name || "").toUpperCase();
-                                            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
+                                            const mmsiStr = String(s.mmsi);
+                                            const type = s.shiptype || s.ship_type;
+                                            
+                                            // Basic exclusions (AtoN, Meteo, etc)
+                                            if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
+
+                                            // Search Filter
+                                            if (searchTerm) {
+                                                const term = searchTerm.toUpperCase();
+                                                if (!nameUpper.includes(term) && !mmsiStr.includes(term)) return false;
+                                            }
+
+                                            // Source Filter
+                                            if (filterSource !== 'all') {
+                                                const source = s.source || 'sdr';
+                                                if (filterSource === 'sdr' && source !== 'sdr' && source !== 'local') return false;
+                                                if (filterSource === 'stream' && source !== 'aisstream') return false;
+                                            }
+
+                                            // Ship Type Filter
+                                            if (filterShipType !== 'all') {
+                                                if (filterShipType === 'cargo' && !(type >= 70 && type <= 79)) return false;
+                                                if (filterShipType === 'tanker' && !(type >= 80 && type <= 89)) return false;
+                                                if (filterShipType === 'passenger' && !(type >= 60 && type <= 69)) return false;
+                                                if (filterShipType === 'fishing' && type !== 30) return false;
+                                                if (filterShipType === 'pleasure' && !(type >= 36 && type <= 37)) return false;
+                                                if (filterShipType === 'tug' && !(type >= 31 && type <= 32 || type === 52)) return false;
+                                                if (filterShipType === 'highspeed' && !(type >= 40 && type <= 49)) return false;
+                                                if (filterShipType === 'other' && (type >= 30 && type <= 89)) return false; // Simple logic: not any above but still defined
+                                            }
+
+                                            return true;
                                         })
                                         .map(s => {
                                             const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
@@ -2105,10 +2214,13 @@ export default function App() {
                                                             {ship.name || ship.mmsi}
                                                         </span>
                                                     </div>
-                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
+                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
                                                         <span>{getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}</span>
                                                         <span style={{ opacity: 0.5 }}>•</span>
                                                         <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}</span>
+                                                        <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(0,255,128,0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#00ff80', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}` }}>
+                                                            {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
+                                                        </span>
                                                     </div>
                                                 </div>
 
