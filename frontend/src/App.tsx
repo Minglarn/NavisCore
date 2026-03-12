@@ -673,7 +673,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                                         textTransform: 'uppercase',
                                         border: `1px solid ${ship.source === 'aisstream' ? 'rgba(68, 170, 255, 0.4)' : 'rgba(0, 255, 128, 0.4)'}`
                                     }}>
-                                        {ship.source === 'aisstream' ? 'AisStream.io' : 'Live SDR'}
+                                        {ship.source === 'aisstream' ? 'STREAM' : 'Live SDR'}
                                     </div>
                                 </div>
                             </div>

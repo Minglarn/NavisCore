@@ -59,6 +59,10 @@ forwarding_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 local_vessels = {}
 aisstream_task = None
 
+# Enrichment Queue for ship images to avoid rate limiting
+enrichment_queue = asyncio.Queue()
+queued_mmsis = set()
+
 # Settings Helpers
 async def cleanup_history_task():
     """Background task to remove history entries older than 24 hours"""
@@ -481,6 +485,29 @@ async def enrich_ship_data(mmsi: str):
         if mmsi in active_lookups:
             active_lookups.remove(mmsi)
 
+# Enrichment Worker
+async def enrichment_worker():
+    """
+    Background worker that processes the enrichment queue sequentially with a delay
+    to avoid overwhelming external AIS image providers.
+    """
+    logger.info("Enrichment worker started.")
+    while True:
+        try:
+            mmsi = await enrichment_queue.get()
+            try:
+                await enrich_ship_data(mmsi)
+            finally:
+                if mmsi in queued_mmsis:
+                    queued_mmsis.remove(mmsi)
+                enrichment_queue.task_done()
+                
+            # Polite delay between requests
+            await asyncio.sleep(2.0)
+        except Exception as e:
+            logger.error(f"Error in enrichment_worker: {e}")
+            await asyncio.sleep(5.0)
+
 # Processing logic
 async def process_ais_data(data: dict):
     mmsi_val = data.get("mmsi")
@@ -529,7 +556,9 @@ async def process_ais_data(data: dict):
 
     # ── Static data without position (Type 5, 24) — update DB only ──
     if msg_type in [5, 24] and lat is None:
-        asyncio.create_task(enrich_ship_data(mmsi_str))
+        if mmsi_str not in queued_mmsis:
+            queued_mmsis.add(mmsi_str)
+            enrichment_queue.put_nowait(mmsi_str)
         async with aiosqlite.connect(DB_PATH) as db:
             # Check if ship exists and when it was last seen for reset_count
             async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
@@ -561,10 +590,14 @@ async def process_ais_data(data: dict):
             if data.get("callsign"):
                 update_fields.append("callsign = ?")
                 update_values.append(data.get("callsign"))
-            ship_type_val = data.get("ship_type") or data.get("shiptype")
-            if ship_type_val is not None:
+            if (data.get("ship_type") or data.get("shiptype")) is not None:
                 update_fields.append("type = ?")
-                update_values.append(ship_type_val)
+                update_values.append(data.get("ship_type") or data.get("shiptype"))
+            
+            # Persist source
+            update_fields.append("source = ?")
+            update_values.append(source)
+
             if data.get("destination"):
                 update_fields.append("destination = ?")
                 update_values.append(data.get("destination"))
@@ -607,7 +640,10 @@ async def process_ais_data(data: dict):
         
     is_aton = data.get("is_aton", False)
     
-    asyncio.create_task(enrich_ship_data(mmsi_str))
+    # NEW: Use enrichment queue instead of starting immediate task
+    if mmsi_str not in queued_mmsis:
+        queued_mmsis.add(mmsi_str)
+        enrichment_queue.put_nowait(mmsi_str)
     
     ship_data = {
         "mmsi": mmsi_str,
@@ -636,6 +672,7 @@ async def process_ais_data(data: dict):
         "water_level": data.get("water_level"),
         "destination": data.get("destination"),
         "draught": data.get("draught"),
+        "source": source,
     }
 
     # Validate Navigational Status against Speed (SOG)
@@ -711,6 +748,10 @@ async def process_ais_data(data: dict):
         if data.get("rot") is not None:
             update_fields.append("rot = ?")
             update_values.append(data.get("rot"))
+            
+        # Persist source
+        update_fields.append("source = ?")
+        update_values.append(source)
             
         update_values.append(mmsi_str)
         await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(update_values))
@@ -1140,6 +1181,10 @@ async def startup_event():
         except Exception: pass
 
         try:
+            await db.execute("ALTER TABLE ships ADD COLUMN source TEXT DEFAULT 'local'")
+        except Exception: pass
+
+        try:
             await db.execute("ALTER TABLE ships ADD COLUMN previous_seen DATETIME")
         except Exception: pass
         
@@ -1178,6 +1223,7 @@ async def startup_event():
     asyncio.create_task(purge_job())
     asyncio.create_task(coverage_24h_reset_job())
     asyncio.create_task(aisstream_loop())
+    asyncio.create_task(enrichment_worker())
 
 # API Endpoints
 @app.get("/api/ships")
@@ -1248,6 +1294,7 @@ async def get_ships():
                 d["rot"] = row["rot"]
                 d["imo"] = row["imo"]
                 d["callsign"] = row["callsign"]
+                d["source"] = row["source"] or "local"
                 d["manual_image"] = bool(row["manual_image"])
                 
                 if d.get("previous_seen"):
