@@ -1,4 +1,5 @@
 import asyncio
+import time
 import json
 import logging
 import os
@@ -54,6 +55,9 @@ mqtt_client_task = None
 mqtt_connected = False
 active_lookups = set()
 forwarding_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# Tracking local vessels for AisStream deduplication. Key: MMSI, Value: last_seen timestamp
+local_vessels = {}
+aisstream_task = None
 
 # Settings Helpers
 async def cleanup_history_task():
@@ -108,7 +112,9 @@ async def get_all_settings():
         "sdr_gain": await get_setting("sdr_gain", "auto"),
         "ship_size": await get_setting("ship_size", "1.0"),
         "circle_size": await get_setting("circle_size", "1.0"),
-        "trail_size": await get_setting("trail_size", "2.0")
+        "trail_size": await get_setting("trail_size", "1.0"),
+        "aisstream_enabled": await get_setting("aisstream_enabled", "false"),
+        "aisstream_api_key": await get_setting("aisstream_api_key", os.getenv("AISSTREAM_API_KEY", "")),
     }
 
 # WebSockets
@@ -124,6 +130,108 @@ async def broadcast(data: dict):
             to_remove.add(client)
     for client in to_remove:
         connected_clients.remove(client)
+
+
+# ── AisStream Integration ──
+def translate_aisstream_message(msg: dict) -> dict:
+    """
+    Translates AisStream.io JSON format to internal dict format.
+    """
+    try:
+        msg_type_str = msg.get("MessageType")
+        meta = msg.get("MetaData", {})
+        body = msg.get("Message", {}).get(msg_type_str, {})
+        
+        mmsi = meta.get("MMSI")
+        if not mmsi: return None
+        
+        # Internal types: 
+        # PositionReport: 1, ShipStaticData: 5, AidsToNavigationReport: 21, SAR: 9
+        type_map = {
+            "PositionReport": 1,
+            "ShipStaticData": 5,
+            "AidsToNavigationReport": 21,
+            "StandardSearchAndRescueAircraftReport": 9
+        }
+        
+        internal_data = {
+            "mmsi": mmsi,
+            "type": type_map.get(msg_type_str, 0),
+            "name": meta.get("ShipName", "").strip(),
+            "lat": body.get("Latitude"),
+            "lon": body.get("Longitude"),
+            "speed": body.get("Sog") or body.get("SpeedOverGround"),
+            "course": body.get("Cog") or body.get("CourseOverGround"),
+            "heading": body.get("TrueHeading"),
+            "source": "aisstream"
+        }
+        
+        if msg_type_str == "AidsToNavigationReport":
+            internal_data["is_aton"] = True
+        elif msg_type_str == "StandardSearchAndRescueAircraftReport":
+            internal_data["is_sar"] = True
+            
+        return internal_data
+    except Exception as e:
+        logger.error(f"Error translating AisStream message: {e}")
+        return None
+
+async def aisstream_loop():
+    """
+    Background loop connecting to AisStream.io WebSocket.
+    """
+    import websockets
+    
+    logger.info("AisStream.io background task started.")
+    
+    while True:
+        try:
+            settings = await get_all_settings()
+            enabled = settings.get("aisstream_enabled") == "true"
+            api_key = settings.get("aisstream_api_key")
+            
+            if not enabled:
+                logger.debug("AisStream.io is disabled in settings.")
+                await asyncio.sleep(15)
+                continue
+                
+            if not api_key:
+                logger.warning("AisStream.io is enabled but API key is missing.")
+                await asyncio.sleep(15)
+                continue
+                
+            url = "wss://stream.aisstream.io/v0/stream"
+            
+            logger.info(f"Connecting to AisStream.io at {url}...")
+            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                # Subscription Message
+                sub_msg = {
+                    "APIKey": api_key,
+                    "BoundingBoxes": [[[56.5, 15.5], [60.0, 21.0]]],
+                    "FiltersShipMMSI": [],
+                    "FilterMessageTypes": [
+                        "PositionReport", 
+                        "ShipStaticData", 
+                        "AidsToNavigationReport", 
+                        "StandardSearchAndRescueAircraftReport"
+                    ]
+                }
+                await ws.send(json.dumps(sub_msg))
+                logger.info("AisStream.io subscription sent successfully.")
+                
+                async for message in ws:
+                    try:
+                        msg_json = json.loads(message)
+                        translated = translate_aisstream_message(msg_json)
+                        if translated:
+                            asyncio.create_task(process_ais_data(translated))
+                    except Exception as inner_e:
+                        logger.error(f"Error processing AisStream message: {inner_e}")
+                        
+        except Exception as e:
+            logger.error(f"AisStream.io loop error: {e}")
+            await asyncio.sleep(10)
+
 
 # Math Helpers
 def haversine_distance(lat1, lon1, lat2, lon2):
@@ -390,6 +498,18 @@ async def process_ais_data(data: dict):
 
     ship_name = data.get("shipname") or data.get("name")
     settings = await get_all_settings()
+    
+    source = data.get("source", "local")
+    
+    # ── Deduplication for AisStream ──
+    if source == "aisstream":
+        # Discard if we have fresh local data (within last 10 minutes)
+        if mmsi_str in local_vessels:
+            if time.time() - local_vessels[mmsi_str] < 600:
+                return
+    else:
+        # Update local tracking
+        local_vessels[mmsi_str] = time.time()
 
     # ── Safety Messages (Type 12 & 14) — broadcast to all WebSocket clients ──
     if data.get("is_safety"):
@@ -672,7 +792,8 @@ async def process_ais_data(data: dict):
         is_aton_val = ship_data.get("is_aton", False)
         is_aircraft = stype == 9 or stype == 18 or data.get("is_sar", False)
 
-        if origin_lat_str and origin_lon_str and not is_meteo and not is_aton_val and not is_aircraft and not mmsi_str.startswith("99"):
+        # AISSTREAM data never updates range stats
+        if source != "aisstream" and origin_lat_str and origin_lon_str and not is_meteo and not is_aton_val and not is_aircraft and not mmsi_str.startswith("99"):
             try:
                 olat = float(origin_lat_str)
                 olon = float(origin_lon_str)
@@ -754,6 +875,7 @@ class UDPProtocol(asyncio.DatagramProtocol):
         asyncio.create_task(self.update_settings_loop())
 
     def handle_parsed_custom(self, decoded_data: dict):
+        decoded_data["source"] = "local"
         asyncio.create_task(process_ais_data(decoded_data))
 
     async def update_settings_loop(self):
@@ -991,6 +1113,8 @@ async def startup_event():
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('ship_size', '1.0')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('circle_size', '1.0')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('trail_size', '2.0')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('aisstream_enabled', 'false')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('aisstream_api_key', '')")
         
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN heading REAL")
@@ -1053,6 +1177,7 @@ async def startup_event():
     asyncio.create_task(mock_mode_loop())
     asyncio.create_task(purge_job())
     asyncio.create_task(coverage_24h_reset_job())
+    asyncio.create_task(aisstream_loop())
 
 # API Endpoints
 @app.get("/api/ships")

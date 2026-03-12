@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2 } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 function CenterButton({ originLat, originLon }: { originLat: number, originLon: number }) {
@@ -590,6 +590,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'Width', value: ship.width ? `${ship.width}m` : '--' },
         { label: 'Messages', value: ship.message_count || '--' },
         { label: 'Last Signal', value: getTimeAgo(ship.timestamp) },
+        { label: 'Data Source', value: ship.source === 'aisstream' ? 'AisStream.io' : 'Local SDR' },
         { label: 'Previous Seen', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
     ];
 
@@ -660,7 +661,21 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                             <span style={{ fontSize: '2.5rem' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
                             <div>
                                 <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{ship.name || 'Unknown Vessel'}</h1>
-                                <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>{ship.ship_type_text}</div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                    <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>{ship.ship_type_text}</div>
+                                    <div style={{
+                                        background: ship.source === 'aisstream' ? 'rgba(68, 170, 255, 0.2)' : 'rgba(0, 255, 128, 0.2)',
+                                        color: ship.source === 'aisstream' ? '#44aaff' : '#00ff80',
+                                        padding: '2px 8px',
+                                        borderRadius: '4px',
+                                        fontSize: '0.7rem',
+                                        fontWeight: 'bold',
+                                        textTransform: 'uppercase',
+                                        border: `1px solid ${ship.source === 'aisstream' ? 'rgba(68, 170, 255, 0.4)' : 'rgba(0, 255, 128, 0.4)'}`
+                                    }}>
+                                        {ship.source === 'aisstream' ? 'AisStream.io' : 'Live SDR'}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -740,6 +755,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
         { id: 'map', label: 'Map', icon: <Sun size={18} /> },
         { id: 'coverage', label: 'Coverage', icon: <Navigation size={18} /> },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} /> },
+        { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} /> },
     ];
 
     return (
@@ -989,6 +1005,33 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                         </div>
                     )}
+
+                    {activeTab === 'hybrid' && (
+                        <div className="settings-section">
+                            <div className="settings-section-title">AisStream.io Integration</div>
+                            <div className="form-group">
+                                <label>Enable Hybrid Data</label>
+                                <Toggle
+                                    checked={settings.aisstream_enabled === 'true'}
+                                    onChange={val => setSettings({ ...settings, aisstream_enabled: String(val) })}
+                                />
+                            </div>
+                            <div className="form-group vertical">
+                                <label>AisStream.io API Key</label>
+                                <input 
+                                    type="password" 
+                                    placeholder="Your API Key" 
+                                    value={settings.aisstream_api_key} 
+                                    onChange={e => setSettings({ ...settings, aisstream_api_key: e.target.value })} 
+                                    style={{ width: '100%', boxSizing: 'border-box' }} 
+                                />
+                                <div className="description" style={{ marginTop: '8px' }}>
+                                    Required to fetch live AIS data from AisStream.io. 
+                                    Get your free key at <a href="https://aisstream.io" target="_blank" rel="noreferrer" style={{color: '#44aaff'}}>aisstream.io</a>.
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ padding: '25px 30px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '15px', background: 'rgba(0,0,0,0.1)' }}>
@@ -1037,7 +1080,9 @@ export default function App() {
         units: 'nautical',
         ship_size: '1.0',
         circle_size: '1.0',
-        trail_size: '2.0'
+        trail_size: '2.0',
+        aisstream_enabled: 'false',
+        aisstream_api_key: ''
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
@@ -1105,7 +1150,9 @@ export default function App() {
                     units: data.units || 'nautical',
                     ship_size: data.ship_size || '1.0',
                     circle_size: data.circle_size || '1.0',
-                    trail_size: data.trail_size || '2.0'
+                    trail_size: data.trail_size || '2.0',
+                    aisstream_enabled: data.aisstream_enabled || 'false',
+                    aisstream_api_key: data.aisstream_api_key || ''
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');

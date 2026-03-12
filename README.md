@@ -11,6 +11,7 @@
 - **Real-time Map**: Interactive map with real-time ship positions, COG (Course Over Ground) lines, and persistence (saves your zoom/center).
 - **RF Resilience**: Intelligent range limiting (200 Nm) to filter out unrealistic tropo-propogation data from statistics.
 - **SDR Management UI**: Configure tuner gain and frequency correction (PPM) directly from the dashboard settings.
+- **Hybrid Data Feed**: Seamlessly integrates real-time AIS data from [AisStream.io](https://aisstream.io) alongside local SDR data with intelligent deduplication.
 - **Mock Mode**: Development-friendly mode to generate simulated AIS traffic without an SDR device.
 
 ## Architecture
@@ -29,6 +30,7 @@ NavisCore is highly flexible and can receive AIS traffic from multiple sources:
 - **MQTT Interface**: Can subscribe to AIS NMEA strings on a remote MQTT broker.
 - **Mock Mode**: Generates simulated traffic for testing and demonstration.
 - **UDP Push**: Accepts NMEA data pushed to port `10110/udp`.
+- **AisStream.io Hybrid**: Real-time global AIS feed via WebSockets (requires API key).
 
 ## Quick Start
 
