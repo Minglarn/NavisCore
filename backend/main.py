@@ -1,6 +1,7 @@
 import asyncio
 import time
 import json
+import random
 import logging
 import os
 import shutil
@@ -155,7 +156,8 @@ def translate_aisstream_message(msg: dict) -> dict:
             "PositionReport": 1,
             "ShipStaticData": 5,
             "AidsToNavigationReport": 21,
-            "StandardSearchAndRescueAircraftReport": 9
+            "StandardSearchAndRescueAircraftReport": 9,
+            "SafetyBroadcastMessage": 14
         }
         
         internal_data = {
@@ -174,6 +176,10 @@ def translate_aisstream_message(msg: dict) -> dict:
             internal_data["is_aton"] = True
         elif msg_type_str == "StandardSearchAndRescueAircraftReport":
             internal_data["is_sar"] = True
+        elif msg_type_str == "SafetyBroadcastMessage":
+            internal_data["is_safety"] = True
+            internal_data["safety_text"] = body.get("Text", "")
+            internal_data["is_broadcast_alert"] = True
             
         return internal_data
     except Exception as e:
@@ -217,7 +223,8 @@ async def aisstream_loop():
                         "PositionReport", 
                         "ShipStaticData", 
                         "AidsToNavigationReport", 
-                        "StandardSearchAndRescueAircraftReport"
+                        "StandardSearchAndRescueAircraftReport",
+                        "SafetyBroadcastMessage"
                     ]
                 }
                 await ws.send(json.dumps(sub_msg))
@@ -464,12 +471,14 @@ async def enrich_ship_data(mmsi: str):
                 if not has_image:
                     success = await try_minglarn_image(mmsi)
                     if not success:
+                        await asyncio.sleep(2.0 + random.random())
                         success = await try_marinetraffic_image(mmsi)
                         if not success:
                             await handle_fallback_image(mmsi)
             else:
                 success = await try_minglarn_image(mmsi)
                 if not success:
+                    await asyncio.sleep(2.0 + random.random())
                     success = await try_marinetraffic_image(mmsi)
                     if not success:
                         await handle_fallback_image(mmsi)
@@ -478,6 +487,7 @@ async def enrich_ship_data(mmsi: str):
         logger.error(f"[Enrichment] Error during enrichment for {mmsi}: {e}")
         success = await try_minglarn_image(mmsi)
         if not success:
+            await asyncio.sleep(2.0 + random.random())
             success = await try_marinetraffic_image(mmsi)
             if not success:
                 await handle_fallback_image(mmsi)
@@ -502,8 +512,8 @@ async def enrichment_worker():
                     queued_mmsis.remove(mmsi)
                 enrichment_queue.task_done()
                 
-            # Polite delay between requests
-            await asyncio.sleep(2.0)
+            # Polite delay between requests (5-7 seconds with jitter)
+            await asyncio.sleep(5.0 + random.random() * 2.0)
         except Exception as e:
             logger.error(f"Error in enrichment_worker: {e}")
             await asyncio.sleep(5.0)
