@@ -12,7 +12,8 @@ import aiosqlite
 import aiomqtt
 import socket
 import math
-from datetime import datetime
+from datetime import datetime, timedelta
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -56,6 +57,7 @@ mqtt_client_task = None
 mqtt_connected = False
 active_lookups = set()
 forwarding_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+udp_server_transport = None
 # Tracking local vessels for AisStream deduplication. Key: MMSI, Value: last_seen timestamp
 local_vessels = {}
 aisstream_task = None
@@ -64,12 +66,20 @@ aisstream_task = None
 enrichment_queue = asyncio.Queue()
 queued_mmsis = set()
 
+# Database helper
+@asynccontextmanager
+async def db_session():
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute('PRAGMA journal_mode=WAL')
+        await db.execute('PRAGMA busy_timeout=30000')
+        yield db
+
 # Settings Helpers
 async def cleanup_history_task():
     """Background task to remove history entries older than 24 hours"""
     while True:
         try:
-            async with aiosqlite.connect(DB_PATH) as db:
+            async with db_session() as db:
                 # Remove history older than 24 hours (86400 seconds)
                 # Note: We use 24h as a hard limit regardless of UI setting to keep DB lean
                 cutoff = int(datetime.now().timestamp() * 1000) - (24 * 3600 * 1000)
@@ -81,13 +91,13 @@ async def cleanup_history_task():
         await asyncio.sleep(3600) # Run once an hour
 
 async def get_setting(key: str, default_val: str = "") -> str:
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         async with db.execute('SELECT value FROM settings WHERE key = ?', (key,)) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else default_val
 
 async def set_setting(key: str, value: str):
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         await db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
         await db.commit()
 
@@ -120,6 +130,11 @@ async def get_all_settings():
         "trail_size": await get_setting("trail_size", "1.0"),
         "aisstream_enabled": await get_setting("aisstream_enabled", "false"),
         "aisstream_api_key": await get_setting("aisstream_api_key", os.getenv("AISSTREAM_API_KEY", "")),
+        "trail_mode": await get_setting("trail_mode", "all"),
+        "show_aisstream_on_map": await get_setting("show_aisstream_on_map", "true"),
+        "sdr_enabled": await get_setting("sdr_enabled", "true"),
+        "udp_enabled": await get_setting("udp_enabled", "true"),
+        "udp_port": await get_setting("udp_port", str(UDP_PORT)),
     }
 
 # WebSockets
@@ -325,7 +340,7 @@ async def handle_fallback_image(mmsi: str):
         try:
             # Instead of copying, we just point to the default image in the DB
             # This allows us to retry fetching a real image later
-            async with aiosqlite.connect(DB_PATH) as db:
+            async with db_session() as db:
                 await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', ("/images/0.jpg", mmsi))
                 await db.commit()
             logger.info(f"[Enrichment] Set placeholder image for {mmsi}")
@@ -357,7 +372,7 @@ async def try_minglarn_image(mmsi: str) -> bool:
                 with open(local_path, "wb") as f:
                     f.write(res.content)
                 logger.info(f"[Enrichment] Downloaded image for {mmsi} from Minglarn")
-                async with aiosqlite.connect(DB_PATH) as db:
+                async with db_session() as db:
                     await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{local_filename}", mmsi))
                     await db.commit()
                 return True
@@ -381,7 +396,7 @@ async def try_marinetraffic_image(mmsi: str) -> bool:
                 with open(local_path, "wb") as f:
                     f.write(res.content)
                 logger.info(f"[Enrichment] Downloaded image for {mmsi} from MarineTraffic fallback")
-                async with aiosqlite.connect(DB_PATH) as db:
+                async with db_session() as db:
                     await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{local_filename}", mmsi))
                     await db.commit()
                 return True
@@ -400,7 +415,7 @@ async def enrich_ship_data(mmsi: str):
     active_lookups.add(mmsi)
 
     try:
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with db_session() as db:
             async with db.execute('SELECT image_fetched_at, image_url, manual_image FROM ships WHERE mmsi = ?', (mmsi,)) as cursor:
                 row = await cursor.fetchone()
                 image_url = None
@@ -450,7 +465,7 @@ async def enrich_ship_data(mmsi: str):
                 name = ship.get("NAME")
                 portrait_id = ship.get("PORTRAIT")
 
-                async with aiosqlite.connect(DB_PATH) as db:
+                async with db_session() as db:
                     if name:
                         await db.execute('UPDATE ships SET name = ? WHERE mmsi = ?', (name, mmsi))
                     
@@ -575,7 +590,7 @@ async def process_ais_data(data: dict):
         if mmsi_str not in queued_mmsis:
             queued_mmsis.add(mmsi_str)
             enrichment_queue.put_nowait(mmsi_str)
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with db_session() as db:
             # Check if ship exists and when it was last seen for reset_count
             async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 row = await cursor.fetchone()
@@ -701,7 +716,7 @@ async def process_ais_data(data: dict):
             ship_data["status_text"] = "Moored (Stationary)"
             ship_data["nav_status"] = 5
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         # Check if ship exists and when it was last seen
         async with db.execute('SELECT last_seen, message_count FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
@@ -720,6 +735,7 @@ async def process_ais_data(data: dict):
                 except Exception as e:
                     logger.error(f"Error checking last_seen for {mmsi_str}: {e}")
 
+        is_new_vessel = row is None
         await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
         
         # Build update query dynamically
@@ -789,12 +805,23 @@ async def process_ais_data(data: dict):
             ON CONFLICT(date) DO UPDATE SET total_messages = total_messages + 1
         ''', (today_date,))
         
+        # Increment hourly status
+        current_hour = datetime.utcnow().hour
+        await db.execute('''
+            INSERT INTO hourly_stats (date, hour, message_count) VALUES (?, ?, 1)
+            ON CONFLICT(date, hour) DO UPDATE SET message_count = message_count + 1
+        ''', (today_date, current_hour))
+        
         # Track unique ships
         try:
             await db.execute('INSERT INTO daily_mmsi (date, mmsi) VALUES (?, ?)', (today_date, mmsi_str))
             # If successful (no UNIQUE constraint violation), increment unique_ships
-            await db.execute('''
-                UPDATE daily_stats SET unique_ships = unique_ships + 1 WHERE date = ?
+            update_stats_fields = ["unique_ships = unique_ships + 1"]
+            if is_new_vessel:
+                update_stats_fields.append("new_ships = new_ships + 1")
+            
+            await db.execute(f'''
+                UPDATE daily_stats SET {", ".join(update_stats_fields)} WHERE date = ?
             ''', (today_date,))
         except Exception:
             pass # MMSI already counted for today
@@ -922,13 +949,10 @@ async def process_ais_data(data: dict):
 class UDPProtocol(asyncio.DatagramProtocol):
     def connection_made(self, transport):
         self.transport = transport
-        logger.info(f"UDP server listening on port {UDP_PORT}")
         self.settings = {}
-        
         # Initialize custom AisStreamManager for puzzle messages & Swedish weather
         self.stream_manager = AisStreamManager()
         self.stream_manager.on_decode(self.handle_parsed_custom)
-        
         asyncio.create_task(self.update_settings_loop())
 
     def handle_parsed_custom(self, decoded_data: dict):
@@ -939,6 +963,37 @@ class UDPProtocol(asyncio.DatagramProtocol):
         while True:
             self.settings = await get_all_settings()
             await asyncio.sleep(5)
+
+async def start_udp_listener():
+    global udp_server_transport
+    loop = asyncio.get_running_loop()
+    settings = await get_all_settings()
+    port_str = settings.get("udp_port", str(UDP_PORT))
+    enabled = settings.get("udp_enabled", "true") == "true"
+    
+    try:
+        port = int(port_str)
+    except ValueError:
+        port = UDP_PORT
+    
+    if udp_server_transport:
+        logger.info("Closing existing UDP listener...")
+        udp_server_transport.close()
+        udp_server_transport = None
+        
+    if not enabled:
+        logger.info("UDP Listener is DISABLED in settings.")
+        return
+
+    try:
+        transport, _ = await loop.create_datagram_endpoint(
+            lambda: UDPProtocol(), 
+            local_addr=('0.0.0.0', port)
+        )
+        udp_server_transport = transport
+        logger.info(f"UDP server successfully started on port {port}")
+    except Exception as e:
+        logger.error(f"Failed to start UDP listener on port {port}: {e}")
 
     def datagram_received(self, data, addr):
         if MOCK_MODE:
@@ -1039,7 +1094,7 @@ async def purge_job():
     while True:
         try:
             logger.info("[Purge] Running cleanup of old ships data (>30 days)")
-            async with aiosqlite.connect(DB_PATH) as db:
+            async with db_session() as db:
                 async with db.execute("SELECT mmsi, image_url FROM ships WHERE last_seen < datetime('now', '-30 days')") as cursor:
                     rows = await cursor.fetchall()
                     for row in rows:
@@ -1067,7 +1122,7 @@ async def purge_job():
 async def coverage_24h_reset_job():
     while True:
         try:
-            async with aiosqlite.connect(DB_PATH) as db:
+            async with db_session() as db:
                 # Reset range_km_24h for sectors not updated in the last 24 hours
                 await db.execute(
                     "UPDATE coverage_sectors SET range_km_24h = 0.0 WHERE last_updated < datetime('now', '-24 hours')"
@@ -1101,7 +1156,7 @@ async def startup_event():
             except Exception as e:
                 logger.error(f"Failed to create placeholder 0.jpg: {e}")
 
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         await db.execute('''CREATE TABLE IF NOT EXISTS ships (
             mmsi TEXT PRIMARY KEY,
             imo TEXT,
@@ -1172,6 +1227,11 @@ async def startup_event():
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('trail_size', '2.0')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('aisstream_enabled', 'false')")
         await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('aisstream_api_key', '')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('trail_mode', 'all')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('show_aisstream_on_map', 'true')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('sdr_enabled', 'true')")
+        await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES ('udp_enabled', 'true')")
+        await db.execute(f"INSERT OR IGNORE INTO settings (key, value) VALUES ('udp_port', '{UDP_PORT}')")
         
         try:
             await db.execute("ALTER TABLE ships ADD COLUMN heading REAL")
@@ -1219,20 +1279,32 @@ async def startup_event():
         await db.execute('''CREATE TABLE IF NOT EXISTS daily_stats (
             date TEXT PRIMARY KEY,
             unique_ships INTEGER DEFAULT 0,
+            new_ships INTEGER DEFAULT 0,
             total_messages INTEGER DEFAULT 0,
             max_range_km REAL DEFAULT 0.0
         )''')
+        
+        try:
+            await db.execute("ALTER TABLE daily_stats ADD COLUMN new_ships INTEGER DEFAULT 0")
+        except Exception: pass
         
         await db.execute('''CREATE TABLE IF NOT EXISTS daily_mmsi (
             date TEXT,
             mmsi TEXT,
             PRIMARY KEY (date, mmsi)
         )''')
+
+        await db.execute('''CREATE TABLE IF NOT EXISTS hourly_stats (
+            date TEXT,
+            hour INTEGER,
+            message_count INTEGER DEFAULT 0,
+            PRIMARY KEY (date, hour)
+        )''')
         
         await db.commit()
 
     loop = asyncio.get_running_loop()
-    await loop.create_datagram_endpoint(lambda: UDPProtocol(), local_addr=('0.0.0.0', UDP_PORT))
+    await start_udp_listener()
     
     restart_mqtt()
     asyncio.create_task(mock_mode_loop())
@@ -1246,7 +1318,7 @@ async def startup_event():
 async def get_ships():
     settings = await get_all_settings()
     timeout_mins = int(settings.get("ship_timeout", 60))
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         db.row_factory = aiosqlite.Row
         
         # Get history duration setting
@@ -1331,9 +1403,13 @@ async def get_settings_api():
 
 @app.post("/api/settings")
 async def set_settings_api(settings: dict):
+    logger.info(f"[Settings] Received update request: {list(settings.keys())}")
     old_settings = await get_all_settings()
     for key, value in settings.items():
         if value is not None:
+            # Only log important changes to avoid spamming
+            if old_settings.get(key) != str(value):
+                logger.info(f"[Settings] Updating {key}: {old_settings.get(key)} -> {value}")
             await set_setting(key, str(value))
             
     # Reset 24h range ONLY if origin has actually changed
@@ -1343,16 +1419,23 @@ async def set_settings_api(settings: dict):
     if new_lat is not None or new_lon is not None:
         if str(new_lat) != old_settings.get("origin_lat") or str(new_lon) != old_settings.get("origin_lon"):
              logger.info(f"[Settings] Station origin changed from ({old_settings.get('origin_lat')},{old_settings.get('origin_lon')}) to ({new_lat},{new_lon}). Resetting coverage.")
-             async with aiosqlite.connect(DB_PATH) as db:
+             async with db_session() as db:
                 await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
                 await db.commit()
             
+    if settings.get("udp_port") and str(settings.get("udp_port")) != old_settings.get("udp_port"):
+        logger.info(f"[Settings] UDP Port changed to {settings.get('udp_port')}. Restarting listener.")
+        asyncio.create_task(start_udp_listener())
+    elif settings.get("udp_enabled") and str(settings.get("udp_enabled")) != old_settings.get("udp_enabled"):
+        logger.info(f"[Settings] UDP Enabled status changed to {settings.get('udp_enabled')}. Updating listener.")
+        asyncio.create_task(start_udp_listener())
+
     restart_mqtt()
     return {"success": True, "settings": await get_all_settings()}
 
 @app.post("/api/coverage/reset")
 async def reset_coverage():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
         await db.commit()
     logger.info("[Coverage] Manual reset of all range data")
@@ -1360,7 +1443,7 @@ async def reset_coverage():
 
 @app.get("/api/coverage")
 async def get_coverage():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with db_session() as db:
         db.row_factory = aiosqlite.Row
         async with db.execute("SELECT sector_id, range_km_24h, range_km_alltime FROM coverage_sectors ORDER BY sector_id ASC") as cursor:
             rows = await cursor.fetchall()
@@ -1378,7 +1461,7 @@ async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
         with open(local_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
-        async with aiosqlite.connect(DB_PATH) as db:
+        async with db_session() as db:
             await db.execute('''
                 UPDATE ships 
                 SET image_url = ?, manual_image = 1, image_fetched_at = CURRENT_TIMESTAMP
@@ -1405,36 +1488,94 @@ async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
         return {"success": False, "error": str(e)}
 
 @app.get("/api/statistics")
-async def get_statistics():
-    today_date = datetime.utcnow().strftime('%Y-%m-%d')
-    async with aiosqlite.connect(DB_PATH) as db:
-        db.row_factory = aiosqlite.Row
+async def get_statistics(date: str = None):
+    try:
+        today_date = datetime.utcnow().strftime('%Y-%m-%d')
+        selected_date = date if date else today_date
         
-        # 1. Get today's stats
-        cursor = await db.execute("SELECT unique_ships, total_messages, max_range_km FROM daily_stats WHERE date = ?", (today_date,))
-        today_row = await cursor.fetchone()
-        today_stats = dict(today_row) if today_row else {"unique_ships": 0, "total_messages": 0, "max_range_km": 0.0}
-        
-        # 2. Get all-time records
-        cursor = await db.execute("SELECT MAX(unique_ships) as max_ships, MAX(total_messages) as max_msgs, MAX(max_range_km) as max_rng FROM daily_stats")
-        all_row = await cursor.fetchone()
-        all_time_stats = {
-            "unique_ships": all_row["max_ships"] if all_row["max_ships"] else 0,
-            "total_messages": all_row["max_msgs"] if all_row["max_msgs"] else 0,
-            "max_range_km": round(all_row["max_rng"] if all_row["max_rng"] else 0.0, 1)
-        }
-        
-        # 3. Get recent history (last 14 days)
-        cursor = await db.execute("SELECT date, unique_ships, total_messages FROM daily_stats ORDER BY date DESC LIMIT 14")
-        history_rows = await cursor.fetchall()
-        history = [dict(row) for row in history_rows]
-        history.reverse() # Chronological order
-        
-        return {
-            "today": today_stats,
-            "all_time": all_time_stats,
-            "history": history
-        }
+        # Validate date format
+        try:
+            yesterday_date = (datetime.strptime(selected_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+        except:
+            selected_date = today_date
+            yesterday_date = (datetime.strptime(selected_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+            yesterday_date = (datetime.strptime(selected_date, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
+
+        async with db_session() as db:
+            db.row_factory = aiosqlite.Row
+            
+            # 1. Get stats for selected date
+            cursor = await db.execute("SELECT unique_ships, new_ships, total_messages, max_range_km FROM daily_stats WHERE date = ?", (selected_date,))
+            today_row = await cursor.fetchone()
+            today_stats = dict(today_row) if today_row else {"unique_ships": 0, "new_ships": 0, "total_messages": 0, "max_range_km": 0.0}
+            
+            # 2. Get stats for day before selected for trends
+            cursor = await db.execute("SELECT unique_ships, new_ships, total_messages FROM daily_stats WHERE date = ?", (yesterday_date,))
+            yest_row = await cursor.fetchone()
+            yest_stats = dict(yest_row) if yest_row else {"unique_ships": 0, "new_ships": 0, "total_messages": 0}
+            
+            # 3. Get all-time records
+            cursor = await db.execute("SELECT MAX(unique_ships) as max_ships, MAX(total_messages) as max_msgs, MAX(max_range_km) as max_rng FROM daily_stats")
+            all_row = await cursor.fetchone()
+            all_time_stats = {
+                "unique_ships": all_row["max_ships"] if all_row["max_ships"] else 0,
+                "total_messages": all_row["max_msgs"] if all_row["max_msgs"] else 0,
+                "max_range_km": round(all_row["max_rng"] if all_row["max_rng"] else 0.0, 1)
+            }
+            
+            # 4. Get 30-day message history
+            cursor = await db.execute("SELECT date, total_messages FROM daily_stats ORDER BY date DESC LIMIT 30")
+            history_rows = await cursor.fetchall()
+            history_30d = [dict(row) for row in history_rows]
+            history_30d.reverse()
+            
+            # 5. Get hourly breakdown for selected date
+            hourly_breakdown = []
+            try:
+                cursor = await db.execute("SELECT hour, message_count FROM hourly_stats WHERE date = ? ORDER BY hour ASC", (selected_date,))
+                hourly_rows = await cursor.fetchall()
+                hourly_raw = {row["hour"]: row["message_count"] for row in hourly_rows}
+                for h in range(24):
+                    hourly_breakdown.append({"hour": h, "count": hourly_raw.get(h, 0)})
+            except:
+                for h in range(24):
+                    hourly_breakdown.append({"hour": h, "count": 0})
+            
+            # 6. Get Vessel Type Breakdown for selected date
+            type_breakdown = []
+            try:
+                start_ts = f"{selected_date} 00:00:00"
+                end_ts = f"{selected_date} 23:59:59"
+                cursor = await db.execute("""
+                    SELECT type, COUNT(*) as count 
+                    FROM ships 
+                    WHERE last_seen >= ? AND last_seen <= ? AND type IS NOT NULL
+                    GROUP BY type 
+                    ORDER BY count DESC
+                """, (start_ts, end_ts))
+                type_rows = await cursor.fetchall()
+                for row in type_rows:
+                    type_code = row["type"]
+                    type_breakdown.append({
+                        "type": type_code,
+                        "label": get_ship_type_name(type_code),
+                        "count": row["count"]
+                    })
+            except:
+                pass
+
+            return {
+                "selected_date": selected_date,
+                "today": today_stats,
+                "yesterday": yest_stats,
+                "all_time": all_time_stats,
+                "history_30d": history_30d,
+                "hourly_breakdown": hourly_breakdown,
+                "type_breakdown": type_breakdown
+            }
+    except Exception as e:
+        logger.error(f"Error in get_statistics: {e}")
+        return {"error": str(e)}
 
 @app.get("/api/status")
 async def get_status():

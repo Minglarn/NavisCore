@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+﻿import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 function CenterButton({ originLat, originLon }: { originLat: number, originLon: number }) {
@@ -63,8 +63,8 @@ function getShipColor(mmsiStr: string, type?: number) {
 }
 
 function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) {
-    if (mmsiStr.startsWith('99')) return 'Aid to Navigation (Light/Buoy)';
-    if (mmsiStr.startsWith('00')) return 'Base Station';
+    if (mmsiStr.startsWith('99')) return 'Navigationshj├ñlpmedel (Fyr/Boj)';
+    if (mmsiStr.startsWith('00')) return 'Basstation';
 
     // Prefer backend-supplied text
     if (typeText) return typeText;
@@ -101,98 +101,35 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) 
 }
 
 
-function getCountryName(countryCode?: string) {
-    if (!countryCode || countryCode === "00") return "";
-    const names: { [key: string]: string } = {
-        "ad": "Andorra", "ae": "U.A.E.", "af": "Afghanistan", "ag": "Antigua & Barbuda", "ai": "Anguilla", "al": "Albania", "am": "Armenia", "ao": "Angola", "ar": "Argentina", "as": "American Samoa", "at": "Austria", "au": "Australia", "aw": "Aruba", "az": "Azerbaijan",
-        "ba": "Bosnia", "bb": "Barbados", "bd": "Bangladesh", "be": "Belgium", "bf": "Burkina Faso", "bg": "Bulgaria", "bh": "Bahrain", "bi": "Burundi", "bj": "Benin", "bm": "Bermuda", "bn": "Brunei", "bo": "Bolivia", "bq": "Bonaire", "br": "Brazil", "bs": "Bahamas", "bt": "Bhutan", "bw": "Botswana", "by": "Belarus", "bz": "Belize",
-        "ca": "Canada", "cd": "Congo (DRC)", "cf": "Central Africa", "cg": "Congo", "ch": "Switzerland", "ci": "Ivory Coast", "ck": "Cook Islands", "cl": "Chile", "cm": "Cameroon", "cn": "China", "co": "Colombia", "cr": "Costa Rica", "cu": "Cuba", "cv": "Cape Verde", "cw": "Curaçao", "cy": "Cyprus", "cz": "Czech Rep.",
-        "de": "Germany", "dj": "Djibouti", "dk": "Denmark", "dm": "Dominica", "do": "Dominican Rep.", "dz": "Algeria",
-        "ec": "Ecuador", "ee": "Estonia", "eg": "Egypt", "er": "Eritrea", "es": "Spain", "et": "Ethiopia",
-        "fi": "Finland", "fj": "Fiji", "fk": "Falkland Is.", "fo": "Faroe Is.", "fr": "France",
-        "ga": "Gabon", "gb": "UK", "gd": "Grenada", "ge": "Georgia", "gf": "French Guiana", "gh": "Ghana", "gi": "Gibraltar", "gl": "Greenland", "gm": "Gambia", "gn": "Guinea", "gp": "Guadeloupe", "gq": "Equatorial Guinea", "gr": "Greece", "gt": "Guatemala", "gu": "Guam", "gw": "Guinea-Bissau", "gy": "Guyana",
-        "hk": "Hong Kong", "hn": "Honduras", "hr": "Croatia", "ht": "Haiti", "hu": "Hungary",
-        "id": "Indonesia", "ie": "Ireland", "il": "Israel", "in": "India", "iq": "Iraq", "ir": "Iran", "is": "Iceland", "it": "Italy",
-        "jm": "Jamaica", "jo": "Jordan", "jp": "Japan",
-        "ke": "Kenya", "kg": "Kyrgyzstan", "kh": "Cambodia", "kn": "St Kitts & Nevis", "kp": "North Korea", "kr": "South Korea", "kw": "Kuwait", "ky": "Cayman Is.", "kz": "Kazakhstan",
-        "lb": "Lebanon", "lc": "St Lucia", "li": "Liechtenstein", "lk": "Sri Lanka", "lr": "Liberia", "ls": "Lesotho", "lt": "Lithuania", "lu": "Luxembourg", "lv": "Latvia", "ly": "Libya",
-        "ma": "Morocco", "mc": "Monaco", "md": "Moldova", "me": "Montenegro", "mg": "Madagascar", "mh": "Marshall Is.", "mk": "North Macedonia", "ml": "Mali", "mm": "Myanmar", "mn": "Mongolia", "mo": "Macao", "mp": "N. Mariana Is.", "mq": "Martinique", "mr": "Mauritania", "ms": "Montserrat", "mt": "Malta", "mu": "Mauritius", "mv": "Maldives", "mw": "Malawi", "mx": "Mexico", "my": "Malaysia", "mz": "Mozambique",
-        "na": "Namibia", "ne": "Niger", "ng": "Nigeria", "ni": "Nicaragua", "nl": "Netherlands", "no": "Norway", "np": "Nepal", "nz": "New Zealand",
-        "om": "Oman",
-        "pa": "Panama", "pe": "Peru", "pf": "Fr. Polynesia", "pg": "P.N.G.", "ph": "Philippines", "pk": "Pakistan", "pl": "Poland", "pm": "St Pierre", "pr": "Puerto Rico", "pt": "Portugal", "py": "Paraguay",
-        "qa": "Qatar",
-        "ro": "Romania", "rs": "Serbia", "ru": "Russia", "rw": "Rwanda",
-        "sa": "Saudi Arabia", "sb": "Solomon Is.", "sc": "Seychelles", "sd": "Sudan", "se": "Sweden", "sg": "Singapore", "sh": "St Helena", "si": "Slovenia", "sk": "Slovakia", "sl": "Sierra Leone", "sm": "San Marino", "sn": "Senegal", "so": "Somalia", "sr": "Suriname", "st": "Sao Tome", "sv": "El Salvador", "sy": "Syria", "sz": "Eswatini",
-        "tc": "Turks & Caicos", "td": "Chad", "tf": "Fr. S. Terr.", "tg": "Togo", "th": "Thailand", "tj": "Tajikistan", "tl": "Timor-Leste", "tm": "Turkmenistan", "tn": "Tunisia", "tr": "Turkey", "tt": "Trinidad", "tw": "Taiwan", "tz": "Tanzania",
-        "ua": "Ukraine", "ug": "Uganda", "us": "USA", "uy": "Uruguay", "uz": "Uzbekistan",
-        "va": "Vatican City", "vc": "St Vincent", "ve": "Venezuela", "vg": "Brit. Virgin Is.", "vi": "U.S. Virgin Is.", "vn": "Vietnam", "vu": "Vanuatu",
-        "ws": "Samoa",
-        "ye": "Yemen",
-        "za": "South Africa", "zm": "Zambia", "zw": "Zimbabwe"
-    };
-    return names[countryCode.toLowerCase()] || countryCode.toUpperCase();
-}
-
 function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     const mid = mmsiStr ? mmsiStr.substring(0, 3) : '';
-    let emoji = '📌';
-    
-    const midToEmoji: { [key: string]: string } = {
-        // Europe
-        "201": "🇦🇱", "202": "🇦🇩", "203": "🇦🇹", "204": "🇵🇹", "205": "🇧🇪", "206": "🇧🇾", "207": "🇧🇬", "208": "🇻🇦",
-        "209": "🇨🇾", "210": "🇨🇾", "212": "🇨🇾", "229": "🇲🇹", "215": "🇲🇹", "248": "🇲🇹", "249": "🇲🇹", "256": "🇲🇹",
-        "211": "🇩🇪", "218": "🇩🇪", "213": "🇬🇪", "214": "🇲🇩", "216": "🇦🇲", "219": "🇩🇰", "220": "🇩🇰", "231": "🇫🇴",
-        "224": "🇪🇸", "225": "🇪🇸", "226": "🇫🇷", "227": "🇫🇷", "228": "🇫🇷", "230": "🇫🇮", "232": "🇬🇧", "233": "🇬🇧",
-        "234": "🇬🇧", "235": "🇬🇧", "236": "🇬🇮", "237": "🇬🇷", "239": "🇬🇷", "240": "🇬🇷", "241": "🇬🇷", "238": "🇭🇷",
-        "242": "🇲🇦", "243": "🇭🇺", "244": "🇳🇱", "245": "🇳🇱", "246": "🇳🇱", "247": "🇮🇹", "250": "🇮🇪", "251": "🇮🇸",
-        "252": "🇱🇮", "253": "🇱🇺", "254": "🇲🇨", "255": "🇵🇹", "257": "🇳🇴", "258": "🇳🇴", "259": "🇳🇴", "261": "🇵🇱",
-        "262": "🇲🇪", "263": "🇵🇹", "264": "🇷🇴", "265": "🇸🇪", "266": "🇸🇪", "267": "🇸🇰", "268": "🇸🇲", "269": "🇨🇭",
-        "270": "🇨🇿", "271": "🇹🇷", "272": "🇺🇦", "273": "🇷🇺", "274": "🇲🇰", "275": "🇱🇻", "276": "🇪🇪", "277": "🇱🇹",
-        "278": "🇸🇮", "279": "🇷🇸",
-        // North / Central America
-        "301": "🇦🇮", "303": "🇺🇸", "304": "🇦🇬", "305": "🇦🇬", "306": "🇧🇶", "307": "🇦🇼", "308": "🇧🇸", "309": "🇧🇸",
-        "311": "🇧🇸", "310": "🇧🇲", "312": "🇧🇿", "314": "🇧🇧", "316": "🇨🇦", "319": "🇰🇾", "321": "🇨🇷", "323": "🇨🇺",
-        "325": "🇩🇲", "327": "🇩🇴", "329": "🇬🇵", "330": "🇬🇩", "331": "🇬🇱", "332": "🇬🇹", "334": "🇭🇳", "336": "🇭🇹",
-        "338": "🇺🇸", "366": "🇺🇸", "367": "🇺🇸", "368": "🇺🇸", "369": "🇺🇸", "339": "🇯🇲", "341": "🇰🇳", "343": "🇱🇨",
-        "345": "🇲🇽", "347": "🇲🇶", "348": "🇲🇸", "350": "🇳🇮", "351": "🇵🇦", "352": "🇵🇦", "353": "🇵🇦", "354": "🇵🇦",
-        "355": "🇵🇦", "356": "🇵🇦", "357": "🇵🇦", "370": "🇵🇦", "371": "🇵🇦", "372": "🇵🇦", "373": "🇵🇦", "358": "🇵🇷",
-        "359": "🇸🇻", "361": "🇵🇲", "362": "🇹🇹", "378": "🇻🇬", "379": "🇻🇮",
-        // Asia
-        "401": "🇦🇫", "405": "🇧🇩", "408": "🇧🇭", "410": "🇧🇹", "412": "🇨🇳", "413": "🇨🇳", "414": "🇨🇳", "416": "🇨🇳",
-        "417": "🇨🇰", "418": "🇫🇯", "419": "🇵🇫", "421": "🇮🇳", "423": "🇦🇿", "427": "🇮🇷", "428": "🇮🇶", "431": "🇯🇵",
-        "432": "🇯🇵", "434": "🇯🇵", "436": "🇯🇵", "437": "🇰🇷", "438": "🇰🇵", "440": "🇲🇴", "441": "🇲🇾", "443": "🇲🇻",
-        "445": "🇲🇺", "447": "🇲🇳", "449": "🇲🇲", "451": "🇳🇵", "453": "🇴🇲", "455": "🇵🇰", "457": "🇵🇭", "459": "🇶🇦",
-        "461": "🇸🇦", "463": "🇸🇬", "466": "🇱🇰", "468": "🇸🇾", "470": "🇹🇼", "471": "🇹🇭", "473": "🇹🇱", "475": "🇦🇪",
-        "477": "🇻🇳", "478": "🇧🇦",
-        // Oceania / SE Asia
-        "501": "🇹🇫", "503": "🇦🇺", "508": "🇧🇳", "514": "🇰🇭", "515": "🇰🇭", "536": "🇲🇵", "559": "🇦🇸",
-        // Africa / Atlantic
-        "601": "🇿🇦", "603": "🇦🇴", "605": "🇩🇿", "608": "🇸🇭", "609": "🇧🇮", "610": "🇧🇯", "611": "🇧🇼", "613": "🇨🇲",
-        "616": "🇰🇲", "617": "🇨🇻", "618": "🇨🇫", "619": "🇹🇩", "620": "🇨🇬", "621": "🇩🇯", "622": "🇪🇬", "624": "🇪🇹",
-        "625": "🇪🇷", "626": "🇬🇶", "627": "🇬🇦", "629": "🇬🇲", "630": "🇬🇭", "631": "🇬🇳", "632": "🇬🇼", "633": "🇧🇫",
-        "634": "🇰🇪", "635": "🇱🇸", "636": "🇱🇷", "637": "🇱🇾", "642": "🇲🇬", "644": "🇲🇼", "645": "🇲🇱", "647": "🇲🇷",
-        "649": "🇲🇺", "650": "🇲🇿", "654": "🇳🇦", "655": "🇳🇪", "656": "🇳🇬", "657": "🇷🇼", "659": "🇸🇳", "660": "🇸🇨",
-        "661": "🇸🇱", "662": "🇸🇴", "663": "🇸🇩", "664": "🇸🇿", "665": "🇹🇿", "666": "🇹🇬", "667": "🇹🇳", "668": "🇺🇬",
-        "669": "🇨🇩", "670": "🇿🇲", "671": "🇿🇼", "672": "🇳🇦", "674": "🇹🇿", "675": "🇪🇹", "676": "🇸🇴", "677": "🇹🇿",
-        "678": "🇸🇹", "679": "🇨🇮",
-        // South America
-        "701": "🇦🇷", "710": "🇧🇷", "720": "🇧🇴", "725": "🇨🇱", "730": "🇨🇴", "735": "🇪🇨", "740": "🇫🇰", "745": "🇬🇾",
-        "750": "🇵🇾", "755": "🇵🇪", "760": "🇸🇷", "765": "🇺🇾", "770": "🇻🇪"
-    };
-
-    if (midToEmoji[mid]) emoji = midToEmoji[mid];
-    else if (!mmsiStr) emoji = '🏳️';
+    let emoji = '­ƒôî';
+    if (mid === '265' || mid === '266') emoji = '­ƒç©­ƒç¬';
+    else if (mid === '219' || mid === '220') emoji = '­ƒç®­ƒç░';
+    else if (mid === '257' || mid === '258' || mid === '259') emoji = '­ƒç│­ƒç┤';
+    else if (mid === '230') emoji = '­ƒç½­ƒç«';
+    else if (mid === '211' || mid === '218') emoji = '­ƒç®­ƒç¬';
+    else if (mid === '235' || mid === '232') emoji = '­ƒç¼­ƒçº';
+    else if (mid === '276') emoji = '­ƒç¬­ƒç¬';
+    else if (mid === '275') emoji = '­ƒç▒­ƒç╗';
+    else if (mid === '277') emoji = '­ƒç▒­ƒç╣';
+    else if (mid === '261') emoji = '­ƒçÁ­ƒç▒';
+    else if (mid === '273') emoji = '­ƒçÀ­ƒç║';
+    else if (mid === '244') emoji = '­ƒç│­ƒç▒';
+    else if (mid === '205') emoji = '­ƒçº­ƒç¬';
+    else if (!mmsiStr) emoji = '­ƒÅ│´©Å';
 
     if (countryCode && typeof countryCode === 'string' && countryCode.length === 2 && countryCode !== "00") {
         const code = countryCode.toLowerCase();
         return `<span style="display: inline-flex; align-items: center;">
-            <img src="https://flagcdn.com/w80/${code}.png" 
+            <img src="https://flagcdn.com/w40/${code}.png" 
                  alt="${countryCode}" 
-                 style="height: 1.4em; width: auto; vertical-align: middle; border-radius: 2px; display: inline-block; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" 
+                 style="height: 1.2em; width: auto; vertical-align: middle; border-radius: 2px; margin-right: 6px; display: inline-block; box-shadow: 0 1px 3px rgba(0,0,0,0.2);" 
                  onerror="this.style.display='none'; this.nextSibling.style.display='inline';" 
             /><span style="display: none;">${emoji}</span>
         </span>`;
     }
+
     return emoji;
 }
 
@@ -204,7 +141,7 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
 
     let svg = '';
     // Increase hit area: Use a larger container size but keep SVG centered and correctly scaled
-    const baseHitArea = 56; // Increased from 44 for better clickability on small markers
+    const baseHitArea = 44; // Standard touch/click target size
     const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
     if (isAircraft) {
@@ -290,7 +227,7 @@ const extraStyles = `
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .settings-modal {
-    background: var(--bg-card); width: 975px; max-width: 95vw; height: 720px;
+    background: var(--bg-card); width: 750px; max-width: 95vw; height: 600px;
     border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
     border: 1px solid rgba(255,255,255,0.1);
@@ -404,7 +341,7 @@ function formatDistance(km: number | undefined, units: string) {
 function getTimeAgo(timestamp: number) {
     const diffMs = Date.now() - timestamp;
     const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'Now';
+    if (diffMins < 1) return 'Nu';
     if (diffMins < 60) return `${diffMins}min`;
     const diffHours = Math.floor(diffMins / 60);
     const remainingMins = diffMins % 60;
@@ -431,256 +368,7 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
     return [toDeg(lat2), toDeg(lon2)];
 }
 
-function StatisticsModal({ isOpen, onClose, colors }: any) {
-    const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-    const [stats, setStats] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
-
-    useEffect(() => {
-        if (isOpen) {
-            setLoading(true);
-            const fetchPath = `/api/statistics?date=${selectedDate}`;
-            fetch(fetchPath)
-                .then(r => r.json())
-                .then(data => {
-                    setStats(data);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    console.error("Failed to fetch stats", err);
-                    setLoading(false);
-                });
-        }
-    }, [isOpen, selectedDate]);
-
-    if (!isOpen) return null;
-
-    const today = stats?.today || { unique_ships: 0, new_ships: 0, total_messages: 0, max_range_km: 0.0 };
-    const history30d = stats?.history_30d || [];
-    const hourlyBreakdown = stats?.hourly_breakdown || [];
-    const typeBreakdown = stats?.type_breakdown || [];
-
-    const max30dMsgs = Math.max(...history30d.map((h: any) => h.total_messages), 1);
-    const maxHourlyMsgs = Math.max(...hourlyBreakdown.map((h: any) => h.count), 1);
-
-    // Donut Chart Helpers
-    const totalVesselsForType = typeBreakdown.reduce((sum: number, item: any) => sum + item.count, 0);
-    let cumulativePercent = 0;
-    const donutPaths = totalVesselsForType > 0 ? typeBreakdown.slice(0, 8).map((item: any, i: number) => {
-        const percent = item.count / totalVesselsForType;
-        const startPercent = cumulativePercent;
-        cumulativePercent += percent;
-        
-        const startAngle = startPercent * 2 * Math.PI;
-        const endAngle = cumulativePercent * 2 * Math.PI;
-        
-        const x1 = 50 + 40 * Math.sin(startAngle);
-        const y1 = 50 - 40 * Math.cos(startAngle);
-        const x2 = 50 + 40 * Math.sin(endAngle);
-        const y2 = 50 - 40 * Math.cos(endAngle);
-        
-        const largeArcFlag = percent > 0.5 ? 1 : 0;
-        const d = `M ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2}`;
-        
-        const categoryColors = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#7c4dff', '#e040fb', '#ff4081', '#ffab40'];
-        return { d, color: categoryColors[i % categoryColors.length], label: item.label, count: item.count };
-    }) : [];
-
-    // Area Chart path - using 1000 width for high definition and thin lines
-    const areaPoints = hourlyBreakdown.map((h: any, i: number) => {
-        const x = (i / 23) * 1000;
-        const y = 100 - (h.count / maxHourlyMsgs) * 85; 
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
-    
-    const areaPath = `0,100 ${areaPoints} 1000,100`;
-    const linePath = areaPoints;
-
-    return (
-        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000 }}>
-            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
-                width: '85%', 
-                height: '85%', 
-                maxWidth: '1400px',
-                padding: '0',
-                display: 'flex',
-                flexDirection: 'column',
-                background: '#f8fafd'
-            }}>
-                {/* Header */}
-                <div style={{ padding: '15px 40px', background: 'white', borderBottom: '1px solid #eef2f7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div>
-                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#1a2233' }}>Advanced Statistics Dashboard</h2>
-                        <div style={{ color: '#5a6b8a', fontSize: '0.85rem' }}>Analyze historical data and system performance.</div>
-                    </div>
-                    
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a2233' }}>Target Date:</div>
-                        <div style={{ position: 'relative' }}>
-                            <Calendar size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#5a6b8a', pointerEvents: 'none' }} />
-                            <input 
-                                type="date" 
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                style={{ 
-                                    padding: '10px 40px 10px 15px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e2e8f0',
-                                    fontSize: '0.9rem',
-                                    outline: 'none',
-                                    color: '#1a2233'
-                                }}
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Dashboard Grid */}
-                <div style={{ flex: 1, padding: '20px 40px', overflowY: 'auto' }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '100px 0' }}>
-                            <div className="spinner"></div>
-                            <div style={{ marginTop: '20px', color: '#5a6b8a' }}>Refreshing dashboard...</div>
-                        </div>
-                    ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {/* Summary Cards */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
-                                {[
-                                    { label: 'Total Messages', value: today.total_messages, icon: <Activity size={20} /> },
-                                    { label: 'Unique Vessels', value: today.unique_ships, icon: <Ship size={20} /> },
-                                    { label: 'New Vessels', value: today.new_ships, icon: <Plus size={20} color="#10b981" /> },
-                                    { label: 'Max Range', value: `${today.max_range_km?.toFixed(1) || '0.0'} km`, icon: <Radar size={20} /> },
-                                ].map((card, i) => (
-                                    <div key={i} style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #eef2f7', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <div style={{ width: '45px', height: '45px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a2233' }}>
-                                            {card.icon}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>{card.label}</div>
-                                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1a2233' }}>{card.value}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {/* Main Charts */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
-                                {/* Messages per Day (30d) */}
-                                <div style={{ background: 'white', borderRadius: '16px', padding: '30px', border: '1px solid #eef2f7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#1a2233' }}>Messages per Day (30d)</h3>
-                                    <div style={{ height: '180px', display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
-                                        {history30d.map((h: any, i: number) => {
-                                            const height = (h.total_messages / max30dMsgs) * 100;
-                                            const isSelected = h.date === selectedDate;
-                                            return (
-                                                <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                                                    <div style={{ 
-                                                        width: '100%', 
-                                                        height: `${Math.max(height, 2)}%`, 
-                                                        background: isSelected ? '#44aaff' : '#cbd5e1',
-                                                        borderRadius: '3px 3px 0 0',
-                                                        transition: 'height 0.3s ease'
-                                                    }} title={`${h.date}: ${h.total_messages} msgs`}></div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Vessel Distribution */}
-                                <div style={{ background: 'white', borderRadius: '16px', padding: '30px', border: '1px solid #eef2f7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#1a2233' }}>Vessel Distribution</h3>
-                                    <div style={{ display: 'flex', gap: '25px', alignItems: 'center' }}>
-                                        <div style={{ width: '150px', height: '150px', position: 'relative' }}>
-                                            <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                                                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" strokeWidth="10" />
-                                                {donutPaths.map((p: any, i: number) => (
-                                                    <path key={i} d={p.d} fill="transparent" stroke={p.color} strokeWidth="10" strokeLinecap="round" />
-                                                ))}
-                                            </svg>
-                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1a2233' }}>{today.unique_ships}</div>
-                                                <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase' }}>Ships</div>
-                                            </div>
-                                        </div>
-                                        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                                            {donutPaths.map((p: any, i: number) => (
-                                                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <div style={{ width: '8px', height: '8px', background: p.color, borderRadius: '50%' }}></div>
-                                                        <div style={{ color: '#5a6b8a' }}>{p.label}</div>
-                                                    </div>
-                                                    <div style={{ fontWeight: 700, color: '#1a2233' }}>{p.count}</div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Activity Chart */}
-                            <div style={{ background: 'white', borderRadius: '16px', padding: '30px', border: '1px solid #eef2f7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1a2233' }}>Hourly Message Activity</h3>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#5a6b8a' }}>
-                                        <div style={{ width: '30px', height: '2px', background: '#22d3ee' }}></div>
-                                        <span>Total Reports / Hour</span>
-                                    </div>
-                                </div>
-                                <div style={{ height: '220px', position: 'relative', marginTop: '10px' }}>
-                                    {/* Gridlines */}
-                                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
-                                        {[0, 1, 2, 3].map(i => <div key={i} style={{ width: '100%', height: '1px', background: '#f1f5f9' }}></div>)}
-                                    </div>
-                                    
-                                    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                                        <defs>
-                                            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.15" />
-                                                <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
-                                            </linearGradient>
-                                        </defs>
-                                        <path d={areaPath} fill="url(#areaGradient)" />
-                                        <polyline points={linePath} fill="none" stroke="#22d3ee" strokeWidth="1.2" strokeLinejoin="round" />
-                                        {hourlyBreakdown.map((h: any, i: number) => {
-                                            const x = (i / 23) * 1000;
-                                            const y = 100 - (h.count / maxHourlyMsgs) * 85;
-                                            return <circle key={i} cx={x} cy={y} r="3" fill="white" stroke="#22d3ee" strokeWidth="1" />;
-                                        })}
-                                    </svg>
-                                    
-                                    {/* Labels */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', color: '#94a3b8', fontSize: '0.7rem' }}>
-                                        {hourlyBreakdown.filter((_: any, i: number) => i % 2 === 0).map((h: any, i: number) => (
-                                            <span key={i}>{h.hour}:00</span>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                <div style={{ padding: '20px 40px', background: '#f1f5f9', borderTop: '1px solid #eef2f7', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button onClick={onClose} style={{ padding: '10px 25px', background: '#1a2233', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}>
-                        Close Dashboard
-                    </button>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [uploading, setUploading] = useState(false);
-    const [localImage, setLocalImage] = useState<string | null>(null);
-
-    useEffect(() => {
-        setLocalImage(ship ? ship.imageUrl : null);
-    }, [ship]);
-
     if (!isOpen || !ship) return null;
 
     const mmsiStr = String(ship.mmsi);
@@ -688,238 +376,106 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'MMSI', value: mmsiStr },
         { label: 'IMO', value: ship.imo || '--' },
         { label: 'Callsign', value: ship.callsign || '--' },
-        { label: 'Fartygstyp', value: ship.ship_type_text || (ship.shiptype ? `Typ ${ship.shiptype}` : 'N/A') },
+        { label: 'Fartygstyp', value: ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'N/A') },
     ];
 
     const navBlocks = [
-        { label: 'Position', value: `${ship.lat.toFixed(3)}, ${ship.lon.toFixed(3)}` },
-        { label: 'Fart (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
-        { label: 'Kurs (COG)', value: ship.cog != null ? `${ship.cog.toFixed(0)}°` : '--' },
-        { label: 'Styrning', value: ship.heading != null ? `${ship.heading}°` : '--' },
-        { label: 'ROT', value: ship.rot != null ? `${ship.rot}°/min` : '--' },
-        { label: 'Status', value: ship.status_text || 'Okänd' },
+        { label: 'Position', value: `${ship.lat.toFixed(4)}, ${ship.lon.toFixed(4)}` },
+        { label: 'Hastighet (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
+        { label: 'Kurs (COG)', value: ship.cog != null ? `${ship.cog.toFixed(1)}┬░` : '--' },
+        { label: 'Heading', value: ship.heading != null ? `${ship.heading}┬░` : '--' },
+        { label: 'ROT (Turn)', value: ship.rot != null ? `${ship.rot}┬░/min` : '--' },
+        { label: 'Status', value: ship.status_text || 'Ok├ñnd' },
     ];
 
     const voyageBlocks = [
         { label: 'Destination', value: ship.destination || '--' },
         { label: 'ETA', value: ship.eta || '--' },
-        { label: 'Djupgående', value: ship.draught ? `${ship.draught}m` : '--' },
+        { label: 'Djupg├Ñende', value: ship.draught ? `${ship.draught}m` : '--' },
     ];
 
     const specBlocks = [
-        { label: 'Längd', value: ship.length ? `${ship.length}m` : '--' },
+        { label: 'L├ñngd', value: ship.length ? `${ship.length}m` : '--' },
         { label: 'Bredd', value: ship.width ? `${ship.width}m` : '--' },
         { label: 'Meddelanden', value: ship.message_count || '--' },
-        { label: 'Senaste', value: getTimeAgo(ship.timestamp) },
-        { label: 'Källa', value: ship.source === 'aisstream' ? 'Stream' : 'Lokal' },
-        { label: 'Sett tidigare', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
+        { label: 'Senast sedd', value: getTimeAgo(ship.timestamp) },
     ];
 
     return (
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1100 }}>
-            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ height: 'auto', maxHeight: '95vh', width: '950px', borderRadius: '16px', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 50px rgba(0,0,0,0.5)' }}>
-                <div style={{ position: 'relative', width: '100%', height: '450px', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        style={{ display: 'none' }} 
-                        accept="image/jpeg, image/png, image/webp"
-                        onChange={async (e) => {
-                            const file = e.target.files?.[0];
-                            if (!file) return;
-                            
-                            setUploading(true);
-                            const formData = new FormData();
-                            formData.append("file", file);
-                            
-                            try {
-                                const isDev = window.location.port === '5173';
-                                const uploadUrl = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/image` : `/api/ships/${mmsiStr}/image`;
-                                
-                                const res = await fetch(uploadUrl, {
-                                    method: 'POST',
-                                    body: formData
-                                });
-                                
-                                if (res.ok) {
-                                    const data = await res.json();
-                                    const newUrl = `${data.image_url}?t=${Date.now()}`;
-                                    setLocalImage(newUrl);
-                                    ship.imageUrl = newUrl;
-                                    ship.manual_image = true;
-                                } else {
-                                    alert("Image upload failed");
-                                }
-                            } catch (err) {
-                                console.error(err);
-                                alert("Upload error");
-                            } finally {
-                                setUploading(false);
-                            }
-                        }}
-                    />
-                    
-                    {localImage && localImage !== "/images/0.jpg" ? (
-                        <div 
-                            title="Klicka för att ladda upp egen bild"
-                            onClick={() => fileInputRef.current?.click()}
-                            style={{ 
-                                width: '100%', 
-                                height: '100%', 
-                                backgroundImage: `url(${localImage})`, 
-                                backgroundSize: 'contain', 
-                                backgroundPosition: 'center', 
-                                backgroundRepeat: 'no-repeat',
-                                cursor: 'pointer', 
-                                opacity: uploading ? 0.5 : 1, 
-                                transition: 'opacity 0.2s',
-                                zIndex: 1
-                            }} 
-                        />
+            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ height: 'auto', maxHeight: '90vh', width: '600px' }}>
+                <div style={{ position: 'relative', width: '100%', height: '250px', background: colors.bgMain }}>
+                    {ship.imageUrl && ship.imageUrl !== "/images/0.jpg" ? (
+                        <div style={{ width: '100%', height: '100%', backgroundImage: `url(${ship.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }} />
                     ) : (
-                        <div 
-                            title="Klicka för att ladda upp egen bild"
-                            onClick={() => fileInputRef.current?.click()}
-                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
-                            <Ship size={80} strokeWidth={1} />
-                            <span style={{ fontSize: '0.9rem' }}>{uploading ? 'Laddar upp...' : 'Klicka för att ladda upp egen bild'}</span>
+                        <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, gap: '10px' }}>
+                            <Ship size={64} />
+                            <span>Ingen bild tillg├ñnglig</span>
                         </div>
                     )}
-                    
-                    {/* Gradient Overlay for Text Readability */}
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '40%', background: 'linear-gradient(transparent, rgba(0,0,0,0.85))', zIndex: 2, pointerEvents: 'none' }}></div>
-                    
-                    <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(255,255,255,0.1)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(10px)', zIndex: 10, transition: 'background 0.2s' }} onMouseEnter={e => e.currentTarget.style.background='rgba(255,255,255,0.2)'} onMouseLeave={e => e.currentTarget.style.background='rgba(255,255,255,0.1)'}>
+                    <button onClick={onClose} style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(0,0,0,0.5)', border: 'none', borderRadius: '50%', color: 'white', cursor: 'pointer', padding: '8px', backdropFilter: 'blur(4px)' }}>
                         <X size={20} />
                     </button>
-                    
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '25px 30px', color: 'white', zIndex: 3 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                            <span style={{ fontSize: '3.5rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
-                            <div style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                                    <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{ship.name || 'Okänt Fartyg'}</h1>
-                                    <div style={{
-                                        background: ship.source === 'aisstream' ? '#44aaff33' : '#00ff8033',
-                                        color: ship.source === 'aisstream' ? '#44aaff' : '#00ff80',
-                                        padding: '2px 10px',
-                                        borderRadius: '20px',
-                                        fontSize: '0.7rem',
-                                        fontWeight: 800,
-                                        letterSpacing: '0.5px',
-                                        textTransform: 'uppercase',
-                                        border: `1px solid ${ship.source === 'aisstream' ? '#44aaff66' : '#00ff8066'}`,
-                                        backdropFilter: 'blur(4px)'
-                                    }}>
-                                        {ship.source === 'aisstream' ? 'STREAM' : 'LIVE'}
-                                    </div>
-                                </div>
-                                <div style={{ opacity: 0.9, fontSize: '1rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <Anchor size={16} />
-                                    {ship.ship_type_text || (ship.shiptype ? `Typ ${ship.shiptype}` : 'Okänd Typ')}
-                                    <span style={{ opacity: 0.5 }}>•</span>
-                                    <span>MMSI: {mmsiStr}</span>
-                                </div>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '20px', background: 'linear-gradient(transparent, rgba(0,0,0,0.8))', color: 'white' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <span style={{ fontSize: '2.5rem' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                            <div>
+                                <h1 style={{ margin: 0, fontSize: '1.8rem', fontWeight: 800 }}>{ship.name || 'Ok├ñnt Fartyg'}</h1>
+                                <div style={{ opacity: 0.8, fontSize: '0.9rem' }}>{ship.ship_type_text}</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div className="settings-content" style={{ padding: '35px 40px', background: colors.bgCard, flex: 1, display: 'flex', justifyContent: 'center' }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 1fr) auto minmax(180px, 1fr) auto minmax(180px, 1fr) auto minmax(180px, 1fr)', gap: '0', width: '100%', maxWidth: '1000px' }}>
-                        {/* Section 1: Info */}
-                        <div style={{ padding: '0 15px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
-                                <Info size={16} />
-                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>INFO</span>
-                            </div>
-                            <div style={{ display: 'grid', gap: '14px' }}>
+                <div className="settings-content" style={{ padding: '25px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                        <div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>Information</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
                                 {infoBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', textAlign: 'right' }}>{b.value}</span>
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
-                        </div>
 
-                        {/* Divider */}
-                        <div style={{ width: '2px', background: colors.border, opacity: 0.5, margin: '0 5px', height: '100%', alignSelf: 'stretch' }}></div>
-
-                        {/* Section 2: Resa */}
-                        <div style={{ padding: '0 15px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
-                                <Navigation size={16} />
-                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>RESA</span>
-                            </div>
-                            <div style={{ display: 'grid', gap: '14px' }}>
+                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Resa</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
                                 {voyageBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', textAlign: 'right' }}>{b.value}</span>
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Divider */}
-                        <div style={{ width: '2px', background: colors.border, opacity: 0.5, margin: '0 5px', height: '100%', alignSelf: 'stretch' }}></div>
-
-                        {/* Section 3: Navigation */}
-                        <div style={{ padding: '0 15px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
-                                <Signal size={16} />
-                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>NAVIGATION</span>
-                            </div>
-                            <div style={{ display: 'grid', gap: '14px' }}>
+                        <div>
+                            <div className="settings-section-title" style={{ marginBottom: '15px' }}>Navigation</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
                                 {navBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 700, fontSize: '0.95rem', textAlign: 'right', color: b.label === 'Status' && b.value.includes('anchor') ? '#ffaa00' : 'inherit' }}>{b.value}</span>
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600, color: b.label === 'Status' && b.value.includes('Moored') ? '#ffaa00' : 'inherit' }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
-                        </div>
 
-                        {/* Divider */}
-                        <div style={{ width: '1px', background: `linear-gradient(to bottom, transparent, ${colors.border}33, transparent)`, margin: '0 5px' }}></div>
-
-                        {/* Section 4: Stats */}
-                        <div style={{ padding: '0 15px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
-                                <Radio size={16} />
-                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>STATS</span>
-                            </div>
-                            <div style={{ display: 'grid', gap: '14px' }}>
+                            <div className="settings-section-title" style={{ marginBottom: '15px', marginTop: '30px' }}>Specifikation & Statistik</div>
+                            <div style={{ display: 'grid', gap: '12px' }}>
                                 {specBlocks.map(b => (
-                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '15px', borderBottom: `1px solid ${colors.border}1a`, paddingBottom: '6px' }}>
-                                        <span style={{ color: colors.textMuted, fontSize: '0.85rem', fontWeight: 500, whiteSpace: 'nowrap' }}>{b.label}</span>
-                                        <span style={{ fontWeight: 600, fontSize: '0.95rem', textAlign: 'right' }}>{b.value}</span>
+                                    <div key={b.label} style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: colors.textMuted, fontSize: '0.9rem' }}>{b.label}</span>
+                                        <span style={{ fontWeight: 600 }}>{b.value}</span>
                                     </div>
                                 ))}
                             </div>
                         </div>
                     </div>
                 </div>
-
-                <div style={{ padding: '20px 30px', borderTop: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'flex-end', background: colors.bgCard }}>
-                    <button 
-                        className="styled-button primary" 
-                        onClick={onClose} 
-                        style={{ 
-                            borderRadius: '12px', 
-                            padding: '10px 40px', 
-                            fontSize: '1rem', 
-                            fontWeight: 700, 
-                            background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)',
-                            boxShadow: '0 4px 15px rgba(0,102,204,0.3)',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Stäng
-                    </button>
+                <div style={{ padding: '15px 25px', borderTop: `1px solid ${colors.border}`, textAlign: 'right', background: 'rgba(0,0,0,0.1)' }}>
+                    <button className="styled-button primary" onClick={onClose} style={{ borderRadius: '8px', padding: '10px 25px' }}>St├ñng</button>
                 </div>
             </div>
         </div>
@@ -939,25 +495,24 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
     if (!isOpen) return null;
 
     const tabs = [
-        { id: 'general', label: 'General', icon: <Info size={18} /> },
+        { id: 'general', label: 'Allm├ñnt', icon: <Info size={18} /> },
         { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} /> },
-        { id: 'trail', label: 'Tracking', icon: <Navigation size={18} /> },
-        { id: 'map', label: 'Map', icon: <Sun size={18} /> },
-        { id: 'coverage', label: 'Coverage', icon: <Navigation size={18} /> },
+        { id: 'trail', label: 'Sp├Ñrning', icon: <Navigation size={18} /> },
+        { id: 'map', label: 'Karta', icon: <Sun size={18} /> },
+        { id: 'coverage', label: 'R├ñckvidd', icon: <Navigation size={18} /> },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} /> },
-        { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} /> },
     ];
 
     return (
         <div className="settings-modal-overlay" onClick={onClose}>
             <div className="settings-modal" onClick={e => e.stopPropagation()}>
-                <div className="settings-tabs" style={{ flexWrap: 'wrap' }}>
+                <div className="settings-tabs">
                     {tabs.map(t => (
                         <button
                             key={t.id}
                             className={`settings-tab-btn ${activeTab === t.id ? 'active' : ''}`}
                             onClick={() => setActiveTab(t.id)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
+                            style={{ display: 'flex', alignItems: 'center', gap: '8px' }}
                         >
                             {t.icon} {t.label}
                         </button>
@@ -971,11 +526,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                 <div className="settings-content">
                     {activeTab === 'general' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">General Settings</div>
+                            <div className="settings-section-title">Grundinst├ñllningar</div>
                             <div className="form-group">
                                 <div>
-                                    <label>Vessel Timeout</label>
-                                    <div className="description">How long a vessel remains visible after last signal (minutes)</div>
+                                    <label>Timeout f├Âr fartyg</label>
+                                    <div className="description">Hur l├ñnge ett fartyg visas efter sista signal (minuter)</div>
                                 </div>
                                 <input
                                     type="number"
@@ -985,20 +540,20 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group">
                                 <div>
-                                    <label>Units</label>
-                                    <div className="description">Choose between Nautical (nm/kn) or Metric (km/km/h)</div>
+                                    <label>Enheter (Units)</label>
+                                    <div className="description">V├ñlj mellan Nautiska (Sj├Âmil/Knop) eller Metriska (km/km/h)</div>
                                 </div>
                                 <select value={settings.units} onChange={e => setSettings({ ...settings, units: e.target.value })}>
-                                    <option value="nautical">Nautical (nm, kn)</option>
-                                    <option value="metric">Metric (km, km/h)</option>
+                                    <option value="nautical">Nautiska (nm, kn)</option>
+                                    <option value="metric">Metriska (km, km/h)</option>
                                 </select>
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Station Position</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Stationens Position</div>
                             <div className="form-group">
                                 <label>Latitude</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. 59.3293"
+                                    placeholder="t.ex. 59.3293"
                                     value={settings.origin_lat}
                                     onChange={e => setSettings({ ...settings, origin_lat: e.target.value })}
                                 />
@@ -1007,7 +562,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 <label>Longitude</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. 18.0686"
+                                    placeholder="t.ex. 18.0686"
                                     value={settings.origin_lon}
                                     onChange={e => setSettings({ ...settings, origin_lon: e.target.value })}
                                 />
@@ -1017,9 +572,9 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'mqtt' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Connection</div>
+                            <div className="settings-section-title">Anslutning</div>
                             <div className="form-group">
-                                <label>MQTT Enabled</label>
+                                <label>MQTT Aktiverad</label>
                                 <Toggle
                                     checked={settings.mqtt_enabled === 'true'}
                                     onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
@@ -1033,13 +588,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 <label>MQTT Topic</label>
                                 <input type="text" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Authentication (Optional)</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Autentisering (Frivilligt)</div>
                             <div className="form-group">
-                                <label>Username</label>
+                                <label>Anv├ñndarnamn</label>
                                 <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>Password</label>
+                                <label>L├Âsenord</label>
                                 <input type="password" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} />
                             </div>
                         </div>
@@ -1047,41 +602,23 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'trail' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Visualization</div>
+                            <div className="settings-section-title">Visualisering</div>
                             <div className="form-group">
-                                <label>Show Vessel Trails (Breadcrumbs)</label>
+                                <label>Visa fartygssp├Ñr (Breadcrumbs)</label>
                                 <Toggle
                                     checked={settings.trail_enabled === 'true'}
                                     onChange={val => setSettings({ ...settings, trail_enabled: String(val) })}
                                 />
                             </div>
                             <div className="form-group">
-                                <label>Tracking Mode</label>
-                                <select 
-                                    value={settings.trail_mode || 'all'} 
-                                    onChange={e => setSettings({ ...settings, trail_mode: e.target.value })}
-                                    style={{
-                                        background: settings.map_style === 'dark' ? 'rgba(0,0,0,0.2)' : '#fff',
-                                        color: colors.textMain,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '6px',
-                                        padding: '6px 8px',
-                                        fontSize: '0.85rem'
-                                    }}
-                                >
-                                    <option value="all">Show All Trails</option>
-                                    <option value="selected">Only Selected/Hovered</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
                                 <div>
-                                    <label>History (Minutes)</label>
-                                    <div className="description">How far back trails are shown (requires reload)</div>
+                                    <label>Historik (Minuter)</label>
+                                    <div className="description">Hur l├Ñng tid bak├Ñt i tiden sp├Ñr visas (kr├ñver omladdning)</div>
                                 </div>
                                 <input type="number" value={settings.history_duration} onChange={e => setSettings({ ...settings, history_duration: e.target.value })} />
                             </div>
                             <div className="form-group">
-                                <label>Trail Color</label>
+                                <label>F├ñrg p├Ñ sp├Ñr</label>
                                 <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
                                     <input type="color" value={settings.trail_color} onChange={e => setSettings({ ...settings, trail_color: e.target.value })} style={{ width: '60px', height: '35px', padding: '2px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
                                     <span style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{settings.trail_color.toUpperCase()}</span>
@@ -1089,7 +626,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Opacity</label>
+                                    <label>Opacitet</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{Math.round(parseFloat(settings.trail_opacity) * 100)}%</span>
                                 </div>
                                 <input type="range" min="0.1" max="1" step="0.1" value={settings.trail_opacity} onChange={e => setSettings({ ...settings, trail_opacity: e.target.value })} style={{ width: '100%' }} />
@@ -1099,11 +636,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'map' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Map Settings</div>
+                            <div className="settings-section-title">Kartinst├ñllningar</div>
                             <div className="form-group">
                                 <div>
-                                    <label>Show Vessel Names</label>
-                                    <div className="description">Displays name directly above the vessel icon on the map</div>
+                                    <label>Visa fartygsnamn</label>
+                                    <div className="description">Visar namn direkt ovanf├Âr fartygsikonen p├Ñ kartan</div>
                                 </div>
                                 <Toggle
                                     checked={settings.show_names_on_map === 'true'}
@@ -1111,44 +648,44 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 />
                             </div>
                             <div className="form-group">
-                                <label>UI Theme</label>
+                                <label>Kartstil (Gr├ñnssnitt)</label>
                                 <select value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
-                                    <option value="light">Light Mode</option>
-                                    <option value="dark">Dark Mode (Night)</option>
+                                    <option value="light">Ljust l├ñge</option>
+                                    <option value="dark">M├Ârkt l├ñge (Natt)</option>
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Map Layer (Base)</label>
+                                <label>Kartlager (Bas)</label>
                                 <select value={settings.base_layer} onChange={e => setSettings({ ...settings, base_layer: e.target.value })}>
-                                    <option value="standard">Standard Vector</option>
-                                    <option value="satellite">Satellite Imagery</option>
+                                    <option value="standard">Standard Vektor</option>
+                                    <option value="satellite">Satellitbilder</option>
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label>Show Range Rings</label>
+                                <label>Visa r├ñckviddsringar</label>
                                 <Toggle
                                     checked={settings.show_range_rings === 'true'}
                                     onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
                                 />
                             </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Object Sizes</div>
+                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Storlek p├Ñ objekt</div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Vessels (Moving)</label>
+                                    <label>Fartyg (Moving)</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.ship_size}x</span>
                                 </div>
                                 <input type="range" min="0.5" max="3" step="0.1" value={settings.ship_size} onChange={e => setSettings({ ...settings, ship_size: e.target.value })} style={{ width: '100%' }} />
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Stationary / Meteo</label>
+                                    <label>Station├ñra / Meteo</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
                                 </div>
                                 <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Trail Thickness</label>
+                                    <label>Sp├Ñrtjocklek (Trail)</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
                                 </div>
                                 <input type="range" min="1" max="10" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
@@ -1158,10 +695,10 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'coverage' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">Statistics & Coverage</div>
+                            <div className="settings-section-title">Statistik & R├ñckvidd</div>
                             <div className="form-group" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '15px' }}>
                                 <div className="description" style={{ fontSize: '0.9rem' }}>
-                                    Here you can reset all saved coverage data. This removes 24h stats and "All-time high".
+                                    H├ñr kan du nollst├ñlla all sparad r├ñckviddsdata f├Âr stationen. Detta tar bort b├Ñde 24h-statistik och "All-time high".
                                 </div>
                                 <button
                                     className="styled-button"
@@ -1175,20 +712,20 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                         gap: '8px'
                                     }}
                                     onClick={async () => {
-                                        if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
+                                        if (window.confirm('├är du s├ñker p├Ñ att du vill nollst├ñlla all r├ñckviddsstatistik?')) {
                                             try {
                                                 const isDev = window.location.port === '5173';
                                                 const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
                                                 await fetch(fetchPath, { method: 'POST' });
-                                                alert('Statistics reset!');
+                                                alert('Statistik nollst├ñlld!');
                                                 window.location.reload();
                                             } catch (e) {
-                                                alert('An error occurred.');
+                                                alert('Ett fel uppstod.');
                                             }
                                         }
                                     }}
                                 >
-                                    <X size={18} /> Reset All Coverage Data
+                                    <X size={18} /> Nollst├ñll all r├ñckviddsdata
                                 </button>
                             </div>
                         </div>
@@ -1196,90 +733,28 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                     {activeTab === 'sdr' && (
                         <div className="settings-section">
-                            <div className="settings-section-title">SDR Tuning (Requires Restart)</div>
+                            <div className="settings-section-title">SDR Tuning (Kr├ñver omstart)</div>
                             <div className="form-group">
                                 <div>
-                                    <label>PPM Error (Frequency Correction)</label>
-                                    <div className="description">e.g. 0 or 34</div>
+                                    <label>PPM Error (Frekvenskorrigering)</label>
+                                    <div className="description">t.ex. 0 eller 34</div>
                                 </div>
                                 <input type="number" value={settings.sdr_ppm} onChange={e => setSettings({ ...settings, sdr_ppm: e.target.value })} />
                             </div>
                             <div className="form-group">
                                 <div>
                                     <label>Tuner Gain</label>
-                                    <div className="description">e.g. auto, 49.6, etc</div>
+                                    <div className="description">t.ex. auto, 49.6, etc</div>
                                 </div>
                                 <input type="text" value={settings.sdr_gain} onChange={e => setSettings({ ...settings, sdr_gain: e.target.value })} />
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'hybrid' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">AisStream.io Integration</div>
-                            <div className="form-group">
-                                <label>Enable Hybrid Data</label>
-                                <Toggle
-                                    checked={settings.aisstream_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, aisstream_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group vertical">
-                                <label>AisStream.io API Key</label>
-                                <input 
-                                    type="password" 
-                                    placeholder="Your API Key" 
-                                    value={settings.aisstream_api_key} 
-                                    onChange={e => setSettings({ ...settings, aisstream_api_key: e.target.value })} 
-                                    style={{ width: '100%', boxSizing: 'border-box' }} 
-                                />
-                                <div className="description" style={{ marginTop: '8px' }}>
-                                    Required to fetch live AIS data from AisStream.io. 
-                                    Get your free key at <a href="https://aisstream.io" target="_blank" rel="noreferrer" style={{color: '#44aaff'}}>aisstream.io</a>.
-                                </div>
-                            </div>
-                            <div className="form-group" style={{ marginTop: '10px' }}>
-                                <label>Show internet vessels on main map</label>
-                                <Toggle
-                                    checked={settings.show_aisstream_on_map !== 'false'}
-                                    onChange={val => setSettings({ ...settings, show_aisstream_on_map: String(val) })}
-                                />
-                            </div>
-
-                            <div className="settings-section-title" style={{ marginTop: '20px' }}>Local Data Sources</div>
-                            <div className="form-group">
-                                <label>Enable Local SDR Dongle</label>
-                                <Toggle
-                                    checked={settings.sdr_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, sdr_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Enable UDP NMEA Listener</label>
-                                <Toggle
-                                    checked={settings.udp_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, udp_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>UDP Listen Port</label>
-                                    <div className="description">Default: 10110</div>
-                                </div>
-                                <input 
-                                    type="number" 
-                                    value={settings.udp_port} 
-                                    onChange={e => setSettings({ ...settings, udp_port: e.target.value })} 
-                                    style={{ width: '100px' }}
-                                />
                             </div>
                         </div>
                     )}
                 </div>
 
                 <div style={{ padding: '25px 30px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '15px', background: 'rgba(0,0,0,0.1)' }}>
-                    <button className="styled-button" style={{ padding: '10px 20px', borderRadius: '8px' }} onClick={onClose}>Cancel</button>
-                    <button className="styled-button primary" style={{ padding: '10px 25px', borderRadius: '8px', background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', boxShadow: '0 4px 15px rgba(0,102,204,0.3)' }} onClick={() => { onSave(); onClose(); }}>Save Changes</button>
+                    <button className="styled-button" style={{ padding: '10px 20px', borderRadius: '8px' }} onClick={onClose}>Avbryt</button>
+                    <button className="styled-button primary" style={{ padding: '10px 25px', borderRadius: '8px', background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', boxShadow: '0 4px 15px rgba(0,102,204,0.3)' }} onClick={() => { onSave(); onClose(); }}>Spara ├ñndringar</button>
                 </div>
             </div>
         </div>
@@ -1311,7 +786,7 @@ export default function App() {
         origin_lon: '',
         show_range_rings: 'true',
         map_style: 'light',
-        range_type: '24h',
+        range_type: '24h', // '24h' eller 'alltime'
         base_layer: 'standard',
         history_duration: '60',
         show_names_on_map: 'true',
@@ -1323,17 +798,9 @@ export default function App() {
         units: 'nautical',
         ship_size: '1.0',
         circle_size: '1.0',
-        trail_size: '2.0',
-        aisstream_enabled: 'false',
-        aisstream_api_key: '',
-        trail_mode: 'all',
-        show_aisstream_on_map: 'true',
-        sdr_enabled: 'true',
-        udp_enabled: 'true',
-        udp_port: '10110'
+        trail_size: '2.0'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
     const [settingsTab, setSettingsTab] = useState('general');
 
     const [selectedShipMmsi, setSelectedShipMmsi] = useState<string | null>(null);
@@ -1346,28 +813,15 @@ export default function App() {
         const saved = localStorage.getItem('naviscore_sidebar_width');
         return saved ? parseInt(saved) : 380;
     });
-
-    // Sidebar Filters
-    const [searchTerm, setSearchTerm] = useState('');
-    const [filterSource, setFilterSource] = useState('all'); // all, sdr, stream
-    const [filterShipType, setFilterShipType] = useState('all');
     const hoverTimerRef = useRef<number | null>(null);
 
-    // Performance & Hybrid Visibility
-    const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
-    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, mmsi: string } | null>(null);
-
     const filteredShipsCount = useMemo(() => {
-        const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
         return ships.filter(s => {
             const nameUpper = (s.name || "").toUpperCase();
             const mmsiStr = String(s.mmsi || "");
             const type = s.shiptype || s.ship_type;
-            const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER');
+            const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('V├äDER');
             if (isMeteo) return false;
-
-            // Internet vessel filtering
-            if (!showAisStream && (s.source === 'aisstream')) return false;
 
             // Exclude ATONs (Buoys/Beacons/etc)
             if (mmsiStr.startsWith('99') || (type >= 91 && type <= 99) || type === 21) return false;
@@ -1377,7 +831,7 @@ export default function App() {
 
             return true;
         }).length;
-    }, [ships, mqttSettings.show_aisstream_on_map]);
+    }, [ships]);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -1411,14 +865,7 @@ export default function App() {
                     units: data.units || 'nautical',
                     ship_size: data.ship_size || '1.0',
                     circle_size: data.circle_size || '1.0',
-                    trail_size: data.trail_size || '2.0',
-                    aisstream_enabled: data.aisstream_enabled || 'false',
-                    aisstream_api_key: data.aisstream_api_key || '',
-                    trail_mode: data.trail_mode || 'all',
-                    show_aisstream_on_map: data.show_aisstream_on_map || 'true',
-                    sdr_enabled: data.sdr_enabled || 'true',
-                    udp_enabled: data.udp_enabled || 'true',
-                    udp_port: data.udp_port || '10110'
+                    trail_size: data.trail_size || '2.0'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -1466,10 +913,10 @@ export default function App() {
                 .then(data => setCoverageSectors(data))
                 .catch(console.error);
 
-            alert('Settings saved!');
+            alert('Inst├ñllningar sparade!');
         } catch (err) {
             console.error(err);
-            alert('Could not save settings');
+            alert('Kunde inte spara inst├ñllningar');
         }
     };
 
@@ -1490,18 +937,18 @@ export default function App() {
                 if (Array.isArray(data) && data.length > 0) {
                     setShips(data.filter((s: any) => {
                         const nameUpper = (s.name || "").toUpperCase();
-                        return s.lat && s.lon && !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
+                        return s.lat && s.lon && !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('V├äDER');
                     }));
                 }
             })
             .catch(console.error);
 
         const ws = new WebSocket(wsUrl);
-            ws.onopen = () => setStatus('Connected to NavisCore');
-            ws.onmessage = (event: MessageEvent) => {
+        ws.onopen = () => setStatus('Ansluten till NavisCore');
+        ws.onmessage = (event: MessageEvent) => {
             const data = JSON.parse(event.data);
             const nameUpper = (data.name || "").toUpperCase();
-            if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return;
+            if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('V├äDER')) return;
 
             if (data.type === 'status') {
                 setStatus('Status: ' + data.message);
@@ -1556,7 +1003,7 @@ export default function App() {
                 }
             }
         };
-        ws.onclose = () => setStatus('Disconnected');
+        ws.onclose = () => setStatus('Nedkopplad');
         ws.onerror = () => setStatus('WebSocket Error');
 
         return () => {
@@ -1624,7 +1071,6 @@ export default function App() {
         : "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
     const isDark = theme === 'dark';
-
     const colors = {
         bgMain: isDark ? '#0f0f1a' : '#f4f6f8',
         bgSidebar: isDark ? '#161625' : '#ffffff',
@@ -1736,8 +1182,8 @@ export default function App() {
     // Tracker for user switching map layers
     const handleLayerChange = (layerName: string) => {
         let mode = 'standard';
-        if (layerName.includes('Satellite')) mode = 'satellite';
-        else if (layerName.includes('Sea Chart')) mode = 'osm';
+        if (layerName.includes('Satellit')) mode = 'satellite';
+        else if (layerName.includes('Sj├Âkort')) mode = 'osm';
 
         setMqttSettings(prev => {
             const next = { ...prev, base_layer: mode };
@@ -1810,7 +1256,7 @@ export default function App() {
                         gap: '8px'
                     }}>
                         <Ship size={16} />
-                        Vessels: {filteredShipsCount}
+                        Fartyg: {filteredShipsCount}
                     </div>
 
                     {!isNaN(originLat) && !isNaN(originLon) && maxDistance > 0 && (
@@ -1879,20 +1325,11 @@ export default function App() {
 
                     <div style={{ display: 'flex', gap: '5px', borderLeft: `1px solid ${colors.border}`, paddingLeft: '15px' }}>
                         <button
-                            onClick={() => setIsStatsModalOpen(true)}
-                            style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
-                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                            title="Statistics"
-                        >
-                            <BarChart2 size={22} />
-                        </button>
-                        <button
                             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
                             style={{ background: isSidebarOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => { if (!isSidebarOpen) e.currentTarget.style.background = 'transparent' }}
-                            title="Seen Objects"
+                            title="Objektlista"
                         >
                             <List size={22} />
                         </button>
@@ -1901,7 +1338,7 @@ export default function App() {
                             style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
                             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                            title="Settings"
+                            title="Inst├ñllningar"
                         >
                             <Settings size={22} />
                         </button>
@@ -1914,26 +1351,26 @@ export default function App() {
                 <div style={{ flex: 1, position: 'relative' }}>
                     {!isSettingsLoaded ? (
                         <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', background: colors.bgMain, color: colors.textMuted }}>
-                            Loading map...
+                            Laddar karta...
                         </div>
                     ) : (
                         <MapContainer key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
                             <CenterButton originLat={originLat} originLon={originLon} />
                             <ZoomTracker setZoom={setCurrentZoom} />
                             <LayersControl position="topright">
-                                <LayersControl.BaseLayer name="Standard Map (Minimal)" checked={mqttSettings.base_layer === 'standard' || !mqttSettings.base_layer}>
+                                <LayersControl.BaseLayer name="Standard Karta (Minimal)" checked={mqttSettings.base_layer === 'standard' || !mqttSettings.base_layer}>
                                     <TileLayer
                                         url={tileUrl}
                                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
                                     />
                                 </LayersControl.BaseLayer>
-                                <LayersControl.BaseLayer name="Satellite (Esri)" checked={mqttSettings.base_layer === 'satellite'}>
+                                <LayersControl.BaseLayer name="Satellit (Esri)" checked={mqttSettings.base_layer === 'satellite'}>
                                     <TileLayer
                                         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                                         attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                                     />
                                 </LayersControl.BaseLayer>
-                                <LayersControl.BaseLayer name="Sea Chart / OSM" checked={mqttSettings.base_layer === 'osm'}>
+                                <LayersControl.BaseLayer name="Sj├Âkort / OSM" checked={mqttSettings.base_layer === 'osm'}>
                                     <TileLayer
                                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -1946,7 +1383,7 @@ export default function App() {
                                 <>
                                     <Marker position={[originLat, originLon]} icon={L.divIcon({
                                         className: 'origin-marker',
-                                        html: `<div style="font-size:24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">📍</div>`,
+                                        html: `<div style="font-size:24px; text-shadow: 0 2px 4px rgba(0,0,0,0.5);">­ƒôì</div>`,
                                         iconSize: [24, 24],
                                         iconAnchor: [12, 24]
                                     })}>
@@ -1983,11 +1420,7 @@ export default function App() {
                             {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
                                 const nameUpper = (s.name || "").toUpperCase();
-                                if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
-
-                                // Internet vessel filtering
-                                const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
-                                if (!showAisStream && (s.source === 'aisstream')) return null;
+                                if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('V├äDER')) return null;
 
                                 // Smart Label Logic:
                                 // 1. Zoom > 13: Show all names
@@ -2014,36 +1447,28 @@ export default function App() {
 
                                 return (
                                     <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={icon}
-                                        riseOnHover={true}
-                                    eventHandlers={{
-                                        mouseover: () => {
-                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                            hoverTimerRef.current = setTimeout(() => {
-                                                setHoveredMmsi(mmsiStr);
-                                            }, 1000);
-                                        },
-                                        mouseout: () => {
-                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                            setHoveredMmsi(null);
-                                        },
-                                        click: (e) => {
-                                            // If we have a tooltip open, clear it when clicking (opening popup)
-                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                            setHoveredMmsi(null);
-                                        },
-                                        dblclick: (e) => {
-                                            // Explicitly for double click as requested
-                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                            setHoveredMmsi(null);
-                                        },
-                                        contextmenu: (e) => {
-                                            setContextMenu({
-                                                x: e.originalEvent.clientX,
-                                                y: e.originalEvent.clientY,
-                                                mmsi: mmsiStr
-                                            });
-                                        }
-                                    }}
+                                        eventHandlers={{
+                                            mouseover: () => {
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                hoverTimerRef.current = setTimeout(() => {
+                                                    setHoveredMmsi(mmsiStr);
+                                                }, 1000);
+                                            },
+                                            mouseout: () => {
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                setHoveredMmsi(null);
+                                            },
+                                            click: (e) => {
+                                                // If we have a tooltip open, clear it when clicking (opening popup)
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                setHoveredMmsi(null);
+                                            },
+                                            dblclick: (e) => {
+                                                // Explicitly for double click as requested
+                                                if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+                                                setHoveredMmsi(null);
+                                            }
+                                        }}
                                     >
                                         {/* Smart Label (Fast text under ship) */}
                                         {shouldShowName && (
@@ -2077,12 +1502,12 @@ export default function App() {
                                                         </div>
                                                         <div style={{ background: '#22282d', padding: '12px', color: '#fff' }}>
                                                             <div style={{ textAlign: 'center', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                                                                {new Date(s.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
+                                                                {new Date(s.timestamp).toLocaleTimeString('sv-SE', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
                                                             </div>
                                                             <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '8px 0' }}></div>
                                                             <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.9rem' }}>
-                                                                <span>Wind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
-                                                                <span>Gusts: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
+                                                                <span>Vind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
+                                                                <span>Byar: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2111,27 +1536,16 @@ export default function App() {
                                         {!s.is_meteo && <Popup className="custom-detailed-popup" offset={[0, -20]}>
                                             <div style={{ display: 'flex', flexDirection: 'column', width: '460px' }}>
                                                 {/* SHIP NAME HEADER */}
-                                                <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'var(--bg-card)' }}>
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', minWidth: '45px' }}>
-                                                        <span style={{ fontSize: '1.6rem', display: 'flex' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
-                                                        <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)', textAlign: 'center', lineHeight: '1', fontWeight: 'bold' }}>
-                                                            {getCountryName(s.country_code)}
-                                                        </span>
-                                                    </div>
+                                                <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--bg-card)' }}>
+                                                    <span style={{ fontSize: '1.6rem', display: 'flex' }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
                                                     <div style={{ flex: 1, overflow: 'hidden' }}>
                                                         <div style={{ fontWeight: '700', fontSize: '1.05rem', whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <span>{s.name || 'Unknown Vessel'} ({mmsiStr})</span>
+                                                            <span>{s.name || 'Unknown Vessel'}</span>
                                                             {s.callsign && <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 'normal' }}>{s.callsign}</span>}
                                                         </div>
                                                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                                            Messages: {s.message_count || 1} • Last Signal: {getTimeAgo(s.timestamp)}
-                                                            {s.previous_seen && <span> • Prev. Seen: {getTimeAgo(s.previous_seen)}</span>}
+                                                            MMSI: {mmsiStr} ÔÇó Sett: {s.message_count || 1} ggr ÔÇó Last Seen: {getTimeAgo(s.timestamp)}
                                                         </div>
-                                                        {s.status_text && (
-                                                            <div style={{ fontSize: '0.75rem', color: '#44aaff', fontWeight: 'bold', marginTop: '2px' }}>
-                                                                {s.status_text}
-                                                            </div>
-                                                        )}
                                                     </div>
                                                 </div>
 
@@ -2156,7 +1570,7 @@ export default function App() {
                                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                                             <div>
                                                                 <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>SOG / COG</div>
-                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{formatSpeed(s.sog, mqttSettings.units)} / {s.cog?.toFixed(0) ?? '--'}°</div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{formatSpeed(s.sog, mqttSettings.units)} / {s.cog?.toFixed(0) ?? '--'}┬░</div>
                                                             </div>
                                                             <div>
                                                                 <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Dimensions</div>
@@ -2175,7 +1589,7 @@ export default function App() {
                                                         <div style={{ marginTop: '2px', borderTop: `1px solid ${colors.border}`, paddingTop: '8px' }}>
                                                             <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Destination / Update</div>
                                                             <div style={{ fontWeight: 600, fontSize: '0.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                {s.destination || '--'} • {new Date(s.timestamp).toLocaleTimeString()}
+                                                                {s.destination || '--'} ÔÇó {new Date(s.timestamp).toLocaleTimeString()}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -2189,27 +1603,17 @@ export default function App() {
                             {/* Ship History Trails */}
                             {ships.map((s: any) => {
                                 const nameUpper = (s.name || "").toUpperCase();
-                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2 || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
-                                
-                                const mmsiStr = String(s.mmsi);
-                                const isHovered = hoveredMmsi === mmsiStr;
-                                const isSelected = selectedShipMmsi === mmsiStr;
-                                const isPinned = pinnedMmsis.has(mmsiStr);
-
-                                // Logic for selective tracking & Internet vessel filtering
-                                const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
-                                if (!showAisStream && (s.source === 'aisstream')) return null;
-                                if (mqttSettings.trail_mode === 'selected' && !isHovered && !isSelected && !isPinned) return null;
-
+                                if (mqttSettings.trail_enabled !== 'true' || !s.history || s.history.length < 2 || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('V├äDER')) return null;
+                                const isHovered = hoveredMmsi === String(s.mmsi);
                                 return (
                                     <Polyline
                                         key={`trail-${s.mmsi}`}
                                         positions={s.history}
                                         pathOptions={{
-                                            color: (isHovered || isSelected || isPinned) ? '#00f0ff' : mqttSettings.trail_color,
-                                            weight: (isHovered || isSelected || isPinned) ? Math.max(parseFloat(mqttSettings.trail_size) + 2, 4) : parseFloat(mqttSettings.trail_size),
-                                            opacity: (isHovered || isSelected || isPinned) ? 1 : parseFloat(mqttSettings.trail_opacity),
-                                            dashArray: (isHovered || isSelected || isPinned) ? undefined : '5, 5'
+                                            color: isHovered ? '#00f0ff' : mqttSettings.trail_color,
+                                            weight: isHovered ? Math.max(parseFloat(mqttSettings.trail_size) + 2, 4) : parseFloat(mqttSettings.trail_size),
+                                            opacity: isHovered ? 1 : parseFloat(mqttSettings.trail_opacity),
+                                            dashArray: isHovered ? undefined : '5, 5'
                                         }}
                                     />
                                 );
@@ -2264,11 +1668,33 @@ export default function App() {
                             transition: isResizing ? 'none' : 'width 0.3s ease',
                             overflow: 'hidden'
                         }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: `1px solid ${colors.border}` }}>
-                                <h1 style={{ margin: 0, fontSize: '1.1rem', color: colors.textMain, fontWeight: 700 }}>
-                                    Seen Objects
-                                </h1>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px', borderBottom: `1px solid ${colors.border}` }}>
+                                <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>
+                                    Lokala Objekt ({ships.filter(s => {
+                                        const nameUpper = (s.name || "").toUpperCase();
+                                        return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('V├äDER');
+                                    }).length})
+                                </h2>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <select
+                                        value={sortConfig.key}
+                                        onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
+                                        style={{
+                                            background: 'rgba(0,0,0,0.2)',
+                                            color: colors.textMain,
+                                            border: `1px solid ${colors.border}`,
+                                            borderRadius: '4px',
+                                            padding: '4px 8px',
+                                            fontSize: '0.8rem',
+                                            cursor: 'pointer'
+                                        }}
+                                    >
+                                        <option value="name">Namn</option>
+                                        <option value="last_seen">Senast sedd</option>
+                                        <option value="shiptype">Typ</option>
+                                        <option value="distance">Distans</option>
+                                        <option value="message_count">Meddelanden</option>
+                                    </select>
                                     <button onClick={() => setSortConfig({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                                         <Navigation size={16} style={{
                                             transform: sortConfig.direction === 'asc' ? 'rotate(0deg)' : 'rotate(180deg)',
@@ -2281,145 +1707,16 @@ export default function App() {
                                 </div>
                             </div>
 
-                            {/* Sidebar Filter Bar */}
-                            <div style={{ padding: '12px 20px', borderBottom: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', gap: '10px', background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
-                                <div style={{ position: 'relative' }}>
-                                    <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Search name or MMSI..." 
-                                        value={searchTerm}
-                                        onChange={e => setSearchTerm(e.target.value)}
-                                        style={{ 
-                                            width: '100%', 
-                                            padding: '8px 10px 8px 32px', 
-                                            borderRadius: '6px', 
-                                            border: `1px solid ${colors.border}`,
-                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-                                            color: colors.textMain,
-                                            fontSize: '0.85rem',
-                                            boxSizing: 'border-box'
-                                        }}
-                                    />
-                                    {searchTerm && (
-                                        <button 
-                                            onClick={() => setSearchTerm('')}
-                                            style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '2px' }}
-                                        >
-                                            <X size={14} />
-                                        </button>
-                                    )}
-                                </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                    <select
-                                        value={filterSource}
-                                        onChange={(e) => setFilterSource(e.target.value)}
-                                        style={{
-                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-                                            color: colors.textMain,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '6px',
-                                            padding: '6px 8px',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer',
-                                            width: '100%'
-                                        }}
-                                    >
-                                        <option value="all">Any Source</option>
-                                        <option value="sdr">Local SDR</option>
-                                        <option value="stream">AisStream</option>
-                                    </select>
-                                    <select
-                                        value={sortConfig.key}
-                                        onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
-                                        style={{
-                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-                                            color: colors.textMain,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '6px',
-                                            padding: '6px 8px',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer'
-                                        }}
-                                    >
-                                        <option value="last_seen">Sort: Last Seen</option>
-                                        <option value="name">Sort: Name</option>
-                                        <option value="shiptype">Sort: Type</option>
-                                        <option value="distance">Sort: Distance</option>
-                                        <option value="message_count">Sort: Messages</option>
-                                    </select>
-                                </div>
-                                <select
-                                    value={filterShipType}
-                                    onChange={(e) => setFilterShipType(e.target.value)}
-                                    style={{
-                                        background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-                                        color: colors.textMain,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '6px',
-                                        padding: '6px 8px',
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer',
-                                        width: '100%'
-                                    }}
-                                >
-                                    <option value="all">All Ship Types</option>
-                                    <option value="cargo">Cargo Vessels</option>
-                                    <option value="tanker">Tankers</option>
-                                    <option value="passenger">Passenger Ships</option>
-                                    <option value="fishing">Fishing</option>
-                                    <option value="pleasure">Pleasure/Sailing</option>
-                                    <option value="tug">Tugs/Towing</option>
-                                    <option value="highspeed">High Speed Craft</option>
-                                    <option value="other">Other Types</option>
-                                </select>
-                            </div>
-
-                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '20px', boxSizing: 'border-box' }}>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                                     {ships.length === 0 ? (
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
-                                            No objects on the radar yet...
+                                            Inget objekt p├Ñ radarn ├ñnnu...
                                         </div>
                                     ) : ships
                                         .filter(s => {
                                             const nameUpper = (s.name || "").toUpperCase();
-                                            const mmsiStr = String(s.mmsi);
-                                            const type = s.shiptype || s.ship_type;
-                                            
-                                            // Basic exclusions (AtoN, Meteo, etc)
-                                            if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
-
-                                            // Internet vessel filtering
-                                            const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
-                                            if (!showAisStream && (s.source === 'aisstream')) return false;
-
-                                            // Search Filter
-                                            if (searchTerm) {
-                                                const term = searchTerm.toUpperCase();
-                                                if (!nameUpper.includes(term) && !mmsiStr.includes(term)) return false;
-                                            }
-
-                                            // Source Filter
-                                            if (filterSource !== 'all') {
-                                                const source = s.source || 'sdr';
-                                                if (filterSource === 'sdr' && source !== 'sdr' && source !== 'local') return false;
-                                                if (filterSource === 'stream' && source !== 'aisstream') return false;
-                                            }
-
-                                            // Ship Type Filter
-                                            if (filterShipType !== 'all') {
-                                                if (filterShipType === 'cargo' && !(type >= 70 && type <= 79)) return false;
-                                                if (filterShipType === 'tanker' && !(type >= 80 && type <= 89)) return false;
-                                                if (filterShipType === 'passenger' && !(type >= 60 && type <= 69)) return false;
-                                                if (filterShipType === 'fishing' && type !== 30) return false;
-                                                if (filterShipType === 'pleasure' && !(type >= 36 && type <= 37)) return false;
-                                                if (filterShipType === 'tug' && !(type >= 31 && type <= 32 || type === 52)) return false;
-                                                if (filterShipType === 'highspeed' && !(type >= 40 && type <= 49)) return false;
-                                                if (filterShipType === 'other' && (type >= 30 && type <= 89)) return false; // Simple logic: not any above but still defined
-                                            }
-
-                                            return true;
+                                            return !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('V├äDER');
                                         })
                                         .map(s => {
                                             const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
@@ -2463,14 +1760,6 @@ export default function App() {
                                                     setHoveredMmsi(String(ship.mmsi));
                                                     setSelectedShipMmsi(String(ship.mmsi));
                                                 }}
-                                                onContextMenu={(e) => {
-                                                    e.preventDefault();
-                                                    setContextMenu({
-                                                        x: e.clientX,
-                                                        y: e.clientY,
-                                                        mmsi: String(ship.mmsi)
-                                                    });
-                                                }}
                                                 onMouseEnter={e => {
                                                     e.currentTarget.style.transform = 'translateX(-4px)';
                                                     e.currentTarget.style.borderColor = '#44aaff';
@@ -2509,13 +1798,10 @@ export default function App() {
                                                             {ship.name || ship.mmsi}
                                                         </span>
                                                     </div>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
+                                                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px' }}>
                                                         <span>{getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}</span>
-                                                        <span style={{ opacity: 0.5 }}>•</span>
+                                                        <span style={{ opacity: 0.5 }}>ÔÇó</span>
                                                         <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}</span>
-                                                        <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(0,255,128,0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#00ff80', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}` }}>
-                                                            {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
-                                                        </span>
                                                     </div>
                                                 </div>
 
@@ -2526,7 +1812,7 @@ export default function App() {
                                                     </div>
                                                     <div style={{ fontSize: '0.75rem', color: colors.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
                                                         <Navigation size={10} style={{ transform: `rotate(${ship.cog || 0}deg)` }} />
-                                                        {ship.cog?.toFixed(0) ?? '--'}°
+                                                        {ship.cog?.toFixed(0) ?? '--'}┬░
                                                     </div>
                                                 </div>
                                             </div>
@@ -2550,6 +1836,7 @@ export default function App() {
                 colors={colors}
             />
 
+            {/* Vessel Detail Modal */}
             <VesselDetailModal
                 isOpen={!!selectedShipMmsi}
                 onClose={() => setSelectedShipMmsi(null)}
@@ -2557,107 +1844,6 @@ export default function App() {
                 colors={colors}
                 mqttSettings={mqttSettings}
             />
-
-            <StatisticsModal
-                isOpen={isStatsModalOpen}
-                onClose={() => setIsStatsModalOpen(false)}
-                colors={colors}
-            />
-
-            {contextMenu && (
-                <ContextMenu
-                    x={contextMenu.x}
-                    y={contextMenu.y}
-                    onClose={() => setContextMenu(null)}
-                    colors={colors}
-                    isDark={isDark}
-                    options={[
-                        {
-                            label: pinnedMmsis.has(contextMenu.mmsi) ? 'Stop Tracking' : 'Track Specifically',
-                            icon: pinnedMmsis.has(contextMenu.mmsi) ? <X size={16} /> : <Navigation size={16} />,
-                            onClick: () => {
-                                setPinnedMmsis(prev => {
-                                    const next = new Set(prev);
-                                    if (next.has(contextMenu.mmsi)) next.delete(contextMenu.mmsi);
-                                    else next.add(contextMenu.mmsi);
-                                    return next;
-                                });
-                            }
-                        },
-                        {
-                            label: 'Focus on Map',
-                            icon: <Search size={16} />,
-                            onClick: () => {
-                                setSelectedShipMmsi(contextMenu.mmsi);
-                                // Forcing map to re-center is handled by popup/marker usually,
-                                // but we could trigger it here if needed.
-                            },
-                            separator: true
-                        },
-                        {
-                            label: 'Vessel Details',
-                            icon: <Info size={16} />,
-                            onClick: () => setSelectedShipMmsi(contextMenu.mmsi)
-                        }
-                    ]}
-                />
-            )}
-        </div>
-    );
-}
-
-function ContextMenu({ x, y, options, onClose, colors, isDark }: any) {
-    useEffect(() => {
-        const handleClick = () => onClose();
-        window.addEventListener('click', handleClick);
-        window.addEventListener('scroll', handleClick);
-        return () => {
-            window.removeEventListener('click', handleClick);
-            window.removeEventListener('scroll', handleClick);
-        };
-    }, [onClose]);
-
-    return (
-        <div 
-            style={{
-                position: 'fixed',
-                left: x,
-                top: y,
-                background: colors.bgCard,
-                border: `1px solid ${colors.border}`,
-                borderRadius: '10px',
-                padding: '6px 0',
-                zIndex: 10000,
-                boxShadow: isDark ? '0 10px 25px rgba(0,0,0,0.6)' : '0 10px 25px rgba(0,0,0,0.15)',
-                minWidth: '180px',
-                backdropFilter: 'blur(10px)',
-                animation: 'contextFadeIn 0.15s ease-out'
-            }}
-            onClick={e => e.stopPropagation()}
-        >
-            {options.map((opt: any, i: number) => (
-                <div
-                    key={i}
-                    onClick={() => { opt.onClick(); onClose(); }}
-                    style={{
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        fontSize: '0.9rem',
-                        color: opt.danger ? '#ff5555' : colors.textMain,
-                        transition: 'background 0.2s',
-                        borderBottom: opt.separator ? `1px solid ${colors.border}` : 'none',
-                        marginBottom: opt.separator ? '6px' : '0'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)'}
-                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                >
-                    <span style={{ color: opt.danger ? '#ff5555' : colors.accent, display: 'flex' }}>{opt.icon}</span>
-                    <span style={{ fontWeight: 500 }}>{opt.label}</span>
-                </div>
-            ))}
         </div>
     );
 }
