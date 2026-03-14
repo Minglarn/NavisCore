@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 function CenterButton({ originLat, originLon }: { originLat: number, originLon: number }) {
@@ -38,9 +38,10 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function getShipColor(mmsiStr: string, type?: number) {
-    if (mmsiStr.startsWith('99')) return '#ff00ff'; // AtoN (Boj/Fyr)
-    if (mmsiStr.startsWith('00')) return '#000000'; // Base Station
+function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?: boolean) {
+    if (isMeteo) return '#44aaff'; // Weather (Light Blue)
+    if (isAton || mmsiStr.startsWith('99')) return '#ff00ff'; // AtoN (Magenta)
+    if (mmsiStr.startsWith('00')) return '#555555'; // Base Station
     if (!type) return '#a0a0a0'; // Unknown
 
     if (type >= 20 && type <= 29) return '#ffffff'; // WIG (White)
@@ -196,18 +197,43 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     return emoji;
 }
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0) {
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number) {
     const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
     const isAircraft = type === 9;
-    const color = getShipColor(mmsi, type);
+    const color = getShipColor(mmsi, type, isMeteo, isAton);
     const borderColor = '#000000';
 
     let svg = '';
-    // Increase hit area: Use a larger container size but keep SVG centered and correctly scaled
-    const baseHitArea = 56; // Increased from 44 for better clickability on small markers
+    const baseHitArea = 56;
     const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
-    if (isAircraft) {
+    if (isMeteo) {
+        // Weather Icon (Vindstrut/Wind sock)
+        const size = 28 * shipScale;
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
+                 <path d="M12,2 L12,22 M12,2 L21,5 L21,9 L12,12 M12,5 L19,6.2 L19,7.8 L12,9" fill="${color}" stroke="${borderColor}" stroke-width="1.5" stroke-linecap="round" />
+                 <circle cx="12" cy="2" r="1.5" fill="${borderColor}" />
+               </svg>`;
+    } else if (isAton) {
+        // AtoN Icon: Lighthouse for fixed structures (1, 3, 5-20), Buoy for floating (21-31)
+        const isFloating = atonType && atonType >= 21 && atonType <= 31;
+        const size = (isFloating ? 24 : 28) * shipScale;
+        if (isFloating) {
+            // Buoy
+            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
+                     <path d="M12,2 L14,6 L16,18 L8,18 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
+                     <path d="M6,18 L18,18" stroke="${borderColor}" stroke-width="2" stroke-linecap="round" />
+                     <circle cx="12" cy="4" r="2" fill="yellow" stroke="${borderColor}" stroke-width="0.5" class="svg-pulse" />
+                   </svg>`;
+        } else {
+            // Lighthouse / Fixed Structure
+            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
+                     <path d="M8,22 L16,22 L14,6 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
+                     <rect x="9" y="4" width="6" height="4" fill="#333" stroke="${borderColor}" stroke-width="1" />
+                     <path d="M7,6 L4,4 M17,6 L20,4 M12,2 L12,4" stroke="yellow" stroke-width="2" stroke-linecap="round" class="svg-pulse" />
+                   </svg>`;
+        }
+    } else if (isAircraft) {
         const rotation = cog !== undefined ? cog : 0;
         const size = 24 * shipScale;
         svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${rotation}deg);">
@@ -215,14 +241,12 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
                  <path d="M21,16 L21,14 L14,10 L14,3.5 C14,2.67 13.33,2 12.5,2 C11.67,2 11,2.67 11,3.5 L11,10 L4,14 L4,16 L11,14 L11,19 L9,20.5 L9,22 L12.5,21 L16,22 L16,20.5 L14,19 L14,14 L21,16 Z" fill="white" />
                </svg>`;
     } else if (isMoving) {
-        // Enlongated Ship-like Polygon (Pointer at 12,2)
         const size = 26 * shipScale;
         svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);">
                  <polygon points="12,2 19,10 17,22 7,22 5,10" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
                           class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
     } else {
-        // Circle for stationary
         const size = 16 * circleScale;
         svg = `<svg width="${size}" height="${size}" viewBox="0 0 16 16">
                  <circle cx="8" cy="8" r="6" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
@@ -280,6 +304,14 @@ const extraStyles = `
 @keyframes svg-fill-flash {
     0% { fill: #ffff00; stroke: #ffffff; stroke-width: 3px; }
     100% { }
+}
+.svg-pulse {
+    animation: svg-pulse-anim 2s infinite ease-in-out;
+}
+@keyframes svg-pulse-anim {
+    0% { opacity: 0.5; stroke-width: 1px; }
+    50% { opacity: 1; stroke-width: 3px; }
+    100% { opacity: 0.5; stroke-width: 1px; }
 }
 .settings-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -1334,6 +1366,8 @@ export default function App() {
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
+    const [isNmeaModalOpen, setIsNmeaModalOpen] = useState(false);
+    const [nmeaLogs, setNmeaLogs] = useState<any[]>([]);
     const [settingsTab, setSettingsTab] = useState('general');
 
     const [selectedShipMmsi, setSelectedShipMmsi] = useState<string | null>(null);
@@ -1352,6 +1386,7 @@ export default function App() {
     const [filterSource, setFilterSource] = useState('all'); // all, sdr, stream
     const [filterShipType, setFilterShipType] = useState('all');
     const hoverTimerRef = useRef<number | null>(null);
+    const lastFlashRef = useRef<Record<string, number>>({});
 
     // Performance & Hybrid Visibility
     const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
@@ -1488,10 +1523,7 @@ export default function App() {
             .then(r => r.json())
             .then((data: any[]) => {
                 if (Array.isArray(data) && data.length > 0) {
-                    setShips(data.filter((s: any) => {
-                        const nameUpper = (s.name || "").toUpperCase();
-                        return s.lat && s.lon && !s.is_meteo && !nameUpper.includes('METEO') && !nameUpper.includes('WEATHER');
-                    }));
+                    setShips(data.filter((s: any) => s.lat && s.lon));
                 }
             })
             .catch(console.error);
@@ -1500,13 +1532,17 @@ export default function App() {
             ws.onopen = () => setStatus('Connected to NavisCore');
             ws.onmessage = (event: MessageEvent) => {
             const data = JSON.parse(event.data);
-            const nameUpper = (data.name || "").toUpperCase();
-            if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return;
+            
+            // Allow weather objects
+            // const nameUpper = (data.name || "").toUpperCase();
+            // if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return;
 
             if (data.type === 'status') {
                 setStatus('Status: ' + data.message);
             } else if (data.type === 'mqtt_status') {
                 setMqttConnected(data.connected);
+            } else if (data.type === 'nmea') {
+                setNmeaLogs(prev => [{ ...data, id: Date.now() + Math.random() }, ...prev].slice(0, 200));
             } else if (data.type === 'coverage_update') {
                 setCoverageSectors(prev => {
                     const idx = prev.findIndex((s: any) => s.sector_id === data.sector_id);
@@ -1543,16 +1579,37 @@ export default function App() {
                     const history = (data.lat && data.lon) ? [[data.lat, data.lon]] : [];
                     return [...prev, { ...data, history }];
                 });
-                // Flash effect
+                // Flash effect with cooldown (10 seconds)
                 if (data.mmsi) {
-                    setFlashedMmsis(prev => new Set(prev).add(String(data.mmsi)));
-                    setTimeout(() => {
-                        setFlashedMmsis(prev => {
-                            const next = new Set(prev);
-                            next.delete(String(data.mmsi));
-                            return next;
-                        });
-                    }, 1500);
+                    const mmsiKey = String(data.mmsi);
+                    const now = Date.now();
+                    const lastFlash = lastFlashRef.current[mmsiKey] || 0;
+                    
+                    if (now - lastFlash > 10000) {
+                        lastFlashRef.current[mmsiKey] = now;
+                        setFlashedMmsis(prev => new Set(prev).add(mmsiKey));
+                        setTimeout(() => {
+                            setFlashedMmsis(prev => {
+                                const next = new Set(prev);
+                                next.delete(mmsiKey);
+                                return next;
+                            });
+                        }, 1500);
+                    }
+                }
+
+                // If this ship update includes decoded nmea, update the nmea log entry
+                if (data.nmea && data.mmsi) {
+                    setNmeaLogs(prev => prev.map(log => {
+                        const rawMatches = Array.isArray(data.nmea) 
+                            ? data.nmea.includes(log.raw)
+                            : log.raw === data.nmea;
+                        
+                        if (rawMatches) {
+                            return { ...log, decoded: data };
+                        }
+                        return log;
+                    }));
                 }
             }
         };
@@ -1897,6 +1954,15 @@ export default function App() {
                             <List size={22} />
                         </button>
                         <button
+                            onClick={() => setIsNmeaModalOpen(true)}
+                            style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            title="NMEA Info"
+                        >
+                            <Terminal size={22} />
+                        </button>
+                        <button
                             onClick={() => setIsSettingsModalOpen(true)}
                             style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
@@ -1983,7 +2049,7 @@ export default function App() {
                             {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
                                 const nameUpper = (s.name || "").toUpperCase();
-                                if (!s.lat || !s.lon || s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return null;
+                                if (!s.lat || !s.lon) return null;
 
                                 // Internet vessel filtering
                                 const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
@@ -2009,7 +2075,10 @@ export default function App() {
                                     s.shiptype || s.ship_type,
                                     showFlash && flashedMmsis.has(mmsiStr),
                                     parseFloat(mqttSettings.ship_size),
-                                    parseFloat(mqttSettings.circle_size)
+                                    parseFloat(mqttSettings.circle_size),
+                                    s.is_meteo,
+                                    s.is_aton,
+                                    s.aton_type
                                 );
 
                                 return (
@@ -2067,23 +2136,41 @@ export default function App() {
                                                 {s.is_meteo ? (
                                                     <div style={{
                                                         display: 'flex', flexDirection: 'column',
-                                                        borderRadius: '6px', overflow: 'hidden',
-                                                        boxShadow: '0 4px 12px rgba(0,0,0,0.5)',
-                                                        width: '300px',
-                                                        fontFamily: 'sans-serif'
+                                                        borderRadius: '8px', overflow: 'hidden',
+                                                        boxShadow: '0 6px 16px rgba(0,0,0,0.4)',
+                                                        width: '280px',
+                                                        fontFamily: 'system-ui, -apple-system, sans-serif'
                                                     }}>
-                                                        <div style={{ background: 'rgba(130, 140, 150, 0.9)', padding: '6px 12px', color: '#fff', fontSize: '0.85rem', fontWeight: 'bold' }}>
-                                                            From: MMSI {mmsiStr} {s.shiptype ? `(${s.shiptype})` : '(1)'}
+                                                        <div style={{ background: '#44aaff', padding: '10px 15px', color: '#fff', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <Activity size={18} />
+                                                            {s.name || 'Meteorologisk Station'}
                                                         </div>
-                                                        <div style={{ background: '#22282d', padding: '12px', color: '#fff' }}>
-                                                            <div style={{ textAlign: 'center', fontSize: '0.95rem', fontWeight: 'bold', marginBottom: '8px' }}>
-                                                                {new Date(s.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} - {s.name || 'Meteo & Hydro'}
+                                                        <div style={{ background: isDark ? '#1a1a2e' : '#fff', padding: '15px', color: colors.textMain }}>
+                                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted, marginBottom: '10px', textAlign: 'center' }}>
+                                                                MMSI: {mmsiStr} • {new Date(s.timestamp).toLocaleTimeString()}
                                                             </div>
-                                                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.15)', margin: '8px 0' }}></div>
-                                                            <div style={{ display: 'flex', justifyContent: 'center', gap: '15px', fontSize: '0.9rem' }}>
-                                                                <span>Wind: <strong>{s.wind_speed !== undefined ? `${s.wind_speed} m/s` : '--'}</strong></span>
-                                                                <span>Gusts: <strong>{s.wind_gust !== undefined ? `${s.wind_gust} m/s` : '--'}</strong></span>
+                                                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                                                                <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Vind</div>
+                                                                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#00f0ff' }}>{s.wind_speed ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>m/s</span></div>
+                                                                    <div style={{ fontSize: '0.7rem', marginTop: '2px' }}>{s.wind_direction ?? '--'}°</div>
+                                                                </div>
+                                                                <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
+                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Miljö</div>
+                                                                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#ffab40' }}>{s.air_temp ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>°C</span></div>
+                                                                    <div style={{ fontSize: '0.7rem', marginTop: '2px' }}>Vatten: {s.water_level ?? '--'} m</div>
+                                                                </div>
                                                             </div>
+                                                            {s.visibility !== undefined && (
+                                                                <div style={{ marginTop: '10px', fontSize: '0.75rem', textAlign: 'center', color: colors.textMuted }}>
+                                                                    Sikt: <strong>{s.visibility} NM</strong>
+                                                                </div>
+                                                            )}
+                                                            {s.wind_gust > s.wind_speed && (
+                                                                <div style={{ marginTop: '10px', padding: '6px', background: 'rgba(255, 50, 50, 0.1)', color: '#ff3333', borderRadius: '6px', fontSize: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
+                                                                    ⚠️ Vindbyar upp till {s.wind_gust} m/s
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 ) : (
@@ -2564,6 +2651,13 @@ export default function App() {
                 colors={colors}
             />
 
+            <NmeaConsoleModal
+                isOpen={isNmeaModalOpen}
+                onClose={() => setIsNmeaModalOpen(false)}
+                logs={nmeaLogs}
+                colors={colors}
+            />
+
             {contextMenu && (
                 <ContextMenu
                     x={contextMenu.x}
@@ -2602,6 +2696,411 @@ export default function App() {
                     ]}
                 />
             )}
+        </div>
+    );
+}
+
+function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
+    const [expandedIds, setExpandedIds] = useState<Set<any>>(new Set());
+    const [searchQuery, setSearchQuery] = useState('');
+    const [viewMode, setViewMode] = useState<'live' | 'grouped'>('live'); // 'live' or 'grouped'
+
+    const filteredLogs = useMemo(() => {
+        return logs.filter((log: any) => {
+            const query = searchQuery.toLowerCase();
+            if (!query) return true;
+            
+            const rawMatch = log.raw.toLowerCase().includes(query);
+            const mmsiMatch = log.decoded?.mmsi?.toString().includes(query);
+            const displayName = log.decoded?.name || 'Unknown';
+            const nameMatch = displayName.toLowerCase().includes(query);
+            
+            return rawMatch || mmsiMatch || nameMatch;
+        });
+    }, [logs, searchQuery]);
+
+    const groupedLogs = useMemo(() => {
+        if (viewMode !== 'grouped') return [];
+        
+        const groups: Record<string, any[]> = {};
+        filteredLogs.forEach((log: any) => {
+            // Group primarily by MMSI to ensure uniqueness
+            const mmsi = log.decoded?.mmsi?.toString();
+            // If no MMSI, use name as fallback, else 'Unknown'
+            const key = mmsi || log.decoded?.name || 'Unknown';
+            
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(log);
+        });
+        
+        return Object.entries(groups).map(([id, items]) => {
+            // Pick most frequent name for the group
+            const names = items.map(i => i.decoded?.name).filter(Boolean);
+            const name = names.length > 0 ? names[0] : 'Unknown';
+            const mmsi = items.find(i => i.decoded?.mmsi)?.decoded?.mmsi;
+            
+            return {
+                id, // Use the key as a stable ID for expanded state
+                name,
+                mmsi,
+                items: items.sort((a, b) => b.timestamp - a.timestamp)
+            };
+        }).sort((a, b) => (a.name || '').localeCompare(b.name || ''));
+    }, [filteredLogs, viewMode]);
+
+    if (!isOpen) return null;
+
+    const toggleExpand = (id: any) => {
+        setExpandedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    return (
+        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000 }}>
+            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
+                width: '90%', 
+                height: '90%', 
+                maxWidth: '1600px',
+                padding: '0',
+                display: 'flex',
+                flexDirection: 'column',
+                background: colors.bgMain,
+                border: `1px solid ${colors.border}`,
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                overflow: 'hidden'
+            }}>
+                {/* Header */}
+                <div style={{ 
+                    padding: '20px 30px', 
+                    background: colors.bgCard, 
+                    borderBottom: `1px solid ${colors.border}`, 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center' 
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ 
+                            background: 'linear-gradient(135deg, #00f0ff, #0072ff)', 
+                            padding: '8px', 
+                            borderRadius: '10px',
+                            display: 'flex',
+                            boxShadow: '0 0 15px rgba(0,240,255,0.3)'
+                        }}>
+                            <Terminal size={24} color="#000" />
+                        </div>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.3rem', fontWeight: 900, color: colors.textMain, letterSpacing: '-0.5px' }}>NMEA Info Browser</h2>
+                            <div style={{ color: colors.textMuted, fontSize: '0.8rem', opacity: 0.8 }}>Real-time telemetry & protocol analysis</div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', transition: 'color 0.2s' }} onMouseEnter={e => e.currentTarget.style.color = '#ff5555'} onMouseLeave={e => e.currentTarget.style.color = colors.textMuted}>
+                        <X size={28} />
+                    </button>
+                </div>
+
+                {/* Toolbar */}
+                <div style={{ 
+                    padding: '12px 30px', 
+                    background: colors.bgSidebar, 
+                    borderBottom: `1px solid ${colors.border}`,
+                    display: 'flex',
+                    gap: '20px',
+                    alignItems: 'center',
+                    flexWrap: 'wrap'
+                }}>
+                    <div style={{ position: 'relative', flex: 1, minWidth: '200px' }}>
+                        <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
+                        <input 
+                            type="text" 
+                            placeholder="Filter by MMSI, Name, or Raw Data..." 
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            style={{ 
+                                width: '100%', 
+                                background: colors.bgMain, 
+                                border: `1px solid ${colors.border}`, 
+                                borderRadius: '8px', 
+                                padding: '8px 12px 8px 38px',
+                                color: colors.textMain,
+                                fontSize: '0.9rem',
+                                outline: 'none'
+                            }}
+                        />
+                    </div>
+                    
+                    <div style={{ display: 'flex', background: colors.bgMain, borderRadius: '8px', padding: '4px', border: `1px solid ${colors.border}` }}>
+                        <button 
+                            onClick={() => setViewMode('live')}
+                            style={{ 
+                                padding: '6px 16px', 
+                                borderRadius: '6px', 
+                                border: 'none', 
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                background: viewMode === 'live' ? '#00f0ff' : 'transparent',
+                                color: viewMode === 'live' ? '#000' : colors.textMuted,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Live Stream
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('grouped')}
+                            style={{ 
+                                padding: '6px 16px', 
+                                borderRadius: '6px', 
+                                border: 'none', 
+                                fontSize: '0.85rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                background: viewMode === 'grouped' ? '#00f0ff' : 'transparent',
+                                color: viewMode === 'grouped' ? '#000' : colors.textMuted,
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            Grouped by Vessel
+                        </button>
+                    </div>
+                </div>
+
+                {/* Log View */}
+                <div style={{ flex: 1, padding: '20px 30px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px', fontFamily: "'JetBrains Mono', 'Fira Code', monospace", background: colors.bgMain }}>
+                    {viewMode === 'live' ? (
+                        filteredLogs.length === 0 ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                                <Radio size={48} style={{ opacity: 0.2 }} />
+                                <div>Waiting for NMEA data matching your criteria...</div>
+                            </div>
+                        ) : filteredLogs.map((log: any) => (
+                            <div key={log.id} style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                background: colors.bgCard, 
+                                borderRadius: '6px', 
+                                border: `1px solid ${colors.border}`,
+                                transition: 'transform 0.1s, border-color 0.2s',
+                                overflow: 'hidden',
+                                flexShrink: 0
+                            }}>
+                                <div 
+                                    onClick={() => log.decoded && toggleExpand(log.id)}
+                                    style={{ 
+                                        padding: '8px 15px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        gap: '20px', 
+                                        fontSize: '0.85rem',
+                                        cursor: log.decoded ? 'pointer' : 'default'
+                                    }}
+                                    onMouseEnter={e => log.decoded && (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                                    onMouseLeave={e => log.decoded && (e.currentTarget.style.background = 'transparent')}
+                                >
+                                    <span style={{ color: colors.textMuted, minWidth: '85px', fontSize: '0.75rem', fontWeight: 600 }}>{new Date(log.timestamp).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                    <span style={{ 
+                                        color: colors.accent, 
+                                        minWidth: '120px', 
+                                        fontSize: '0.75rem', 
+                                        fontWeight: 800, 
+                                        textTransform: 'uppercase',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap'
+                                    }}>
+                                        {log.decoded?.name || log.decoded?.mmsi || 'Unknown'}
+                                    </span>
+                                    <span style={{ color: colors.isDark ? '#00ff80' : '#00a854', flex: 1, wordBreak: 'break-all', letterSpacing: '0.5px', fontWeight: 500 }}>{log.raw}</span>
+                                    {log.decoded ? (
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{ 
+                                                background: '#00f0ff', 
+                                                color: '#000', 
+                                                padding: '1px 8px', 
+                                                borderRadius: '4px', 
+                                                fontSize: '0.65rem', 
+                                                fontWeight: 900, 
+                                                boxShadow: '0 0 10px rgba(0,240,255,0.3)',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                DECODED MSG • {log.decoded.type}
+                                            </span>
+                                            {expandedIds.has(log.id) ? <ChevronUp size={16} color={colors.textMuted} /> : <ChevronDown size={16} color={colors.textMuted} />}
+                                        </div>
+                                    ) : (
+                                        <span style={{ color: colors.textMuted, fontSize: '0.65rem', opacity: 0.5, textTransform: 'uppercase', fontWeight: 800 }}>RAW</span>
+                                    )}
+                                </div>
+                                
+                                {expandedIds.has(log.id) && log.decoded && (
+                                    <div style={{ 
+                                        padding: '15px 20px 20px 50px', 
+                                        background: colors.isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)', 
+                                        borderTop: `1px solid ${colors.border}`,
+                                        fontSize: '0.85rem',
+                                        color: colors.textMain,
+                                        overflow: 'auto',
+                                        maxHeight: '400px'
+                                    }}>
+                                        <pre style={{ margin: 0, color: colors.isDark ? '#44aaff' : '#0066cc', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(log.decoded, null, 2)}</pre>
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    ) : (
+                        /* Grouped View */
+                        groupedLogs.length === 0 ? (
+                            <div style={{ padding: '60px', textAlign: 'center', color: colors.textMuted }}>No grouped data available.</div>
+                        ) : groupedLogs.map((group: any) => (
+                            <div key={group.id} style={{ 
+                                background: colors.bgCard, 
+                                borderRadius: '8px', 
+                                border: `1px solid ${colors.border}`,
+                                marginBottom: '10px',
+                                overflow: 'hidden',
+                                flexShrink: 0
+                            }}>
+                                <div 
+                                    onClick={() => toggleExpand(`group-${group.id}`)}
+                                    style={{ 
+                                        padding: '12px 20px', 
+                                        display: 'flex', 
+                                        alignItems: 'center', 
+                                        justifyContent: 'space-between',
+                                        cursor: 'pointer',
+                                        background: colors.bgSidebar
+                                    }}
+                                >
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                        <Ship size={18} color={colors.accent} />
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontWeight: 800, color: colors.textMain }}>{group.name}</span>
+                                            {group.mmsi && <span style={{ color: colors.textMuted, fontSize: '0.7rem', opacity: 0.8 }}>MMSI: {group.mmsi}</span>}
+                                        </div>
+                                        <span style={{ 
+                                            background: colors.bgMain, 
+                                            color: colors.textMuted, 
+                                            padding: '2px 8px', 
+                                            borderRadius: '12px', 
+                                            fontSize: '0.7rem', 
+                                            fontWeight: 700 
+                                        }}>
+                                            {group.items.length} msgs
+                                        </span>
+                                    </div>
+                                    {expandedIds.has(`group-${group.id}`) ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                                </div>
+                                
+                                {expandedIds.has(`group-${group.id}`) && (
+                                    <div style={{ padding: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                        {group.items.map((log: any) => (
+                                            <div key={log.id} style={{ 
+                                                background: colors.isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)',
+                                                borderRadius: '4px',
+                                                overflow: 'hidden',
+                                                borderLeft: `3px solid ${log.decoded ? '#00f0ff' : colors.border}`,
+                                                marginLeft: '10px',
+                                                flexShrink: 0
+                                            }}>
+                                                <div 
+                                                    onClick={() => log.decoded && toggleExpand(log.id)}
+                                                    style={{ 
+                                                        padding: '8px 15px', 
+                                                        fontSize: '0.8rem', 
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '15px',
+                                                        cursor: log.decoded ? 'pointer' : 'default'
+                                                    }}
+                                                    onMouseEnter={e => log.decoded && (e.currentTarget.style.background = 'rgba(255,255,255,0.03)')}
+                                                    onMouseLeave={e => log.decoded && (e.currentTarget.style.background = 'transparent')}
+                                                >
+                                                    <span style={{ color: colors.textMuted, fontSize: '0.75rem', minWidth: '70px' }}>{new Date(log.timestamp).toLocaleTimeString()}</span>
+                                                    <span style={{ color: colors.isDark ? '#00ff80' : '#00a854', flex: 1, wordBreak: 'break-all', fontFamily: 'monospace', fontWeight: 500 }}>{log.raw}</span>
+                                                    {log.decoded ? (
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                            <span style={{ 
+                                                                background: '#00f0ff', 
+                                                                color: '#000', 
+                                                                padding: '1px 8px', 
+                                                                borderRadius: '4px', 
+                                                                fontSize: '0.65rem', 
+                                                                fontWeight: 900, 
+                                                                boxShadow: '0 0 10px rgba(0,240,255,0.3)'
+                                                            }}>
+                                                                DECODED MSG
+                                                            </span>
+                                                            {expandedIds.has(log.id) ? <ChevronUp size={14} color={colors.textMuted} /> : <ChevronDown size={14} color={colors.textMuted} />}
+                                                        </div>
+                                                    ) : (
+                                                        <span style={{ color: colors.textMuted, fontSize: '0.65rem', opacity: 0.5 }}>RAW</span>
+                                                    )}
+                                                </div>
+                                                {expandedIds.has(log.id) && log.decoded && (
+                                                    <div style={{ 
+                                                        padding: '15px 20px 20px 50px', 
+                                                        background: colors.isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)', 
+                                                        borderTop: `1px solid ${colors.border}`,
+                                                        fontSize: '0.85rem',
+                                                        color: colors.textMain,
+                                                        overflow: 'auto',
+                                                        maxHeight: '400px'
+                                                    }}>
+                                                        <pre style={{ margin: 0, color: colors.isDark ? '#44aaff' : '#0066cc', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(log.decoded, null, 2)}</pre>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div style={{ 
+                    padding: '15px 30px', 
+                    background: colors.bgCard, 
+                    borderTop: `1px solid ${colors.border}`, 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center', 
+                    fontSize: '0.85rem', 
+                    color: colors.textMuted 
+                }}>
+                    <div style={{ display: 'flex', gap: '20px' }}>
+                        <span>Buffers: <b>{logs.length} / 200</b> msgs</span>
+                        <span>Filtered: <b>{filteredLogs.length}</b></span>
+                    </div>
+                    <button 
+                        onClick={onClose} 
+                        style={{ 
+                            padding: '10px 25px', 
+                            background: '#00f0ff', 
+                            color: '#000', 
+                            border: 'none', 
+                            borderRadius: '8px', 
+                            fontWeight: 900, 
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(0,240,255,0.2)',
+                            transition: 'all 0.2s'
+                        }}
+                        onMouseEnter={e => {
+                            e.currentTarget.style.transform = 'translateY(-2px)';
+                            e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,240,255,0.4)';
+                        }}
+                        onMouseLeave={e => {
+                            e.currentTarget.style.transform = 'translateY(0)';
+                            e.currentTarget.style.boxShadow = '0 4px 15px rgba(0,240,255,0.2)';
+                        }}
+                    >
+                        Close Browser
+                    </button>
+                </div>
+            </div>
         </div>
     );
 }

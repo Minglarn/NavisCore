@@ -546,9 +546,9 @@ async def process_ais_data(data: dict):
         return
     msg_type = data.get("type", 0)
     
-    # ── IMMEDIATE DISCARD for Type 8 (Binary Broadcast / Meteo) ──
-    if msg_type == 8:
-        return
+    # Type 8 is weather data, don't discard
+    # if msg_type == 8:
+    #     return
 
     mmsi_str = str(mmsi_val)
     lat = data.get("lat")
@@ -659,15 +659,16 @@ async def process_ais_data(data: dict):
         return
 
     # ── Position-bearing messages (require lat/lon) ──
-    if lat is None or lon is None:
+    # Type 8 can proceed without current position to try the DB lookup
+    if (lat is None or lon is None) and msg_type != 8:
         return
         
     origin_lat_str = settings.get("origin_lat")
     origin_lon_str = settings.get("origin_lon")
 
     is_meteo = data.get("is_meteo", False) or msg_type in [4, 8]
-    if is_meteo:
-        return
+    # if is_meteo:
+    #     return
         
     is_aton = data.get("is_aton", False)
     
@@ -701,9 +702,12 @@ async def process_ais_data(data: dict):
         "wind_gust": data.get("wind_gust"),
         "wind_direction": data.get("wind_direction"),
         "water_level": data.get("water_level"),
+        "visibility": data.get("visibility"),
+        "air_temp": data.get("air_temp"),
         "destination": data.get("destination"),
         "draught": data.get("draught"),
         "source": source,
+        "nmea": data.get("nmea"),
     }
 
     # Validate Navigational Status against Speed (SOG)
@@ -765,6 +769,10 @@ async def process_ais_data(data: dict):
         if lat is not None:
             update_fields.append("latitude = ?")
             update_values.append(lat)
+        elif row and row[5] is not None: # row[5] is latitude in the select below, wait it's not.
+            # Actually we already have ship_data["lat"] and ship_data["lon"] initialized to data.get("lat")
+            pass
+        
         if lon is not None:
             update_fields.append("longitude = ?")
             update_values.append(lon)
@@ -827,7 +835,7 @@ async def process_ais_data(data: dict):
             pass # MMSI already counted for today
         
         # Read back whatever data we lacked in this specific incoming packet
-        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
@@ -859,6 +867,16 @@ async def process_ais_data(data: dict):
                     except Exception: pass
                     
                 ship_data["manual_image"] = bool(row[15])
+
+                # Position Recovery
+                if ship_data.get("lat") is None and row[16] is not None:
+                    ship_data["lat"] = row[16]
+                if ship_data.get("lon") is None and row[17] is not None:
+                    ship_data["lon"] = row[17]
+                
+                # Meteo Preservation
+                if row[18]:
+                    ship_data["is_meteo"] = True
         
         # Ensure ship_type_text is always populated
         if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -941,8 +959,8 @@ async def process_ais_data(data: dict):
             except ValueError:
                 pass
 
-    if not is_meteo:
-        await broadcast(ship_data)
+    # Always broadcast
+    await broadcast(ship_data)
 
 
 # UDP NMEA Listener & Forwarder
@@ -975,9 +993,12 @@ class UDPProtocol(asyncio.DatagramProtocol):
             return
         
         # AIS-catcher may send multiple NMEA sentences in a single UDP packet
+        now_ms = int(datetime.now().timestamp() * 1000)
         for line in message.splitlines():
             line = line.strip()
             if line:
+                # Immediate broadcast for NMEA Console
+                asyncio.create_task(broadcast({"type": "nmea", "raw": line, "timestamp": now_ms}))
                 # Custom decoder handles ALL AIS message types (1-27)
                 self.stream_manager.process_sentence(line)
         
@@ -1272,6 +1293,22 @@ async def startup_event():
             await db.execute("ALTER TABLE ships ADD COLUMN manual_image BOOLEAN DEFAULT 0")
         except Exception: pass
         
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN is_meteo BOOLEAN DEFAULT 0")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN is_aton BOOLEAN DEFAULT 0")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN aton_type INTEGER")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN aton_type_text TEXT")
+        except Exception: pass
+        
         await db.execute('''CREATE TABLE IF NOT EXISTS coverage_sectors (
             sector_id INTEGER PRIMARY KEY,
             range_km_24h REAL DEFAULT 0.0,
@@ -1330,7 +1367,7 @@ async def get_ships():
         row = await cursor.fetchone()
         duration_min = int(row["value"]) if row else 60
 
-        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL AND (name NOT LIKE '%METEO%' AND name NOT LIKE '%WEATHER%')")
+        cursor = await db.execute(f"SELECT * FROM ships WHERE last_seen >= datetime('now', '-{timeout_mins} minutes') AND latitude IS NOT NULL AND longitude IS NOT NULL")
         rows = await cursor.fetchall()
         result = []
         for row in rows:

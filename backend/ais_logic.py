@@ -391,6 +391,38 @@ def _decode_type_8(bitstr: str, data: dict):
         data["is_meteo"] = True
         data["name"] = f"METEO WEATHER {data['mmsi']}"
 
+    # Swedish weather report (DAC 265, FI 01)
+    elif dac == 265 and fid == 1 and len(bitstr) >= 185:
+        # According to SMA / VIVA AIS specification provided by user
+        # Header skips first 56 bits
+        
+        # Station name: Bits 56-115 (10 chars of 6-bit ASCII)
+        station_name = decode_6bit_string(bitstr, 56, 10)
+        
+        # Wind: Medel (7 bits), Byar (7 bits), Riktning (9 bits)
+        wind_speed = get_int_from_bits(bitstr, 116, 7)
+        wind_gust = get_int_from_bits(bitstr, 123, 7)
+        wind_dir = get_int_from_bits(bitstr, 130, 9)
+        
+        # Water level: Bits 153-166 (14 bits)
+        # Logic: If > 8192, subtract 16384 for negative values
+        water_val = get_int_from_bits(bitstr, 153, 14)
+        if water_val > 8192:
+            water_val -= 16384
+        water_level = water_val / 100.0  # cm to meters
+        
+        # Air temperature: Bits 175-185 (11 bits, 0.1C units)
+        air_temp_val = get_int_from_bits(bitstr, 175, 11, signed=True)
+        air_temp = air_temp_val / 10.0
+
+        data["wind_speed"] = wind_speed
+        data["wind_direction"] = wind_dir
+        data["wind_gust"] = wind_gust
+        data["water_level"] = water_level
+        data["air_temp"] = air_temp
+        data["is_meteo"] = True
+        data["name"] = station_name if station_name else f"VIVA WEATHER {data['mmsi']}"
+
 
 def _decode_type_9(bitstr: str, data: dict):
     """Type 9: SAR Aircraft Position Report."""
@@ -704,26 +736,30 @@ class AisStreamManager:
             return
 
         if total_fragments == 1:
-            self._decode_payload(payload)
+            self._decode_payload(payload, [sentence])
         else:
             key = (sequence_id, channel)
             if key not in self.buffer:
                 self.buffer[key] = {
                     "fragments": {},
+                    "sentences": {},
                     "expected": total_fragments,
                     "timestamp": time.time()
                 }
 
             self.buffer[key]["fragments"][fragment_num] = payload
+            self.buffer[key]["sentences"][fragment_num] = sentence
             self.buffer[key]["timestamp"] = time.time()
 
             if len(self.buffer[key]["fragments"]) == self.buffer[key]["expected"]:
                 full_payload = ""
+                full_sentences = []
                 for i in range(1, total_fragments + 1):
                     full_payload += self.buffer[key]["fragments"].get(i, "")
+                    full_sentences.append(self.buffer[key]["sentences"].get(i, ""))
 
                 del self.buffer[key]
-                self._decode_payload(full_payload)
+                self._decode_payload(full_payload, full_sentences)
 
     def _cleanup(self):
         now = time.time()
@@ -736,7 +772,7 @@ class AisStreamManager:
         for k in expired_24:
             del self.type24_buffer[k]
 
-    def _decode_payload(self, payload: str):
+    def _decode_payload(self, payload: str, sentences: list = None):
         bitstr = "".join([to_6_bit_string(c) for c in payload])
 
         if len(bitstr) < 38:
@@ -748,6 +784,7 @@ class AisStreamManager:
         decoded_data = {
             "mmsi": mmsi,
             "type": msg_type,
+            "nmea": sentences[0] if sentences and len(sentences) == 1 else sentences
         }
 
         # Type 24: Class B CS Static Data Report (Part A + B pairing)
