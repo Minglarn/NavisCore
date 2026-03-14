@@ -964,6 +964,33 @@ class UDPProtocol(asyncio.DatagramProtocol):
             self.settings = await get_all_settings()
             await asyncio.sleep(5)
 
+    def datagram_received(self, data, addr):
+        if MOCK_MODE:
+            return
+        
+        try:
+            message = data.decode('utf-8', errors='ignore').strip()
+        except Exception as e:
+            logger.error(f"Error decoding UDP data: {e}")
+            return
+        
+        # AIS-catcher may send multiple NMEA sentences in a single UDP packet
+        for line in message.splitlines():
+            line = line.strip()
+            if line:
+                # Custom decoder handles ALL AIS message types (1-27)
+                self.stream_manager.process_sentence(line)
+        
+        # Forwarding logic
+        if self.settings.get("forward_enabled") == "true":
+            fwd_ip = self.settings.get("forward_ip")
+            fwd_port = self.settings.get("forward_port")
+            if fwd_ip and fwd_port:
+                try:
+                    forwarding_socket.sendto(data, (fwd_ip, int(fwd_port)))
+                except Exception:
+                    pass
+
 async def start_udp_listener():
     global udp_server_transport
     loop = asyncio.get_running_loop()
@@ -987,36 +1014,13 @@ async def start_udp_listener():
 
     try:
         transport, _ = await loop.create_datagram_endpoint(
-            lambda: UDPProtocol(), 
+            UDPProtocol, 
             local_addr=('0.0.0.0', port)
         )
         udp_server_transport = transport
         logger.info(f"UDP server successfully started on port {port}")
     except Exception as e:
         logger.error(f"Failed to start UDP listener on port {port}: {e}")
-
-    def datagram_received(self, data, addr):
-        if MOCK_MODE:
-            return
-        
-        message = data.decode('utf-8', errors='ignore').strip()
-        
-        # AIS-catcher may send multiple NMEA sentences in a single UDP packet
-        for line in message.splitlines():
-            line = line.strip()
-            if line:
-                # Custom decoder handles ALL AIS message types (1-27)
-                self.stream_manager.process_sentence(line)
-        
-        # Forwarding logic
-        if self.settings.get("forward_enabled") == "true":
-            fwd_ip = self.settings.get("forward_ip")
-            fwd_port = self.settings.get("forward_port")
-            if fwd_ip and fwd_port:
-                try:
-                    forwarding_socket.sendto(data, (fwd_ip, int(fwd_port)))
-                except Exception:
-                    pass
 
 # MQTT Client Loop
 async def mqtt_loop():
