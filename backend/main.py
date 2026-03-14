@@ -125,6 +125,7 @@ async def get_all_settings():
         "trail_size": await get_setting("trail_size", "1.0"),
         "aisstream_enabled": await get_setting("aisstream_enabled", "false"),
         "aisstream_api_key": await get_setting("aisstream_api_key", os.getenv("AISSTREAM_API_KEY", "")),
+        "include_aisstream_in_range": await get_setting("include_aisstream_in_range", "false"),
         "trail_mode": await get_setting("trail_mode", "all"),
         "show_aisstream_on_map": await get_setting("show_aisstream_on_map", "true"),
         "sdr_enabled": await get_setting("sdr_enabled", "true"),
@@ -440,7 +441,9 @@ async def process_ais_data(data: dict):
             "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
             "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False), "is_advanced_binary": data.get("is_advanced_binary", False),
             "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
-            "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category")
+            "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
+            "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
+            "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure")
         }
 
         if ship_data.get("is_advanced_binary") and not ship_data.get("status_text"):
@@ -470,7 +473,7 @@ async def process_ais_data(data: dict):
             
             flds = ["last_seen = CURRENT_TIMESTAMP", "message_count = message_count + 1"]
             vals = []
-            for f, k in [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type")]:
+            for f, k in [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type"), ("wind_speed", "wind_speed"), ("wind_gust", "wind_gust"), ("wind_direction", "wind_direction"), ("water_level", "water_level"), ("air_temp", "air_temp"), ("air_pressure", "air_pressure")]:
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(v)
             for f, k in [("is_meteo", "is_meteo"), ("is_emergency", "is_emergency"), ("virtual_aton", "virtual_aton"), ("is_advanced_binary", "is_advanced_binary"), ("dac", "dac"), ("fid", "fid"), ("raw_payload", "raw_payload")]:
@@ -489,9 +492,11 @@ async def process_ais_data(data: dict):
             
             # Stats
             today = datetime.utcnow().strftime('%Y-%m-%d')
+            time_min = datetime.utcnow().strftime('%Y-%m-%d %H:%M')
             await db.execute('INSERT INTO daily_stats (date, total_messages) VALUES (?, 1) ON CONFLICT(date) DO UPDATE SET total_messages = total_messages + 1', (today,))
             current_h = datetime.utcnow().hour
             await db.execute('INSERT INTO hourly_stats (date, hour, message_count) VALUES (?, ?, 1) ON CONFLICT(date, hour) DO UPDATE SET message_count = message_count + 1', (today, current_h))
+            await db.execute('INSERT INTO minute_stats (time_min, total_messages) VALUES (?, 1) ON CONFLICT(time_min) DO UPDATE SET total_messages = total_messages + 1', (time_min,))
             try:
                 await db.execute('INSERT INTO daily_mmsi (date, mmsi) VALUES (?, ?)', (today, mmsi_str))
                 sf = ["unique_ships = unique_ships + 1"]
@@ -499,8 +504,13 @@ async def process_ais_data(data: dict):
                 await db.execute(f'UPDATE daily_stats SET {", ".join(sf)} WHERE date = ?', (today,))
             except Exception: pass
             
+            try:
+                await db.execute('INSERT INTO minute_mmsi (time_min, mmsi) VALUES (?, ?)', (time_min, mmsi_str))
+                await db.execute('UPDATE minute_stats SET unique_ships = unique_ships + 1 WHERE time_min = ?', (time_min,))
+            except Exception: pass
+            
             # Read back missing data
-            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 r = await cursor.fetchone()
                 if r:
                     ship_data["imageUrl"] = r[0] or "/images/0.jpg"
@@ -527,34 +537,56 @@ async def process_ais_data(data: dict):
                         if r[23] is not None: ship_data["dac"] = r[23]
                         if r[24] is not None: ship_data["fid"] = r[24]
                         if r[25]: ship_data["raw_payload"] = r[25]
+                        if len(r) > 26:
+                            ship_data["wind_speed"] = r[26]
+                            ship_data["wind_gust"] = r[27]
+                            ship_data["wind_direction"] = r[28]
+                            ship_data["water_level"] = r[29]
+                            ship_data["air_temp"] = r[30]
+                            if len(r) > 31: ship_data["air_pressure"] = r[31]
             
             if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
                 try:
                     c = int(ship_data["shiptype"])
                     ship_data["ship_type_text"], ship_data["ship_category"] = get_ship_type_name(c), get_ship_category(c)
                 except Exception: pass
-            await db.commit()
+            # Range tracking
+            origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
+            include_aisstream = settings.get("include_aisstream_in_range") == "true"
+            
+            should_track_range = (source != "aisstream" or include_aisstream) and \
+                                origin_lat and origin_lon and \
+                                not is_meteo and \
+                                not ship_data.get("is_aton") and \
+                                not ship_data.get("is_sar") and \
+                                not mmsi_str.startswith("99")
+                                
+            if should_track_range:
+                try:
+                    dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
+                    # Lower limit 1.0 km to avoid station self-noise, upper 370km (~200nm)
+                    # message_count >= 1 allows immediate update
+                    msg_count = ship_data.get("message_count", 0)
+                    if msg_count >= 1 and 1.0 <= dist <= 370.4:
+                        bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
+                        sector = int(bearing // 5) % 72
+                        async with db.execute('SELECT range_km_24h, range_km_alltime FROM coverage_sectors WHERE sector_id = ?', (sector,)) as cursor:
+                            row = await cursor.fetchone()
+                            rng_24h, rng_all = (row[0] if row else 0.0), (row[1] if row else 0.0)
+                            updated = False
+                            if dist > rng_24h: rng_24h = dist; updated = True
+                            if dist > rng_all: rng_all = dist; updated = True
+                            if updated or not row:
+                                logger.debug(f"[Range] Updating sector {sector} for MMSI {mmsi_str}: {dist:.2f} km")
+                                await db.execute('INSERT INTO coverage_sectors (sector_id, range_km_24h, range_km_alltime, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(sector_id) DO UPDATE SET range_km_24h = ?, range_km_alltime = ?, last_updated = CURRENT_TIMESTAMP', (sector, rng_24h, rng_all, rng_24h, rng_all))
+                                await db.execute('UPDATE daily_stats SET max_range_km = ? WHERE date = ? AND ? > max_range_km', (dist, today, dist))
+                                await db.execute('INSERT INTO sector_history (sector_id, distance_km, timestamp) VALUES (?, ?, ?)', (sector, dist, int(datetime.utcnow().timestamp() * 1000)))
+                                await db.commit()
+                                await broadcast({"type": "coverage_update", "sector_id": sector, "range_km_24h": rng_24h, "range_km_alltime": rng_all})
+                except Exception as e:
+                    logger.error(f"Error in range tracking: {e}")
 
-        # Range tracking
-        origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
-        if source != "aisstream" and origin_lat and origin_lon and not is_meteo and not ship_data.get("is_aton") and not ship_data.get("is_sar") and not mmsi_str.startswith("99"):
-            try:
-                dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
-                if ship_data.get("message_count", 0) >= 2 and 1.0 <= dist <= 370.4:
-                    bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
-                    sector = int(bearing // 5) % 72
-                    async with db.execute('SELECT range_km_24h, range_km_alltime FROM coverage_sectors WHERE sector_id = ?', (sector,)) as cursor:
-                        row = await cursor.fetchone()
-                        rng_24h, rng_all = (row[0] if row else 0.0), (row[1] if row else 0.0)
-                        updated = False
-                        if dist > rng_24h: rng_24h = dist; updated = True
-                        if dist > rng_all: rng_all = dist; updated = True
-                        if updated or not row:
-                            await db.execute('INSERT INTO coverage_sectors (sector_id, range_km_24h, range_km_alltime, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(sector_id) DO UPDATE SET range_km_24h = ?, range_km_alltime = ?, last_updated = CURRENT_TIMESTAMP', (sector, rng_24h, rng_all, rng_24h, rng_all))
-                            await db.execute('UPDATE daily_stats SET max_range_km = ? WHERE date = ? AND ? > max_range_km', (dist, today, dist))
-                            await db.commit()
-                            await broadcast({"type": "coverage_update", "sector_id": sector, "range_km_24h": rng_24h, "range_km_alltime": rng_all})
-            except Exception: pass
+            await db.commit()
         await broadcast(ship_data)
     except Exception as e: logger.error(f"Error for MMSI {data.get('mmsi')}: {e}")
 
@@ -634,6 +666,9 @@ async def purge_job():
                             if os.path.exists(p): os.remove(p)
                 await db.execute("DELETE FROM ships WHERE last_seen < datetime('now', '-30 days')")
                 await db.execute("DELETE FROM daily_mmsi WHERE date < date('now', '-7 days')")
+                await db.execute("DELETE FROM minute_stats WHERE time_min < datetime('now', '-24 hours')")
+                await db.execute("DELETE FROM minute_mmsi WHERE time_min < datetime('now', '-24 hours')")
+                await db.execute("DELETE FROM sector_history WHERE timestamp < ?", (int((datetime.now() - timedelta(hours=24)).timestamp() * 1000),))
                 await db.commit()
         except Exception as e: logger.error(f"[Purge] Error: {e}")
         await asyncio.sleep(86400)
@@ -654,7 +689,7 @@ async def startup_event():
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
         await db.execute('CREATE TABLE IF NOT EXISTS ships (mmsi TEXT PRIMARY KEY, imo TEXT, name TEXT, callsign TEXT, type INTEGER, image_url TEXT, image_fetched_at DATETIME, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP)')
-        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'"]:
+        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL"]:
             try: await db.execute(f"ALTER TABLE ships ADD COLUMN {c}")
             except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
@@ -668,6 +703,10 @@ async def startup_event():
         except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS daily_mmsi (date TEXT, mmsi TEXT, PRIMARY KEY (date, mmsi))')
         await db.execute('CREATE TABLE IF NOT EXISTS hourly_stats (date TEXT, hour INTEGER, message_count INTEGER DEFAULT 0, PRIMARY KEY (date, hour))')
+        await db.execute('CREATE TABLE IF NOT EXISTS minute_stats (time_min TEXT PRIMARY KEY, unique_ships INTEGER DEFAULT 0, total_messages INTEGER DEFAULT 0)')
+        await db.execute('CREATE TABLE IF NOT EXISTS minute_mmsi (time_min TEXT, mmsi TEXT, PRIMARY KEY (time_min, mmsi))')
+        await db.execute('CREATE TABLE IF NOT EXISTS sector_history (sector_id INTEGER, distance_km REAL, timestamp INTEGER)')
+        await db.execute('CREATE INDEX IF NOT EXISTS idx_sector_history_ts ON sector_history (timestamp)')
         await db.commit()
     asyncio.create_task(start_udp_listener()); restart_mqtt(); asyncio.create_task(mock_mode_loop()); asyncio.create_task(purge_job()); asyncio.create_task(coverage_24h_reset_job()); asyncio.create_task(aisstream_loop()); asyncio.create_task(enrichment_worker())
 
@@ -694,8 +733,8 @@ async def get_ships():
                     except Exception: pass
                 d["lat"], d["lon"] = d["latitude"], d["longitude"]
                 for f in ["manual_image", "is_emergency", "virtual_aton", "is_advanced_binary"]: d[f] = bool(d.get(f, 0))
-                # Include binary metadata
-                for f in ["dac", "fid", "raw_payload", "emergency_type"]: 
+                # Include binary and weather metadata
+                for f in ["dac", "fid", "raw_payload", "emergency_type", "wind_speed", "wind_gust", "wind_direction", "water_level", "air_temp", "air_pressure"]: 
                     val = d.get(f)
                     if val is not None: d[f] = val
                 if d["previous_seen"]:
@@ -773,7 +812,7 @@ async def get_statistics(date: str = None):
             r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (sel,)); t_row = await r.fetchone() or {"unique_ships":0,"new_ships":0,"total_messages":0,"max_range_km":0.0}
             r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (yest,)); y_row = await r.fetchone() or {"unique_ships":0,"new_ships":0,"total_messages":0}
             r = await db.execute("SELECT MAX(unique_ships), MAX(total_messages), MAX(max_range_km) FROM daily_stats"); a_row = await r.fetchone()
-            r = await db.execute("SELECT date, total_messages FROM daily_stats ORDER BY date DESC LIMIT 30"); h30 = [dict(row) for row in await r.fetchall()]; h30.reverse()
+            r = await db.execute("SELECT date, unique_ships, total_messages FROM daily_stats ORDER BY date DESC LIMIT 30"); h30 = [dict(row) for row in await r.fetchall()]; h30.reverse()
             h_brk = []
             r = await db.execute("SELECT hour, message_count FROM hourly_stats WHERE date = ? ORDER BY hour ASC", (sel,))
             h_raw = {row["hour"]: row["message_count"] for row in await r.fetchall()}
@@ -782,8 +821,41 @@ async def get_statistics(date: str = None):
             r = await db.execute("SELECT type, COUNT(*) as count FROM ships WHERE last_seen LIKE ? GROUP BY type ORDER BY count DESC", (f"{sel}%",))
             for row in await r.fetchall():
                 if row["type"]: t_brk.append({"type":row["type"], "label":get_ship_type_name(row["type"]), "count":row["count"]})
-            return {"selected_date":sel, "today":dict(t_row), "yesterday":dict(y_row), "all_time":{"unique_ships":a_row[0] or 0,"total_messages":a_row[1] or 0,"max_range_km":a_row[2] or 0}, "history_30d":h30, "hourly_breakdown":h_brk, "type_breakdown":t_brk}
-    except Exception: return {"error": "Stats error"}
+                
+            # New hour stats (last 60 minutes)
+            min_brk = []
+            sixty_mins_ago = (datetime.utcnow() - timedelta(minutes=60)).strftime('%Y-%m-%d %H:%M')
+            hour_ago_ts = int((datetime.utcnow() - timedelta(hours=1)).timestamp() * 1000)
+            
+            r = await db.execute("SELECT time_min, unique_ships, total_messages FROM minute_stats WHERE time_min >= ? ORDER BY time_min ASC", (sixty_mins_ago,))
+            min_raw = {row["time_min"]: dict(row) for row in await r.fetchall()}
+            
+            for i in range(60, -1, -1):
+                t_str = (datetime.utcnow() - timedelta(minutes=i)).strftime('%Y-%m-%d %H:%M')
+                min_brk.append(min_raw.get(t_str, {"time_min": t_str, "unique_ships": 0, "total_messages": 0}))
+
+            # New sector max distance last hour
+            sector_max = [0] * 72
+            r = await db.execute("SELECT sector_id, MAX(distance_km) as max_dist FROM sector_history WHERE timestamp >= ? GROUP BY sector_id", (hour_ago_ts,))
+            for row in await r.fetchall():
+                if 0 <= row["sector_id"] < 72:
+                    sector_max[row["sector_id"]] = row["max_dist"]
+                    
+            # 24h sector max distance
+            sector_24h_max = [0] * 72
+            day_ago_ts = int((datetime.utcnow() - timedelta(hours=24)).timestamp() * 1000)
+            r = await db.execute("SELECT sector_id, MAX(distance_km) as max_dist FROM sector_history WHERE timestamp >= ? GROUP BY sector_id", (day_ago_ts,))
+            for row in await r.fetchall():
+                if 0 <= row["sector_id"] < 72:
+                    sector_24h_max[row["sector_id"]] = row["max_dist"]
+
+            return {
+                "selected_date":sel, "today":dict(t_row), "yesterday":dict(y_row), 
+                "all_time":{"unique_ships":a_row[0] or 0,"total_messages":a_row[1] or 0,"max_range_km":a_row[2] or 0}, 
+                "history_30d":h30, "hourly_breakdown":h_brk, "type_breakdown":t_brk,
+                "minute_breakdown": min_brk, "sector_max_last_hour": sector_max, "sector_max_last_24h": sector_24h_max
+            }
+    except Exception as e: logger.error(f"Stats err: {e}"); return {"error": "Stats error"}
 
 @app.get("/api/status")
 async def get_status():

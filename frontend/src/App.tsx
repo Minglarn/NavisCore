@@ -4,6 +4,36 @@ import L from 'leaflet'
 import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
+import {
+  Chart as ChartJS,
+  RadialLinearScale,
+  ArcElement,
+  Tooltip as ChartTooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Filler,
+  BarElement
+} from 'chart.js';
+import { PolarArea, Line, Bar } from 'react-chartjs-2';
+
+ChartJS.register(
+  RadialLinearScale,
+  ArcElement,
+  ChartTooltip,
+  Legend,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Filler,
+  BarElement
+);
+
 function CenterButton({ originLat, originLon }: { originLat: number, originLon: number }) {
     const map = useMap();
     if (isNaN(originLat) || isNaN(originLon)) return null;
@@ -488,10 +518,28 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
     return [toDeg(lat2), toDeg(lon2)];
 }
 
+function ChartCard({ title, children, colors }: any) {
+    return (
+        <div style={{ background: colors.bgCard, borderRadius: '8px', padding: '25px', border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', height: '100%' }}>
+            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '30px' }}>
+                <div style={{ background: `${colors.accent}44`, borderRadius: '12px', padding: '4px 10px', width: '85%' }}>
+                     <div style={{ background: colors.accent, borderRadius: '4px', padding: '8px 0', color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
+                         {title}
+                     </div>
+                </div>
+            </div>
+            <div style={{ width: '100%', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                {children}
+            </div>
+        </div>
+    );
+}
+
 function StatisticsModal({ isOpen, onClose, colors }: any) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(false);
+    const [activeTab, setActiveTab] = useState<'Hour'|'Day'|'Month'>('Hour');
 
     useEffect(() => {
         if (isOpen) {
@@ -513,219 +561,432 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
     if (!isOpen) return null;
 
     const today = stats?.today || { unique_ships: 0, new_ships: 0, total_messages: 0, max_range_km: 0.0 };
-    const history30d = stats?.history_30d || [];
-    const hourlyBreakdown = stats?.hourly_breakdown || [];
-    const typeBreakdown = stats?.type_breakdown || [];
-
-    const max30dMsgs = Math.max(...history30d.map((h: any) => h.total_messages), 1);
-    const maxHourlyMsgs = Math.max(...hourlyBreakdown.map((h: any) => h.count), 1);
-
-    // Donut Chart Helpers
-    const totalVesselsForType = typeBreakdown.reduce((sum: number, item: any) => sum + item.count, 0);
-    let cumulativePercent = 0;
-    const donutPaths = totalVesselsForType > 0 ? typeBreakdown.slice(0, 8).map((item: any, i: number) => {
-        const percent = item.count / totalVesselsForType;
-        const startPercent = cumulativePercent;
-        cumulativePercent += percent;
-        
-        const startAngle = startPercent * 2 * Math.PI;
-        const endAngle = cumulativePercent * 2 * Math.PI;
-        
-        const x1 = 50 + 40 * Math.sin(startAngle);
-        const y1 = 50 - 40 * Math.cos(startAngle);
-        const x2 = 50 + 40 * Math.sin(endAngle);
-        const y2 = 50 - 40 * Math.cos(endAngle);
-        
-        const largeArcFlag = percent > 0.5 ? 1 : 0;
-        const d = `M ${x1} ${y1} A 40 40 0 ${largeArcFlag} 1 ${x2} ${y2}`;
-        
-        const categoryColors = ['#ff5252', '#ffd740', '#69f0ae', '#40c4ff', '#7c4dff', '#e040fb', '#ff4081', '#ffab40'];
-        return { d, color: categoryColors[i % categoryColors.length], label: item.label, count: item.count };
-    }) : [];
-
-    // Area Chart path - using 1000 width for high definition and thin lines
-    const areaPoints = hourlyBreakdown.map((h: any, i: number) => {
-        const x = (i / 23) * 1000;
-        const y = 100 - (h.count / maxHourlyMsgs) * 85; 
-        return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(' ');
     
-    const areaPath = `0,100 ${areaPoints} 1000,100`;
-    const linePath = areaPoints;
+    // Hour Tab Variables
+    const minuteBreakdown = stats?.minute_breakdown || [];
+    const avgVessels = minuteBreakdown.length > 0 ? minuteBreakdown.reduce((sum: number, m: any) => sum + m.unique_ships, 0) / minuteBreakdown.length : 0;
+    const vesselsPerMinuteData = {
+        labels: minuteBreakdown.map((_: any, i: number) => i - 60 + 1),
+        datasets: [
+            {
+                label: 'Vessels',
+                data: minuteBreakdown.map((m: any) => m.unique_ships),
+                borderColor: '#dfa773',
+                tension: 0,
+                borderWidth: 2,
+                pointRadius: 0,
+            },
+            {
+                label: 'Average',
+                data: minuteBreakdown.map(() => avgVessels),
+                borderColor: '#0a58ca',
+                borderDash: [5, 5],
+                borderWidth: 2,
+                pointRadius: 0,
+            }
+        ]
+    };
+    const lineOptions: any = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+            x: {
+                grid: { display: true, color: colors.border },
+                ticks: { color: colors.textMuted }
+            },
+            y: {
+                min: 0,
+                max: Math.max(25, Math.ceil(Math.max(...minuteBreakdown.map((h: any) => h.unique_ships)) / 5) * 5),
+                grid: { display: true, color: colors.border },
+                ticks: { color: colors.textMuted, stepSize: 5 }
+            }
+        }
+    };
+
+    const sectorMaxNmi = (stats?.sector_max_last_hour || Array(72).fill(0)).map((km: number) => km / 1.852);
+    const maxPolar = Math.max(...sectorMaxNmi);
+    const polarMaxAxis = maxPolar > 0 ? (Math.ceil(maxPolar / 5) * 5) : 30;
+
+    const polarData = {
+        labels: Array.from({length: 72}, (_, i) => `${i*5}°`),
+        datasets: [{
+            data: sectorMaxNmi,
+            backgroundColor: 'rgba(223, 167, 115, 0.7)',
+            borderColor: 'rgba(223, 167, 115, 1)',
+            borderWidth: 1,
+        }]
+    };
+    const polarOptions: any = {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+            r: {
+                beginAtZero: true,
+                max: Math.max(polarMaxAxis, 30),
+                ticks: { stepSize: 5, backdropColor: 'transparent', color: colors.textMuted },
+                grid: { color: colors.border }
+            }
+        }
+    };
+
+    // Day Tab Variables
+    const hourlyBreakdown = stats?.hourly_breakdown || [];
+    const vesselsPerHourData = {
+        labels: hourlyBreakdown.map((h: any) => `${h.hour}:00`),
+        datasets: [{
+            label: 'Messages',
+            data: hourlyBreakdown.map((h: any) => h.count),
+            backgroundColor: '#0a58ca',
+            borderRadius: 4
+        }]
+    };
+    const barOptions: any = {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: colors.border }, ticks: { color: colors.textMuted } }, x: { grid: { display: false }, ticks: { color: colors.textMuted } } }
+    };
+
+    // Month Tab Variables
+    const history30d = stats?.history_30d || [];
+    const historyData = {
+        labels: history30d.map((h: any) => h.date.split('-').slice(1).join('/')),
+        datasets: [{
+            label: 'Unique Vessels',
+            data: history30d.map((h: any) => h.unique_ships),
+            backgroundColor: '#10b981',
+            borderRadius: 4
+        }]
+    };
+
+    const tabs = [
+        { id: 'Hour', label: 'Senaste Timmen' },
+        { id: 'Day', label: 'Dagens Statistik' },
+        { id: 'Month', label: 'Månadsöversikt (30d)' }
+    ];
 
     return (
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000 }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
-                width: '85%', 
-                height: '85%', 
-                maxWidth: '1400px',
+                width: '90vw', 
+                height: '90vh',
+                maxWidth: 'none',
                 padding: '0',
                 display: 'flex',
                 flexDirection: 'column',
-                background: '#f8fafd'
+                background: colors.bgMain,
+                border: `1px solid ${colors.border}`
             }}>
                 {/* Header */}
-                <div style={{ padding: '15px 40px', background: 'white', borderBottom: '1px solid #eef2f7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ padding: '20px 40px', background: colors.bgCard, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800, color: '#1a2233' }}>Advanced Statistics Dashboard</h2>
-                        <div style={{ color: '#5a6b8a', fontSize: '0.85rem' }}>Analyze historical data and system performance.</div>
+                        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: colors.textMain }}>Statistikcentralen</h2>
+                        <div style={{ color: colors.textMuted, fontSize: '0.9rem', marginTop: '4px' }}>Senaste aktivitet och global prestanda.</div>
                     </div>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#1a2233' }}>Target Date:</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        {/* Tab Switcher */}
+                        <div style={{ display: 'flex', background: colors.bgMain, padding: '4px', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
+                            {tabs.map(t => (
+                                <button
+                                    key={t.id}
+                                    onClick={() => setActiveTab(t.id as any)}
+                                    style={{
+                                        padding: '8px 24px', outline: 'none', border: 'none',
+                                        background: activeTab === t.id ? colors.bgCard : 'transparent',
+                                        color: activeTab === t.id ? colors.accent : colors.textMuted,
+                                        borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem',
+                                        boxShadow: activeTab === t.id ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
+                                        cursor: 'pointer', transition: 'all 0.2s'
+                                    }}
+                                >
+                                    {t.label}
+                                </button>
+                            ))}
+                        </div>
+
                         <div style={{ position: 'relative' }}>
-                            <Calendar size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: '#5a6b8a', pointerEvents: 'none' }} />
+                            <Calendar size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted, pointerEvents: 'none' }} />
                             <input 
                                 type="date" 
                                 value={selectedDate}
                                 onChange={(e) => setSelectedDate(e.target.value)}
                                 style={{ 
-                                    padding: '10px 40px 10px 15px',
-                                    borderRadius: '8px',
-                                    border: '1px solid #e2e8f0',
-                                    fontSize: '0.9rem',
-                                    outline: 'none',
-                                    color: '#1a2233'
+                                    padding: '10px 40px 10px 15px', borderRadius: '8px',
+                                    border: `1px solid ${colors.border}`, fontSize: '0.9rem', outline: 'none', 
+                                    color: colors.textMain, background: colors.bgMain
                                 }}
                             />
                         </div>
+                        <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px', color: colors.textMuted }}>
+                            <X size={24} />
+                        </button>
                     </div>
                 </div>
 
-                {/* Dashboard Grid */}
-                <div style={{ flex: 1, padding: '20px 40px', overflowY: 'auto' }}>
+                {/* Dashboard Area */}
+                <div style={{ flex: 1, padding: '30px 40px', overflowY: 'auto' }}>
                     {loading ? (
                         <div style={{ textAlign: 'center', padding: '100px 0' }}>
                             <div className="spinner"></div>
-                            <div style={{ marginTop: '20px', color: '#5a6b8a' }}>Refreshing dashboard...</div>
+                            <div style={{ marginTop: '20px', color: colors.textMuted }}>Beräknar statistik...</div>
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                            {/* Summary Cards */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
+                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '25px' }}>
+                            {/* Summaries always show above */}
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '25px', flexShrink: 0 }}>
                                 {[
-                                    { label: 'Total Messages', value: today.total_messages, icon: <Activity size={20} /> },
-                                    { label: 'Unique Vessels', value: today.unique_ships, icon: <Ship size={20} /> },
-                                    { label: 'New Vessels', value: today.new_ships, icon: <Plus size={20} color="#10b981" /> },
-                                    { label: 'Max Range', value: `${today.max_range_km?.toFixed(1) || '0.0'} km`, icon: <Radar size={20} /> },
+                                    { label: 'Unika Fartyg', value: today.unique_ships, icon: <Ship size={24} /> },
+                                    { label: 'Meddelanden', value: today.total_messages, icon: <Activity size={24} color={colors.accent} /> },
+                                    { label: 'Nya Fartyg', value: today.new_ships, icon: <Plus size={24} color="#10b981" /> },
+                                    { label: 'Max Räckvidd', value: `${today.max_range_km?.toFixed(1) || '0.0'} km / ${(today.max_range_km/1.852).toFixed(1)} NMI`, icon: <Radar size={24} color="#ff3b3b" /> },
                                 ].map((card, i) => (
-                                    <div key={i} style={{ background: 'white', padding: '20px', borderRadius: '16px', border: '1px solid #eef2f7', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                        <div style={{ width: '45px', height: '45px', borderRadius: '12px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1a2233' }}>
+                                    <div key={i} style={{ background: colors.bgCard, padding: '25px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', gap: '20px' }}>
+                                        <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMain }}>
                                             {card.icon}
                                         </div>
                                         <div>
-                                            <div style={{ fontSize: '0.75rem', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase' }}>{card.label}</div>
-                                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#1a2233' }}>{card.value}</div>
+                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>{card.label}</div>
+                                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: colors.textMain }}>{card.value}</div>
                                         </div>
                                     </div>
                                 ))}
                             </div>
 
-                            {/* Main Charts */}
-                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '20px' }}>
-                                {/* Messages per Day (30d) */}
-                                <div style={{ background: 'white', borderRadius: '16px', padding: '30px', border: '1px solid #eef2f7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#1a2233' }}>Messages per Day (30d)</h3>
-                                    <div style={{ height: '180px', display: 'flex', alignItems: 'flex-end', gap: '6px' }}>
-                                        {history30d.map((h: any, i: number) => {
-                                            const height = (h.total_messages / max30dMsgs) * 100;
-                                            const isSelected = h.date === selectedDate;
-                                            return (
-                                                <div key={i} style={{ flex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
-                                                    <div style={{ 
-                                                        width: '100%', 
-                                                        height: `${Math.max(height, 2)}%`, 
-                                                        background: isSelected ? '#44aaff' : '#cbd5e1',
-                                                        borderRadius: '3px 3px 0 0',
-                                                        transition: 'height 0.3s ease'
-                                                    }} title={`${h.date}: ${h.total_messages} msgs`}></div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                {/* Vessel Distribution */}
-                                <div style={{ background: 'white', borderRadius: '16px', padding: '30px', border: '1px solid #eef2f7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                                    <h3 style={{ margin: '0 0 20px 0', fontSize: '1.1rem', fontWeight: 800, color: '#1a2233' }}>Vessel Distribution</h3>
-                                    <div style={{ display: 'flex', gap: '25px', alignItems: 'center' }}>
-                                        <div style={{ width: '150px', height: '150px', position: 'relative' }}>
-                                            <svg viewBox="0 0 100 100" style={{ transform: 'rotate(-90deg)' }}>
-                                                <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" strokeWidth="10" />
-                                                {donutPaths.map((p: any, i: number) => (
-                                                    <path key={i} d={p.d} fill="transparent" stroke={p.color} strokeWidth="10" strokeLinecap="round" />
-                                                ))}
-                                            </svg>
-                                            <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', textAlign: 'center' }}>
-                                                <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#1a2233' }}>{today.unique_ships}</div>
-                                                <div style={{ fontSize: '0.6rem', color: '#94a3b8', textTransform: 'uppercase' }}>Ships</div>
-                                            </div>
+                            {/* View Modes */}
+                            {activeTab === 'Hour' && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '25px', flex: 1, minHeight: '400px' }}>
+                                    <ChartCard title="Max Distance Last Hour (NMI)" colors={colors}>
+                                        <div style={{ width: '100%', height: '100%' }}>
+                                            <PolarArea data={polarData} options={polarOptions} />
                                         </div>
-                                        <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr', gap: '8px' }}>
-                                            {donutPaths.map((p: any, i: number) => (
-                                                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.75rem' }}>
-                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                        <div style={{ width: '8px', height: '8px', background: p.color, borderRadius: '50%' }}></div>
-                                                        <div style={{ color: '#5a6b8a' }}>{p.label}</div>
-                                                    </div>
-                                                    <div style={{ fontWeight: 700, color: '#1a2233' }}>{p.count}</div>
-                                                </div>
-                                            ))}
+                                    </ChartCard>
+                                    <ChartCard title="Vessels per Minute" colors={colors}>
+                                        <div style={{ width: '100%', height: '100%' }}>
+                                            <Line data={vesselsPerMinuteData} options={lineOptions} />
                                         </div>
-                                    </div>
+                                    </ChartCard>
                                 </div>
-                            </div>
+                            )}
 
-                            {/* Activity Chart */}
-                            <div style={{ background: 'white', borderRadius: '16px', padding: '30px', border: '1px solid #eef2f7', boxShadow: '0 4px 20px rgba(0,0,0,0.03)' }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '30px' }}>
-                                    <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 800, color: '#1a2233' }}>Hourly Message Activity</h3>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.8rem', color: '#5a6b8a' }}>
-                                        <div style={{ width: '30px', height: '2px', background: '#22d3ee' }}></div>
-                                        <span>Total Reports / Hour</span>
-                                    </div>
+                            {activeTab === 'Day' && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '25px', flex: 1, minHeight: '400px' }}>
+                                    <ChartCard title="Messages per Hour" colors={colors}>
+                                        <div style={{ width: '100%', height: '100%' }}>
+                                            <Bar data={vesselsPerHourData} options={barOptions} />
+                                        </div>
+                                    </ChartCard>
                                 </div>
-                                <div style={{ height: '220px', position: 'relative', marginTop: '10px' }}>
-                                    {/* Gridlines */}
-                                    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', pointerEvents: 'none' }}>
-                                        {[0, 1, 2, 3].map(i => <div key={i} style={{ width: '100%', height: '1px', background: '#f1f5f9' }}></div>)}
-                                    </div>
-                                    
-                                    <svg viewBox="0 0 1000 100" preserveAspectRatio="none" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
-                                        <defs>
-                                            <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="0%" stopColor="#22d3ee" stopOpacity="0.15" />
-                                                <stop offset="100%" stopColor="#22d3ee" stopOpacity="0.0" />
-                                            </linearGradient>
-                                        </defs>
-                                        <path d={areaPath} fill="url(#areaGradient)" />
-                                        <polyline points={linePath} fill="none" stroke="#22d3ee" strokeWidth="1.2" strokeLinejoin="round" />
-                                        {hourlyBreakdown.map((h: any, i: number) => {
-                                            const x = (i / 23) * 1000;
-                                            const y = 100 - (h.count / maxHourlyMsgs) * 85;
-                                            return <circle key={i} cx={x} cy={y} r="3" fill="white" stroke="#22d3ee" strokeWidth="1" />;
-                                        })}
-                                    </svg>
-                                    
-                                    {/* Labels */}
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '15px', color: '#94a3b8', fontSize: '0.7rem' }}>
-                                        {hourlyBreakdown.filter((_: any, i: number) => i % 2 === 0).map((h: any, i: number) => (
-                                            <span key={i}>{h.hour}:00</span>
-                                        ))}
-                                    </div>
+                            )}
+
+                            {activeTab === 'Month' && (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '25px', flex: 1, minHeight: '400px' }}>
+                                    <ChartCard title="Vessels per Day (30d)" colors={colors}>
+                                        <div style={{ width: '100%', height: '100%' }}>
+                                            <Bar data={historyData} options={barOptions} />
+                                        </div>
+                                    </ChartCard>
                                 </div>
-                            </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function Accordion({ title, children, defaultOpen = false, colors }: any) {
+    const [isOpen, setIsOpen] = useState(defaultOpen);
+    return (
+        <div style={{ borderBottom: `1px solid ${colors.border}` }}>
+            <div 
+                onClick={() => setIsOpen(!isOpen)} 
+                style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: colors.bgSidebar, cursor: 'pointer' }}
+            >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#44aaff', fontWeight: 800, fontSize: '0.85rem' }}>
+                    {title}
+                </div>
+                {isOpen ? <ChevronUp size={18} color="#44aaff" /> : <ChevronDown size={18} color="#44aaff" />}
+            </div>
+            {isOpen && (
+                <div style={{ padding: '0', background: colors.bgCard }}>
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function AccordionRow({ label, value, labelIcon, colors }: any) {
+    return (
+        <div style={{ display: 'flex', flexDirection: 'column', padding: '10px 16px', borderBottom: `1px solid ${colors.border}88` }}>
+            <span style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                {labelIcon} {label}
+            </span>
+            <span style={{ fontSize: '0.9rem', fontWeight: 800, color: colors.textMain }}>{value}</span>
+        </div>
+    );
+}
+
+function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: any) {
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+    const [localImage, setLocalImage] = useState<string | null>(null);
+
+    useEffect(() => {
+        setLocalImage(ship ? ship.imageUrl : null);
+    }, [ship]);
+
+    if (!isOpen || !ship) return null;
+
+    const mmsiStr = String(ship.mmsi);
+    
+    return (
+        <>
+            <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1100, background: 'rgba(0,0,0,0.3)' }} />
+            <div style={{ 
+                position: 'fixed', right: 0, top: 0, bottom: 0, width: '400px', 
+                background: colors.bgMain, zIndex: 1101, display: 'flex', flexDirection: 'column', 
+                boxShadow: '-5px 0 25px rgba(0,0,0,0.5)', overflowY: 'auto',
+                transition: 'transform 0.3s ease-out', transform: isOpen ? 'translateX(0)' : 'translateX(100%)'
+            }}>
+                {/* Header Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${colors.border}` }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 900, color: '#44aaff', textTransform: 'uppercase' }}>{ship.name || 'UNKNOWN'}</h2>
+                    </div>
+                    <span style={{ fontSize: '2rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                </div>
+
+                {/* Destination Row */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 20px', borderBottom: `1px solid ${colors.border}`, background: colors.bgSidebar }}>
+                    <div>
+                        <div style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Destination</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: colors.textMain, fontSize: '1rem' }}>
+                            <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                            {ship.destination || '--'}
+                        </div>
+                    </div>
+                    <div style={{ textAlign: 'right' }}>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 800, color: colors.textMain }}>{ship.eta || 'N/A'}</div>
+                        <div style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700 }}>{getTimeAgo(ship.timestamp)}</div>
+                    </div>
+                </div>
+
+                {/* Image Section */}
+                <div style={{ position: 'relative', width: '100%', height: '240px', background: '#0a0a0a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        style={{ display: 'none' }} 
+                        accept="image/jpeg, image/png, image/webp"
+                        onChange={async (e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            
+                            setUploading(true);
+                            const formData = new FormData();
+                            formData.append("file", file);
+                            
+                            try {
+                                const isDev = window.location.port === '5173';
+                                const uploadUrl = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/image` : `/api/ships/${mmsiStr}/image`;
+                                
+                                const res = await fetch(uploadUrl, { method: 'POST', body: formData });
+                                
+                                if (res.ok) {
+                                    const data = await res.json();
+                                    const newUrl = `${data.image_url}?t=${Date.now()}`;
+                                    setLocalImage(newUrl);
+                                    ship.imageUrl = newUrl;
+                                    ship.manual_image = true;
+                                } else {
+                                    alert("Image upload failed");
+                                }
+                            } catch (err) {
+                                console.error(err);
+                            } finally {
+                                setUploading(false);
+                            }
+                        }}
+                    />
+                    
+                    {localImage && localImage !== "/images/0.jpg" ? (
+                        <div 
+                            title="Click to upload new image"
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                backgroundImage: `url(${localImage})`, 
+                                backgroundSize: 'cover', 
+                                backgroundPosition: 'center', 
+                                backgroundRepeat: 'no-repeat',
+                                cursor: 'pointer', 
+                                opacity: uploading ? 0.5 : 1, 
+                                transition: 'opacity 0.2s',
+                            }} 
+                        />
+                    ) : (
+                        <div 
+                            title="Click to upload new image"
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1 }}>
+                            <Ship size={50} strokeWidth={1} />
+                            <span style={{ fontSize: '0.8rem' }}>{uploading ? 'Uploading...' : 'Upload Image'}</span>
                         </div>
                     )}
                 </div>
 
-                <div style={{ padding: '20px 40px', background: '#f1f5f9', borderTop: '1px solid #eef2f7', display: 'flex', justifyContent: 'flex-end' }}>
-                    <button onClick={onClose} style={{ padding: '10px 25px', background: '#1a2233', color: 'white', border: 'none', borderRadius: '8px', fontWeight: 700, cursor: 'pointer' }}>
-                        Close Dashboard
-                    </button>
+                {/* Ship Type Strip */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 20px', background: '#1a2233', color: 'white' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, letterSpacing: '0.5px' }}>
+                        {ship.ship_type_text || (ship.shiptype ? `TYPE ${ship.shiptype}` : 'UNKNOWN TYPE').toUpperCase()}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>
+                        Last update: {getTimeAgo(ship.timestamp)}
+                    </div>
+                </div>
+
+                {/* Accordions */}
+                <div style={{ flex: 1, overflowY: 'auto' }}>
+                    <Accordion title={<><Navigation size={18} /> VOYAGE INFO</>} defaultOpen={true} colors={colors}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr', borderBottom: `1px solid ${colors.border}88` }}>
+                            <div style={{ padding: '10px 16px' }}>
+                                <div style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Status</div>
+                                <div style={{ fontSize: '1rem', fontWeight: 800, color: colors.textMain }}>{ship.status_text || 'Unknown'}</div>
+                            </div>
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                            <AccordionRow label="Latitude" value={ship.lat.toFixed(3)} colors={colors} />
+                            <AccordionRow label="Longitude" value={ship.lon.toFixed(3)} colors={colors} />
+                            <AccordionRow label="Course" value={ship.cog != null ? `${ship.cog.toFixed(0)}°` : '--'} colors={colors} />
+                            <AccordionRow label="Speed" value={formatSpeed(ship.sog, mqttSettings.units)} colors={colors} />
+                            <AccordionRow label="Draught" value={ship.draught ? `${ship.draught}m` : '--'} colors={colors} />
+                            <AccordionRow label="Heading" value={ship.heading != null ? `${ship.heading}°` : '--'} colors={colors} />
+                        </div>
+                    </Accordion>
+
+                    <Accordion title={<><Info size={18} /> VESSEL PARTICULARS</>} defaultOpen={true} colors={colors}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                            <AccordionRow label="IMO" value={ship.imo || '--'} colors={colors} />
+                            <AccordionRow label="MMSI" value={mmsiStr} colors={colors} />
+                            <AccordionRow label="Callsign" value={ship.callsign || '--'} colors={colors} />
+                            <AccordionRow label="Dimensions" value={(ship.length || ship.width) ? `${ship.length || '?'}x${ship.width || '?'}m` : '--'} colors={colors} />
+                        </div>
+                    </Accordion>
+
+                    <Accordion title={<><Radio size={18} /> DATA SOURCE</>} defaultOpen={false} colors={colors}>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                            <AccordionRow label="Source" value={ship.source === 'aisstream' ? 'AisStream.io' : 'Local Receiver'} colors={colors} />
+                            <AccordionRow label="Messages" value={ship.message_count || '--'} colors={colors} />
+                            <AccordionRow label="First Seen" value={ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--'} colors={colors} />
+                        </div>
+                    </Accordion>
                 </div>
             </div>
-        </div>
+        </>
     );
 }
 
@@ -1168,6 +1429,16 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                 />
                             </div>
                             <div className="form-group">
+                                <div>
+                                    <label>Vessel Detail View</label>
+                                    <div className="description">How vessel details are shown</div>
+                                </div>
+                                <select value={settings.vessel_detail_view} onChange={e => setSettings({ ...settings, vessel_detail_view: e.target.value })}>
+                                    <option value="sidebar">Sidebar (Right)</option>
+                                    <option value="modal">Popup Modal</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
                                 <label>UI Theme</label>
                                 <select value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
                                     <option value="light">Light Mode</option>
@@ -1219,6 +1490,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             <div className="form-group" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '15px' }}>
                                 <div className="description" style={{ fontSize: '0.9rem' }}>
                                     Here you can reset all saved coverage data. This removes 24h stats and "All-time high".
+                                </div>
+                                <div className="form-group">
+                                    <label>Include Internet vessels in range</label>
+                                    <Toggle
+                                        checked={settings.include_aisstream_in_range === 'true'}
+                                        onChange={val => setSettings({ ...settings, include_aisstream_in_range: String(val) })}
+                                    />
                                 </div>
                                 <button
                                     className="styled-button"
@@ -1387,7 +1665,8 @@ export default function App() {
         show_aisstream_on_map: 'true',
         sdr_enabled: 'true',
         udp_enabled: 'true',
-        udp_port: '10110'
+        udp_port: '10110',
+        vessel_detail_view: 'sidebar'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
@@ -1478,7 +1757,8 @@ export default function App() {
                     show_aisstream_on_map: data.show_aisstream_on_map || 'true',
                     sdr_enabled: data.sdr_enabled || 'true',
                     udp_enabled: data.udp_enabled || 'true',
-                    udp_port: data.udp_port || '10110'
+                    udp_port: data.udp_port || '10110',
+                    vessel_detail_view: data.vessel_detail_view || 'sidebar'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -2185,7 +2465,10 @@ export default function App() {
                                                                 <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
                                                                     <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Miljö</div>
                                                                     <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#ffab40' }}>{s.air_temp ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>°C</span></div>
-                                                                    <div style={{ fontSize: '0.7rem', marginTop: '2px' }}>Vatten: {s.water_level ?? '--'} m</div>
+                                                                    <div style={{ fontSize: '0.7rem' }}>Vatten: {s.water_level ?? '--'} m</div>
+                                                                    {s.air_pressure && (
+                                                                        <div style={{ fontSize: '0.7rem', color: colors.textMuted }}>Tryck: {s.air_pressure} hPa</div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                             {s.visibility !== undefined && (
@@ -2701,13 +2984,23 @@ export default function App() {
                 colors={colors}
             />
 
-            <VesselDetailModal
-                isOpen={!!selectedShipMmsi}
-                onClose={() => setSelectedShipMmsi(null)}
-                ship={ships.find((s: any) => String(s.mmsi) === selectedShipMmsi)}
-                colors={colors}
-                mqttSettings={mqttSettings}
-            />
+            {mqttSettings.vessel_detail_view === 'sidebar' ? (
+                <VesselDetailSidebar
+                    isOpen={!!selectedShipMmsi}
+                    onClose={() => setSelectedShipMmsi(null)}
+                    ship={ships.find((s: any) => String(s.mmsi) === selectedShipMmsi)}
+                    mqttSettings={mqttSettings}
+                    colors={colors}
+                />
+            ) : (
+                <VesselDetailModal
+                    isOpen={!!selectedShipMmsi}
+                    onClose={() => setSelectedShipMmsi(null)}
+                    ship={ships.find((s: any) => String(s.mmsi) === selectedShipMmsi)}
+                    colors={colors}
+                    mqttSettings={mqttSettings}
+                />
+            )}
 
             <StatisticsModal
                 isOpen={isStatsModalOpen}

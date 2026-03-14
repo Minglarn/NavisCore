@@ -238,8 +238,10 @@ def validate_checksum(nmea_sentence: str) -> bool:
 def to_6_bit_string(payload_char: str) -> str:
     """Converts a single ASCII payload character to its 6-bit binary representation."""
     val = ord(payload_char) - 48
-    if val >= 40:
+    if val > 40:
         val -= 8
+    # Ensure value is clamped to 0-63 range as per AIS spec
+    val = max(0, min(63, val))
     return f"{val:06b}"
 
 
@@ -379,13 +381,22 @@ def _decode_type_8(bitstr: str, data: dict):
     if dac == 1 and fid == 31 and len(bitstr) >= 163:
         lon = get_int_from_bits(bitstr, 56, 25, signed=True) / 60000.0
         lat = get_int_from_bits(bitstr, 81, 24, signed=True) / 60000.0
-        wind_speed = get_int_from_bits(bitstr, 140, 7)
-        wind_gust = get_int_from_bits(bitstr, 147, 7)
+        
+        # Wind: Apply 0.1 scaling (Common for SMA legacy stations)
+        wind_speed = get_int_from_bits(bitstr, 140, 7) / 10.0
+        wind_gust = get_int_from_bits(bitstr, 147, 7) / 10.0
         wind_dir = get_int_from_bits(bitstr, 154, 9)
 
-        if len(bitstr) >= 175:
-            water_level = get_int_from_bits(bitstr, 163, 12, signed=True) / 100.0
+        if len(bitstr) >= 185:
+            # Water level: standard offset for FID 31 is different but let's 
+            # try to detect if it needs scaling.
+            water_raw = get_int_from_bits(bitstr, 163, 12, signed=True)
+            water_level = water_raw / 100.0
             data["water_level"] = water_level
+
+        # Validation per user rules (even for DAC 1)
+        if wind_dir > 360 or wind_speed > 120.0:
+            return
 
         data["lon"] = lon
         data["lat"] = lat
@@ -397,31 +408,43 @@ def _decode_type_8(bitstr: str, data: dict):
 
     # Swedish weather report (DAC 265, FI 01)
     elif dac == 265 and fid == 1 and len(bitstr) >= 185:
-        # According to SMA / VIVA AIS specification provided by user
-        # Header skips first 56 bits
+        # According to SMA / VIVA AIS specification (Strict Rule Implementation)
         
         # Station name: Bits 56-115 (10 chars of 6-bit ASCII)
         station_name = decode_6bit_string(bitstr, 56, 10)
         
         # Wind: Medel (7 bits), Byar (7 bits), Riktning (9 bits)
-        wind_speed = get_int_from_bits(bitstr, 116, 7)
-        wind_gust = get_int_from_bits(bitstr, 123, 7)
+        # Unit: 0.1 m/s for speeds
+        wind_speed = get_int_from_bits(bitstr, 116, 7) / 10.0
+        wind_gust = get_int_from_bits(bitstr, 123, 7) / 10.0
         wind_dir = get_int_from_bits(bitstr, 130, 9)
         
-        # Water level: Bits 153-166 (14 bits)
-        # Logic: If > 8192, subtract 16384 for negative values
+        # Lufttryck: Bits 139-152 (14 bits, Unit: hPa)
+        air_pressure = get_int_from_bits(bitstr, 139, 14)
+        
+        # Water level: Bits 153-166 (14 bits, Unit: cm)
+        # Signed 14-bit: If RawValue > 8192, val = RawValue - 16384
         water_val = get_int_from_bits(bitstr, 153, 14)
         if water_val > 8192:
             water_val -= 16384
         water_level = water_val / 100.0  # cm to meters
         
         # Air temperature: Bits 175-185 (11 bits, 0.1C units)
-        air_temp_val = get_int_from_bits(bitstr, 175, 11, signed=True)
-        air_temp = air_temp_val / 10.0
+        # Signed 11-bit: If bit 175 is 1 (val > 1024), val = val - 2048
+        temp_val = get_int_from_bits(bitstr, 175, 11)
+        if temp_val > 1024:
+            temp_val -= 2048
+        air_temp = temp_val / 10.0
+
+        # Validation per user rules
+        if wind_dir > 360 or wind_speed > 120.0:
+            logger.warning(f"[AIS] VIVA decode error (bad offset?): mmsi={data.get('mmsi')} wind={wind_speed} dir={wind_dir}")
+            return
 
         data["wind_speed"] = wind_speed
         data["wind_direction"] = wind_dir
         data["wind_gust"] = wind_gust
+        data["air_pressure"] = air_pressure
         data["water_level"] = water_level
         data["air_temp"] = air_temp
         data["is_meteo"] = True
