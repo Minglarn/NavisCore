@@ -65,7 +65,7 @@ queued_mmsis = set()
 # Database helper
 @asynccontextmanager
 async def db_session():
-    async with aiosqlite.connect(DB_PATH) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=30.0) as db:
         # Note: WAL mode disabled due to issues with Docker Desktop volumes on Windows
         # await db.execute('PRAGMA journal_mode=WAL')
         await db.execute('PRAGMA busy_timeout=30000')
@@ -338,7 +338,10 @@ async def enrich_ship_data(mmsi: str):
         
         async with httpx.AsyncClient() as client:
             res = await client.get(f"https://www.myshiptracking.com/requests/autocomplete.php?type=1&site=1&q={mmsi}", headers={'User-Agent': 'Mozilla/5.0'}, timeout=10.0)
-            data = res.json() if res.status_code == 200 else []
+            try:
+                data = res.json() if res.status_code == 200 else []
+            except Exception:
+                data = []
             has_image = False
             if data and isinstance(data, list) and len(data) > 0:
                 ship = data[0]
@@ -701,6 +704,44 @@ async def get_ships():
                 res.append(d)
             except Exception: continue
         return res
+
+@app.post("/api/ships/{mmsi}/image")
+async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
+    try:
+        if not mmsi.isdigit() or len(mmsi) != 9:
+            return {"error": "Invalid MMSI"}
+            
+        file_ext = "jpg"
+        if file.filename:
+            parts = file.filename.split(".")
+            if len(parts) > 1:
+                file_ext = parts[-1].lower()
+                
+        # We save everything as jpg in IMAGES_DIR for simplicity, or use original extension
+        # and update DB accordingly. Let's force standard .jpg or keep extension.
+        # Actually in other places code hardcodes .jpg or /images/{mmsi}.jpg 
+        safe_filename = f"{mmsi}.jpg"
+        file_path = os.path.join(IMAGES_DIR, safe_filename)
+        
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+            
+        image_url = f"/images/{safe_filename}?t={int(time.time())}"
+        
+        async with db_session() as db:
+            await db.execute(
+                'UPDATE ships SET image_url = ?, manual_image = 1 WHERE mmsi = ?', 
+                (f"/images/{safe_filename}", mmsi)
+            )
+            await db.commit()
+            
+        # Broadcast update to connected clients
+        await broadcast({"mmsi": mmsi, "imageUrl": image_url, "manual_image": True})
+        
+        return {"success": True, "imageUrl": image_url}
+    except Exception as e:
+        logger.error(f"Error uploading image for {mmsi}: {e}")
+        return {"error": str(e)}
 
 @app.get("/api/settings")
 async def get_settings_api(): return await get_all_settings()
