@@ -40,10 +40,16 @@ L.Icon.Default.mergeOptions({
 
 function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?: boolean, isEmergency?: boolean) {
     if (isEmergency) return '#ff0000'; // Emergency (Bright Red)
+    
+    // Fallback: Check MMSI prefixes for emergency devices if flag didn't catch it
+    if (mmsiStr && (mmsiStr.startsWith('970') || mmsiStr.startsWith('972') || mmsiStr.startsWith('974'))) {
+        return '#ff0000';
+    }
+
     if (isMeteo) return '#44aaff'; // Weather (Light Blue)
     if (isAton || mmsiStr.startsWith('99')) return '#ff00ff'; // AtoN (Magenta)
     if (mmsiStr.startsWith('00')) return '#555555'; // Base Station
-    if (!type) return '#a0a0a0'; // Unknown
+    if (!type && type !== 0) return '#a0a0a0'; // Unknown
 
     if (type >= 20 && type <= 29) return '#ffffff'; // WIG (White)
     if (type === 30) return '#f68b1f'; // Fishing (Orange)
@@ -251,7 +257,7 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
                </svg>`;
     } else {
         const size = 16 * circleScale;
-        svg = `<svg width="${size}" height="${size}" viewBox="0 0 16 16">
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 16 16" class="${emergencyClass}">
                  <circle cx="8" cy="8" r="6" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
                          class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
@@ -322,6 +328,10 @@ const extraStyles = `
 @keyframes svg-emergency-pulse-anim {
     from { filter: drop-shadow(0 0 2px #ff0000) drop-shadow(0 0 5px #ff0000); }
     to { filter: drop-shadow(0 0 8px #ff0000) drop-shadow(0 0 15px #ff0000); }
+}
+@keyframes emergency-flash {
+    from { background-color: #ff0000; }
+    to { background-color: #880000; }
 }
 .settings-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -2295,6 +2305,23 @@ export default function App() {
                                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.draught ? `${s.draught}m` : '--'}</div>
                                                             </div>
                                                         </div>
+                                                        
+                                                        {s.is_advanced_binary && (
+                                                            <div style={{ marginTop: '4px', padding: '6px', background: 'rgba(246,139,31,0.1)', borderRadius: '4px', border: '1px solid rgba(246,139,31,0.2)' }}>
+                                                                <div style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#f68b1f', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '4px' }}>
+                                                                    <Terminal size={12} /> BINARY PAYLOAD
+                                                                </div>
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px', fontSize: '0.65rem' }}>
+                                                                    <div><span style={{ color: colors.textMuted }}>DAC:</span> {s.dac}</div>
+                                                                    <div><span style={{ color: colors.textMuted }}>FI:</span> {s.fid}</div>
+                                                                </div>
+                                                                {s.raw_payload && (
+                                                                    <div style={{ marginTop: '4px', fontSize: '0.6rem', fontFamily: 'monospace', wordBreak: 'break-all', color: colors.textMuted, background: 'rgba(0,0,0,0.05)', padding: '2px' }}>
+                                                                        {s.raw_payload.substring(0, 60)}{s.raw_payload.length > 60 ? '...' : ''}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
 
                                                         <div style={{ marginTop: '2px', borderTop: `1px solid ${colors.border}`, paddingTop: '8px' }}>
                                                             <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Destination / Update</div>
@@ -2574,7 +2601,7 @@ export default function App() {
                                                     padding: '10px',
                                                     background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
                                                     borderRadius: '8px',
-                                                    borderLeft: `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)}`,
+                                                    borderLeft: `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}`,
                                                     display: 'flex',
                                                     gap: '12px',
                                                     alignItems: 'center',

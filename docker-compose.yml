@@ -36,6 +36,7 @@ services:
       - LOG_LEVEL=info
     volumes:
       - ./data:/app/data
+      - ./backend:/app/backend
     depends_on:
       - sdr
     networks:

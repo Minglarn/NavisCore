@@ -219,6 +219,7 @@ def get_ship_category(code: int) -> str:
 def validate_checksum(nmea_sentence: str) -> bool:
     """Verifies the NMEA checksum by XOR-ing all chars between ! and *."""
     if not nmea_sentence.startswith('!') or '*' not in nmea_sentence:
+        logger.debug(f"[AIS] Invalid NMEA format (no ! or *): {nmea_sentence}")
         return False
     try:
         data_str, checksum_hex = nmea_sentence.split('*', 1)
@@ -228,6 +229,9 @@ def validate_checksum(nmea_sentence: str) -> bool:
             calculated_checksum ^= ord(char)
         return f"{calculated_checksum:02X}" == checksum_hex.strip().upper()
     except Exception:
+        return False
+    except Exception as e:
+        logger.error(f"[AIS] Error validating checksum: {e}")
         return False
 
 
@@ -633,7 +637,7 @@ def _decode_type_23(bitstr: str, data: dict):
 
 def _decode_type_25(bitstr: str, data: dict):
     """Type 25: Single Slot Binary Message."""
-    if len(bitstr) < 168:
+    if len(bitstr) < 40:
         return
     addressed = bool(get_int_from_bits(bitstr, 38, 1))
     structured = bool(get_int_from_bits(bitstr, 39, 1))
@@ -644,9 +648,19 @@ def _decode_type_25(bitstr: str, data: dict):
         data["dac"] = get_int_from_bits(bitstr, 40, 10)
         data["fid"] = get_int_from_bits(bitstr, 50, 6)
         data["is_advanced_binary"] = True
+        # Content starts at bit 56
+        data["raw_payload"] = bitstr[56:]
     else:
-        # Raw bitstream data (hex representation for simplicity)
-        data["raw_binary"] = bitstr[40:min(len(bitstr), 168)]
+        # Unstructured binary data starts at bit 40 (addressed=1) or 40 (addressed=0)
+        # Actually bit 40 if addressed, otherwise bit 40? 
+        # Referencing ITU-R M.1371: 
+        # If addressed=0, structured=0: 168 bits total, data starts at 40
+        # If addressed=1, structured=0: 168 bits total, data starts at 70 (dest mmsi is 30 bits)
+        if addressed:
+            data["dest_mmsi"] = get_int_from_bits(bitstr, 40, 30)
+            data["raw_payload"] = bitstr[70:]
+        else:
+            data["raw_payload"] = bitstr[40:]
         data["is_advanced_binary"] = True
 
 
@@ -659,12 +673,20 @@ def _decode_type_26(bitstr: str, data: dict):
     data["addressed"] = addressed
     data["structured"] = structured
     
+    if addressed:
+        data["dest_mmsi"] = get_int_from_bits(bitstr, 40, 30)
+        start_bit = 70
+    else:
+        start_bit = 40
+
     if structured:
-        data["dac"] = get_int_from_bits(bitstr, 40, 10)
-        data["fid"] = get_int_from_bits(bitstr, 50, 6)
+        data["dac"] = get_int_from_bits(bitstr, start_bit, 10)
+        data["fid"] = get_int_from_bits(bitstr, start_bit + 10, 6)
         data["is_advanced_binary"] = True
+        data["raw_payload"] = bitstr[start_bit + 16 : len(bitstr) - 20] # Subtract comm state
     else:
         data["is_advanced_binary"] = True
+        data["raw_payload"] = bitstr[start_bit : len(bitstr) - 20]
 
 
 def _decode_type_27(bitstr: str, data: dict):

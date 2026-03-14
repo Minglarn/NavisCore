@@ -26,3 +26,9 @@ backend/data/
 frontend/dist/
 *.jpg
 !data/images/0.jpg # Keep the fallback image
+
+# Test/Diagnostic scripts
+test*.py
+check*.py
+**/test*.py
+**/check*.py
