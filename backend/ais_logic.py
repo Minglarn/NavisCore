@@ -608,10 +608,17 @@ def _decode_type_21(bitstr: str, data: dict):
 
 def _decode_type_22(bitstr: str, data: dict):
     """Type 22: Channel Management."""
-    if len(bitstr) < 168:
-        return
-    data["channel_a"] = get_int_from_bits(bitstr, 40, 12)
-    data["channel_b"] = get_int_from_bits(bitstr, 52, 12)
+    channel_a = get_int_from_bits(bitstr, 40, 12)
+    channel_b = get_int_from_bits(bitstr, 52, 12)
+    tx_rx_mode = get_int_from_bits(bitstr, 64, 4)
+    power = get_int_from_bits(bitstr, 68, 1)
+    
+    data["channel_a"] = channel_a
+    data["channel_b"] = channel_b
+    data["tx_rx_mode"] = tx_rx_mode
+    data["high_power"] = bool(power)
+    
+    logger.info(f"[AIS Channel Mgmt] MMSI={data['mmsi']} | CH_A={channel_a} CH_B={channel_b} Mode={tx_rx_mode} Power={'High' if power else 'Low'}")
 
 
 def _decode_type_23(bitstr: str, data: dict):
@@ -628,16 +635,36 @@ def _decode_type_25(bitstr: str, data: dict):
     """Type 25: Single Slot Binary Message."""
     if len(bitstr) < 168:
         return
-    data["addressed"] = bool(get_int_from_bits(bitstr, 38, 1))
-    data["structured"] = bool(get_int_from_bits(bitstr, 39, 1))
+    addressed = bool(get_int_from_bits(bitstr, 38, 1))
+    structured = bool(get_int_from_bits(bitstr, 39, 1))
+    data["addressed"] = addressed
+    data["structured"] = structured
+    
+    if structured:
+        data["dac"] = get_int_from_bits(bitstr, 40, 10)
+        data["fid"] = get_int_from_bits(bitstr, 50, 6)
+        data["is_advanced_binary"] = True
+    else:
+        # Raw bitstream data (hex representation for simplicity)
+        data["raw_binary"] = bitstr[40:min(len(bitstr), 168)]
+        data["is_advanced_binary"] = True
 
 
 def _decode_type_26(bitstr: str, data: dict):
     """Type 26: Multiple Slot Binary Message with Communications State."""
     if len(bitstr) < 60:
         return
-    data["addressed"] = bool(get_int_from_bits(bitstr, 38, 1))
-    data["structured"] = bool(get_int_from_bits(bitstr, 39, 1))
+    addressed = bool(get_int_from_bits(bitstr, 38, 1))
+    structured = bool(get_int_from_bits(bitstr, 39, 1))
+    data["addressed"] = addressed
+    data["structured"] = structured
+    
+    if structured:
+        data["dac"] = get_int_from_bits(bitstr, 40, 10)
+        data["fid"] = get_int_from_bits(bitstr, 50, 6)
+        data["is_advanced_binary"] = True
+    else:
+        data["is_advanced_binary"] = True
 
 
 def _decode_type_27(bitstr: str, data: dict):
@@ -781,10 +808,26 @@ class AisStreamManager:
         msg_type = get_int_from_bits(bitstr, 0, 6)
         mmsi = get_int_from_bits(bitstr, 8, 30)
 
+        # Emergency Detection (MMSI Prefixes)
+        mmsi_str = str(mmsi)
+        is_emergency = False
+        emergency_type = None
+        if mmsi_str.startswith("970"):
+            is_emergency = True
+            emergency_type = "AIS-SART"
+        elif mmsi_str.startswith("972"):
+            is_emergency = True
+            emergency_type = "MOB"
+        elif mmsi_str.startswith("974"):
+            is_emergency = True
+            emergency_type = "EPIRB"
+
         decoded_data = {
             "mmsi": mmsi,
             "type": msg_type,
-            "nmea": sentences[0] if sentences and len(sentences) == 1 else sentences
+            "nmea": sentences[0] if sentences and len(sentences) == 1 else sentences,
+            "is_emergency": is_emergency,
+            "emergency_type": emergency_type
         }
 
         # Type 24: Class B CS Static Data Report (Part A + B pairing)

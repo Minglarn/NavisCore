@@ -706,6 +706,10 @@ async def process_ais_data(data: dict):
         "air_temp": data.get("air_temp"),
         "destination": data.get("destination"),
         "draught": data.get("draught"),
+        "is_emergency": data.get("is_emergency", False),
+        "emergency_type": data.get("emergency_type"),
+        "virtual_aton": data.get("virtual_aton", False),
+        "is_advanced_binary": data.get("is_advanced_binary", False),
         "source": source,
         "nmea": data.get("nmea"),
     }
@@ -835,7 +839,7 @@ async def process_ais_data(data: dict):
             pass # MMSI already counted for today
         
         # Read back whatever data we lacked in this specific incoming packet
-        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+        async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
             row = await cursor.fetchone()
             if row:
                 ship_data["imageUrl"] = row[0] if row[0] else "/images/0.jpg"
@@ -877,6 +881,12 @@ async def process_ais_data(data: dict):
                 # Meteo Preservation
                 if row[18]:
                     ship_data["is_meteo"] = True
+                
+                if row and len(row) > 19:
+                    if row[19]: ship_data["is_emergency"] = True
+                    ship_data["emergency_type"] = row[20]
+                    if row[21]: ship_data["virtual_aton"] = True
+                    if row[22]: ship_data["is_advanced_binary"] = True
         
         # Ensure ship_type_text is always populated
         if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -1309,6 +1319,22 @@ async def startup_event():
             await db.execute("ALTER TABLE ships ADD COLUMN aton_type_text TEXT")
         except Exception: pass
         
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN is_emergency BOOLEAN DEFAULT 0")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN emergency_type TEXT")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN virtual_aton BOOLEAN DEFAULT 0")
+        except Exception: pass
+
+        try:
+            await db.execute("ALTER TABLE ships ADD COLUMN is_advanced_binary BOOLEAN DEFAULT 0")
+        except Exception: pass
+        
         await db.execute('''CREATE TABLE IF NOT EXISTS coverage_sectors (
             sector_id INTEGER PRIMARY KEY,
             range_km_24h REAL DEFAULT 0.0,
@@ -1425,6 +1451,10 @@ async def get_ships():
                 d["callsign"] = row["callsign"]
                 d["source"] = row["source"] or "local"
                 d["manual_image"] = bool(row["manual_image"])
+                d["is_emergency"] = bool(row.get("is_emergency", 0))
+                d["emergency_type"] = row.get("emergency_type")
+                d["virtual_aton"] = bool(row.get("virtual_aton", 0))
+                d["is_advanced_binary"] = bool(row.get("is_advanced_binary", 0))
                 
                 if d.get("previous_seen"):
                     try:

@@ -38,7 +38,8 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?: boolean) {
+function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?: boolean, isEmergency?: boolean) {
+    if (isEmergency) return '#ff0000'; // Emergency (Bright Red)
     if (isMeteo) return '#44aaff'; // Weather (Light Blue)
     if (isAton || mmsiStr.startsWith('99')) return '#ff00ff'; // AtoN (Magenta)
     if (mmsiStr.startsWith('00')) return '#555555'; // Base Station
@@ -197,11 +198,13 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     return emoji;
 }
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number) {
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean) {
     const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
     const isAircraft = type === 9;
-    const color = getShipColor(mmsi, type, isMeteo, isAton);
+    const color = getShipColor(mmsi, type, isMeteo, isAton, isEmergency);
     const borderColor = '#000000';
+    const strokeDash = virtualAton ? 'stroke-dasharray="2,2"' : '';
+    const emergencyClass = isEmergency ? 'svg-emergency-pulse' : '';
 
     let svg = '';
     const baseHitArea = 56;
@@ -220,15 +223,15 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
         const size = (isFloating ? 24 : 28) * shipScale;
         if (isFloating) {
             // Buoy
-            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
-                     <path d="M12,2 L14,6 L16,18 L8,18 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
+            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="${emergencyClass}">
+                     <path d="M12,2 L14,6 L16,18 L8,18 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" ${strokeDash} />
                      <path d="M6,18 L18,18" stroke="${borderColor}" stroke-width="2" stroke-linecap="round" />
                      <circle cx="12" cy="4" r="2" fill="yellow" stroke="${borderColor}" stroke-width="0.5" class="svg-pulse" />
                    </svg>`;
         } else {
             // Lighthouse / Fixed Structure
-            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
-                     <path d="M8,22 L16,22 L14,6 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" />
+            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="${emergencyClass}">
+                     <path d="M8,22 L16,22 L14,6 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" ${strokeDash} />
                      <rect x="9" y="4" width="6" height="4" fill="#333" stroke="${borderColor}" stroke-width="1" />
                      <path d="M7,6 L4,4 M17,6 L20,4 M12,2 L12,4" stroke="yellow" stroke-width="2" stroke-linecap="round" class="svg-pulse" />
                    </svg>`;
@@ -242,7 +245,7 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
                </svg>`;
     } else if (isMoving) {
         const size = 26 * shipScale;
-        svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);">
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);" class="${emergencyClass}">
                  <polygon points="12,2 19,10 17,22 7,22 5,10" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
                           class="${shouldFlash ? 'svg-flash-fill' : ''}" />
                </svg>`;
@@ -312,6 +315,13 @@ const extraStyles = `
     0% { opacity: 0.5; stroke-width: 1px; }
     50% { opacity: 1; stroke-width: 3px; }
     100% { opacity: 0.5; stroke-width: 1px; }
+}
+.svg-emergency-pulse {
+    animation: svg-emergency-pulse-anim 1s infinite alternate;
+}
+@keyframes svg-emergency-pulse-anim {
+    from { filter: drop-shadow(0 0 2px #ff0000) drop-shadow(0 0 5px #ff0000); }
+    to { filter: drop-shadow(0 0 8px #ff0000) drop-shadow(0 0 15px #ff0000); }
 }
 .settings-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -390,6 +400,11 @@ const extraStyles = `
 }
 input:checked + .slider { background-color: #44aaff; }
 input:checked + .slider:before { transform: translateX(20px); }
+
+@keyframes emergency-flash {
+    from { background: #ff0000; box-shadow: 0 0 5px #ff0000; }
+    to { background: #990000; box-shadow: 0 0 20px #ff0000; }
+}
 `;
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -2078,7 +2093,9 @@ export default function App() {
                                     parseFloat(mqttSettings.circle_size),
                                     s.is_meteo,
                                     s.is_aton,
-                                    s.aton_type
+                                    s.aton_type,
+                                    s.is_emergency,
+                                    s.virtual_aton
                                 );
 
                                 return (
@@ -2176,6 +2193,16 @@ export default function App() {
                                                 ) : (
                                                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '8px', borderRadius: '8px', color: 'var(--text-main)' }}>
                                                         <strong style={{ fontSize: '1rem' }}>{s.name || s.mmsi}</strong>
+                                                        {s.is_emergency && (
+                                                            <div style={{ background: '#ff0000', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
+                                                                ⚠️ NÖDSITUATION
+                                                            </div>
+                                                        )}
+                                                        {s.virtual_aton && (
+                                                            <div style={{ background: '#ff00ff', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
+                                                                VIRTUELLT SJÖMÄRKE
+                                                            </div>
+                                                        )}
                                                         {s.status_text && (
                                                             <span style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>
                                                                 {s.status_text}
@@ -2246,10 +2273,20 @@ export default function App() {
                                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{formatSpeed(s.sog, mqttSettings.units)} / {s.cog?.toFixed(0) ?? '--'}°</div>
                                                             </div>
                                                             <div>
-                                                                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Dimensions</div>
-                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.length && s.width ? `${s.length}x${s.width}m` : '--'}</div>
-                                                            </div>
-                                                            <div>
+                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Dimensions</div>
+                                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.length && s.width ? `${s.length}x${s.width}m` : '--'}</div>
+                                                                </div>
+                                                                {s.is_emergency && (
+                                                                    <div style={{ gridColumn: 'span 2', background: '#ff0000', color: '#fff', padding: '8px', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', animation: 'emergency-flash 1s infinite alternate' }}>
+                                                                        ⚠️ NÖDSITUATION
+                                                                    </div>
+                                                                )}
+                                                                {s.virtual_aton && (
+                                                                    <div style={{ gridColumn: 'span 2', background: '#ff00ff', color: '#fff', padding: '4px', borderRadius: '4px', textAlign: 'center', fontSize: '0.75rem' }}>
+                                                                        VIRTUELT SJÖMÄRKE
+                                                                    </div>
+                                                                )}
+                                                                <div>
                                                                 <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Type / Stat</div>
                                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'N/A')}</div>
                                                             </div>
