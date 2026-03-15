@@ -66,8 +66,11 @@ queued_mmsis = set()
 @asynccontextmanager
 async def db_session():
     async with aiosqlite.connect(DB_PATH, timeout=30.0) as db:
-        # Note: WAL mode disabled due to issues with Docker Desktop volumes on Windows
-        # await db.execute('PRAGMA journal_mode=WAL')
+        # Attempt to use WAL mode for better concurrency
+        try:
+            await db.execute('PRAGMA journal_mode=WAL')
+        except Exception:
+            pass
         await db.execute('PRAGMA busy_timeout=30000')
         yield db
 
@@ -85,53 +88,55 @@ async def cleanup_history_task():
             logger.error(f"Error in cleanup_history_task: {e}")
         await asyncio.sleep(3600)
 
-async def get_setting(key: str, default_val: str = "") -> str:
-    async with db_session() as db:
+async def get_setting(key: str, default_val: str = "", db: aiosqlite.Connection = None) -> str:
+    if db:
         async with db.execute('SELECT value FROM settings WHERE key = ?', (key,)) as cursor:
             row = await cursor.fetchone()
             return row[0] if row else default_val
+    async with db_session() as ds:
+        async with ds.execute('SELECT value FROM settings WHERE key = ?', (key,)) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else default_val
 
-async def set_setting(key: str, value: str):
-    async with db_session() as db:
+async def set_setting(key: str, value: str, db: aiosqlite.Connection = None):
+    if db:
         await db.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
         await db.commit()
+        return
+    async with db_session() as ds:
+        await ds.execute('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)', (key, str(value)))
+        await ds.commit()
 
-async def get_all_settings():
-    return {
-        "mqtt_enabled": await get_setting("mqtt_enabled", "false"),
-        "mqtt_url": await get_setting("mqtt_url", ""),
-        "mqtt_topic": await get_setting("mqtt_topic", "ais"),
-        "mqtt_user": await get_setting("mqtt_user", ""),
-        "mqtt_pass": await get_setting("mqtt_pass", ""),
-        "forward_enabled": await get_setting("forward_enabled", "false"),
-        "forward_ip": await get_setting("forward_ip", ""),
-        "forward_port": await get_setting("forward_port", ""),
-        "ship_timeout": await get_setting("ship_timeout", "60"),
-        "origin_lat": await get_setting("origin_lat", ""),
-        "origin_lon": await get_setting("origin_lon", ""),
-        "show_range_rings": await get_setting("show_range_rings", "true"),
-        "map_style": await get_setting("map_style", "light"),
-        "base_layer": await get_setting("base_layer", "standard"),
-        "range_type": await get_setting("range_type", "24h"),
-        "history_duration": await get_setting("history_duration", "60"),
-        "show_names_on_map": await get_setting("show_names_on_map", "true"),
-        "trail_color": await get_setting("trail_color", "#ff4444"),
-        "trail_opacity": await get_setting("trail_opacity", "0.6"),
-        "trail_enabled": await get_setting("trail_enabled", "true"),
-        "sdr_ppm": await get_setting("sdr_ppm", "0"),
-        "sdr_gain": await get_setting("sdr_gain", "auto"),
-        "ship_size": await get_setting("ship_size", "1.0"),
-        "circle_size": await get_setting("circle_size", "1.0"),
-        "trail_size": await get_setting("trail_size", "1.0"),
-        "aisstream_enabled": await get_setting("aisstream_enabled", "false"),
-        "aisstream_api_key": await get_setting("aisstream_api_key", os.getenv("AISSTREAM_API_KEY", "")),
-        "include_aisstream_in_range": await get_setting("include_aisstream_in_range", "false"),
-        "trail_mode": await get_setting("trail_mode", "all"),
-        "show_aisstream_on_map": await get_setting("show_aisstream_on_map", "true"),
-        "sdr_enabled": await get_setting("sdr_enabled", "true"),
-        "udp_enabled": await get_setting("udp_enabled", "true"),
-        "udp_port": await get_setting("udp_port", str(UDP_PORT)),
+async def get_all_settings(db: aiosqlite.Connection = None):
+    # If db is provided, use it, otherwise open a temporary one
+    if db:
+        return await _get_all_settings_internal(db)
+    async with db_session() as ds:
+        return await _get_all_settings_internal(ds)
+
+async def _get_all_settings_internal(db: aiosqlite.Connection):
+    settings = {}
+    async with db.execute('SELECT key, value FROM settings') as cursor:
+        async for row in cursor:
+            settings[row[0]] = row[1]
+    
+    # Fill in defaults for missing keys
+    defaults = {
+        "mqtt_enabled": "false", "mqtt_url": "", "mqtt_topic": "ais", "mqtt_user": "", "mqtt_pass": "",
+        "forward_enabled": "false", "forward_ip": "", "forward_port": "",
+        "ship_timeout": "60", "origin_lat": "", "origin_lon": "",
+        "show_range_rings": "true", "map_style": "light", "base_layer": "standard",
+        "range_type": "24h", "history_duration": "60", "show_names_on_map": "true",
+        "trail_color": "#ff4444", "trail_opacity": "0.6", "trail_enabled": "true",
+        "sdr_ppm": "0", "sdr_gain": "auto", "ship_size": "1.0", "circle_size": "1.0",
+        "trail_size": "1.0", "aisstream_enabled": "false", "aisstream_api_key": os.getenv("AISSTREAM_API_KEY", ""),
+        "include_aisstream_in_range": "false", "trail_mode": "all", "show_aisstream_on_map": "true",
+        "sdr_enabled": "true", "udp_enabled": "true", "udp_port": str(UDP_PORT),
     }
+    for k, v in defaults.items():
+        if k not in settings:
+            settings[k] = v
+    return settings
 
 async def broadcast(data: dict):
     if not connected_clients:
@@ -374,30 +379,31 @@ async def enrichment_worker():
         except Exception as e: logger.error(f"Enrichment worker error: {e}"); await asyncio.sleep(5.0)
 
 async def process_ais_data(data: dict):
+    mmsi_val = data.get("mmsi")
+    if not mmsi_val: return
+    mmsi_str = str(mmsi_val)
+    lat, lon = data.get("lat"), data.get("lon")
+    msg_type = data.get("type", 0)
+    ship_name = data.get("shipname") or data.get("name")
+    source = data.get("source", "local")
+
+    if source == "aisstream":
+        if mmsi_str in local_vessels and time.time() - local_vessels[mmsi_str] < 600: return
+    else: local_vessels[mmsi_str] = time.time()
+
+    if data.get("is_safety"):
+        safety_msg = {"type": "safety_alert", "mmsi": mmsi_str, "text": data.get("safety_text", ""), "is_broadcast": data.get("is_broadcast_alert", False), "timestamp": int(datetime.now().timestamp() * 1000)}
+        for ws in list(connected_clients):
+            try: await ws.send_json(safety_msg)
+            except Exception: pass
+        return
+
     try:
-        mmsi_val = data.get("mmsi")
-        if not mmsi_val: return
-        mmsi_str = str(mmsi_val)
-        lat, lon = data.get("lat"), data.get("lon")
-        msg_type = data.get("type", 0)
-        ship_name = data.get("shipname") or data.get("name")
-        settings = await get_all_settings()
-        source = data.get("source", "local")
-
-        if source == "aisstream":
-            if mmsi_str in local_vessels and time.time() - local_vessels[mmsi_str] < 600: return
-        else: local_vessels[mmsi_str] = time.time()
-
-        if data.get("is_safety"):
-            safety_msg = {"type": "safety_alert", "mmsi": mmsi_str, "text": data.get("safety_text", ""), "is_broadcast": data.get("is_broadcast_alert", False), "timestamp": int(datetime.now().timestamp() * 1000)}
-            for ws in list(connected_clients):
-                try: await ws.send_json(safety_msg)
-                except Exception: pass
-            return
-
-        if msg_type in [5, 24] and lat is None:
-            if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
-            async with db_session() as db:
+        async with db_session() as db:
+            settings = await get_all_settings(db)
+            
+            if msg_type in [5, 24] and lat is None:
+                if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
                 async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                     row = await cursor.fetchone()
                     reset_count = False
@@ -425,39 +431,34 @@ async def process_ais_data(data: dict):
                 if to_b is not None and to_s is not None: await db.execute("UPDATE ships SET length = ? WHERE mmsi = ?", (to_b + to_s, mmsi_str))
                 if to_p is not None and to_st is not None: await db.execute("UPDATE ships SET width = ? WHERE mmsi = ?", (to_p + to_st, mmsi_str))
                 await db.commit()
-            return
+                return
 
-        if (lat is None or lon is None) and msg_type != 8: return
+            if (lat is None or lon is None) and msg_type != 8: return
+            
+            is_meteo = data.get("is_meteo", False) or msg_type in [4, 8]
+            if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
         
-        is_meteo = data.get("is_meteo", False) or msg_type in [4, 8]
-        if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
-    
-        ship_data = {
-            "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
-            "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype"),
-            "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
-            "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": data.get("is_aton", False),
-            "is_sar": data.get("is_sar", False), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
-            "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
-            "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False), "is_advanced_binary": data.get("is_advanced_binary", False),
-            "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
-            "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
-            "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
-            "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure")
-        }
+            ship_data = {
+                "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
+                "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype"),
+                "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
+                "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": data.get("is_aton", False),
+                "is_sar": data.get("is_sar", False), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
+                "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
+                "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False), "is_advanced_binary": data.get("is_advanced_binary", False),
+                "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
+                "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
+                "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
+                "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure")
+            }
 
-        if ship_data.get("is_advanced_binary") and not ship_data.get("status_text"):
-            dac = ship_data.get("dac")
-            fid = ship_data.get("fid")
-            if dac is not None and fid is not None:
-                ship_data["status_text"] = f"Advanced Binary (DAC:{dac}, FI:{fid})"
-            else:
-                ship_data["status_text"] = "Advanced Binary Message"
+            if ship_data.get("is_advanced_binary") and not ship_data.get("status_text"):
+                dac, fid = ship_data.get("dac"), ship_data.get("fid")
+                ship_data["status_text"] = f"Advanced Binary (DAC:{dac}, FI:{fid})" if dac is not None and fid is not None else "Advanced Binary Message"
 
-        if ship_data.get("sog") is not None and ship_data["sog"] < 0.1:
-            if data.get("nav_status") in [0, 8]: ship_data["status_text"] = "Moored (Stationary)"; ship_data["nav_status"] = 5
+            if ship_data.get("sog") is not None and ship_data["sog"] < 0.1:
+                if data.get("nav_status") in [0, 8]: ship_data["status_text"] = "Moored (Stationary)"; ship_data["nav_status"] = 5
 
-        async with db_session() as db:
             async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 row = await cursor.fetchone()
                 reset_count = False
@@ -471,8 +472,7 @@ async def process_ais_data(data: dict):
             is_new_v = row is None
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
             
-            flds = ["last_seen = CURRENT_TIMESTAMP", "message_count = message_count + 1"]
-            vals = []
+            flds, vals = ["last_seen = CURRENT_TIMESTAMP", "message_count = message_count + 1"], []
             for f, k in [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type"), ("wind_speed", "wind_speed"), ("wind_gust", "wind_gust"), ("wind_direction", "wind_direction"), ("water_level", "water_level"), ("air_temp", "air_temp"), ("air_pressure", "air_pressure")]:
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(v)
@@ -491,11 +491,9 @@ async def process_ais_data(data: dict):
                     await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, now_ms))
             
             # Stats
-            today = datetime.utcnow().strftime('%Y-%m-%d')
-            time_min = datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+            today, time_min = datetime.utcnow().strftime('%Y-%m-%d'), datetime.utcnow().strftime('%Y-%m-%d %H:%M')
             await db.execute('INSERT INTO daily_stats (date, total_messages) VALUES (?, 1) ON CONFLICT(date) DO UPDATE SET total_messages = total_messages + 1', (today,))
-            current_h = datetime.utcnow().hour
-            await db.execute('INSERT INTO hourly_stats (date, hour, message_count) VALUES (?, ?, 1) ON CONFLICT(date, hour) DO UPDATE SET message_count = message_count + 1', (today, current_h))
+            await db.execute('INSERT INTO hourly_stats (date, hour, message_count) VALUES (?, ?, 1) ON CONFLICT(date, hour) DO UPDATE SET message_count = message_count + 1', (today, datetime.utcnow().hour))
             await db.execute('INSERT INTO minute_stats (time_min, total_messages) VALUES (?, 1) ON CONFLICT(time_min) DO UPDATE SET total_messages = total_messages + 1', (time_min,))
             try:
                 await db.execute('INSERT INTO daily_mmsi (date, mmsi) VALUES (?, ?)', (today, mmsi_str))
@@ -538,11 +536,7 @@ async def process_ais_data(data: dict):
                         if r[24] is not None: ship_data["fid"] = r[24]
                         if r[25]: ship_data["raw_payload"] = r[25]
                         if len(r) > 26:
-                            ship_data["wind_speed"] = r[26]
-                            ship_data["wind_gust"] = r[27]
-                            ship_data["wind_direction"] = r[28]
-                            ship_data["water_level"] = r[29]
-                            ship_data["air_temp"] = r[30]
+                            ship_data["wind_speed"], ship_data["wind_gust"], ship_data["wind_direction"], ship_data["water_level"], ship_data["air_temp"] = r[26], r[27], r[28], r[29], r[30]
                             if len(r) > 31: ship_data["air_pressure"] = r[31]
             
             if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
@@ -550,24 +544,15 @@ async def process_ais_data(data: dict):
                     c = int(ship_data["shiptype"])
                     ship_data["ship_type_text"], ship_data["ship_category"] = get_ship_type_name(c), get_ship_category(c)
                 except Exception: pass
+            
             # Range tracking
             origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
-            include_aisstream = settings.get("include_aisstream_in_range") == "true"
-            
-            should_track_range = (source != "aisstream" or include_aisstream) and \
-                                origin_lat and origin_lon and \
-                                not is_meteo and \
-                                not ship_data.get("is_aton") and \
-                                not ship_data.get("is_sar") and \
-                                not mmsi_str.startswith("99")
-                                
-            if should_track_range:
+            if (source != "aisstream" or settings.get("include_aisstream_in_range") == "true") and \
+               origin_lat and origin_lon and not is_meteo and not ship_data.get("is_aton") and \
+               not ship_data.get("is_sar") and not mmsi_str.startswith("99"):
                 try:
                     dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
-                    # Lower limit 1.0 km to avoid station self-noise, upper 370km (~200nm)
-                    # message_count >= 1 allows immediate update
-                    msg_count = ship_data.get("message_count", 0)
-                    if msg_count >= 1 and 1.0 <= dist <= 370.4:
+                    if ship_data.get("message_count", 0) >= 1 and 1.0 <= dist <= 370.4:
                         bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
                         sector = int(bearing // 5) % 72
                         async with db.execute('SELECT range_km_24h, range_km_alltime FROM coverage_sectors WHERE sector_id = ?', (sector,)) as cursor:
@@ -577,18 +562,16 @@ async def process_ais_data(data: dict):
                             if dist > rng_24h: rng_24h = dist; updated = True
                             if dist > rng_all: rng_all = dist; updated = True
                             if updated or not row:
-                                logger.debug(f"[Range] Updating sector {sector} for MMSI {mmsi_str}: {dist:.2f} km")
                                 await db.execute('INSERT INTO coverage_sectors (sector_id, range_km_24h, range_km_alltime, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(sector_id) DO UPDATE SET range_km_24h = ?, range_km_alltime = ?, last_updated = CURRENT_TIMESTAMP', (sector, rng_24h, rng_all, rng_24h, rng_all))
                                 await db.execute('UPDATE daily_stats SET max_range_km = ? WHERE date = ? AND ? > max_range_km', (dist, today, dist))
                                 await db.execute('INSERT INTO sector_history (sector_id, distance_km, timestamp) VALUES (?, ?, ?)', (sector, dist, int(datetime.utcnow().timestamp() * 1000)))
-                                await db.commit()
                                 await broadcast({"type": "coverage_update", "sector_id": sector, "range_km_24h": rng_24h, "range_km_alltime": rng_all})
-                except Exception as e:
-                    logger.error(f"Error in range tracking: {e}")
+                except Exception as e: logger.error(f"Range err: {e}")
 
             await db.commit()
-        await broadcast(ship_data)
-    except Exception as e: logger.error(f"Error for MMSI {data.get('mmsi')}: {e}")
+            await broadcast(ship_data)
+    except Exception as e:
+        logger.error(f"Error for MMSI {mmsi_str}: {e}")
 
 class UDPProtocol(asyncio.DatagramProtocol):
     def connection_made(self, transport):

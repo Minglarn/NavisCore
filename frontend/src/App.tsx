@@ -140,6 +140,33 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) 
         default: return "Unknown Type";
     }
 }
+ 
+const aisShipTypes = [
+    { value: 0, label: "Not available" },
+    { value: 30, label: "Fishing" },
+    { value: 31, label: "Towing" },
+    { value: 32, label: "Towing (Large)" },
+    { value: 33, label: "Dredging/Underwater" },
+    { value: 34, label: "Diving ops" },
+    { value: 35, label: "Military ops" },
+    { value: 36, label: "Sailing" },
+    { value: 37, label: "Pleasure Craft" },
+    { value: 50, label: "Pilot Vessel" },
+    { value: 51, label: "S.A.R" },
+    { value: 52, label: "Tug" },
+    { value: 53, label: "Port Tender" },
+    { value: 54, label: "Anti-pollution" },
+    { value: 55, label: "Law Enforcement" },
+    { value: 56, label: "Local Vessel" },
+    { value: 57, label: "Local Vessel" },
+    { value: 58, label: "Medical Transport" },
+    { value: 59, label: "Noncombatant ship" },
+    { value: 60, label: "Passenger" },
+    { value: 70, label: "Cargo" },
+    { value: 80, label: "Tanker" },
+    { value: 90, label: "Other Type" }
+];
+
 
 
 function getCountryName(countryCode?: string) {
@@ -904,6 +931,8 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
     const [uploading, setUploading] = useState(false);
     const [localImage, setLocalImage] = useState<string | null>(null);
 
+    const mmsiStr = ship ? String(ship.mmsi) : '';
+
     const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
         const saved = localStorage.getItem('naviscore_expanded_sections');
         return saved ? JSON.parse(saved) : { "Navigation & Signal": true };
@@ -949,8 +978,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
 
     if (!isOpen || !ship) return null;
 
-    const mmsiStr = String(ship.mmsi);
-    
+
     return (
         <div style={{ 
             position: 'fixed', right: 0, top: 0, bottom: 0, width: '420px', 
@@ -1011,7 +1039,6 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                 <div>
                     <div style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Destination</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: colors.textMain, fontSize: '0.95rem' }}>
-                        <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
                         {ship.destination || '--'}
                     </div>
                 </div>
@@ -1108,6 +1135,23 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         <AccordionRow 
                             label="Width" 
                             value={isEditing ? <input type="number" value={editData.width || ''} onChange={e => setEditData({...editData, width: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.width ? `${ship.width}m` : 'N/A')} 
+                            colors={colors} 
+                        />
+                        <AccordionRow 
+                            label="Type" 
+                            value={isEditing ? (
+                                <select 
+                                    value={editData.shiptype || 0} 
+                                    onChange={e => setEditData({...editData, shiptype: parseInt(e.target.value)})}
+                                    style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800, cursor: 'pointer', outline: 'none' }}
+                                >
+                                    {aisShipTypes.map(t => (
+                                        <option key={t.value} value={t.value} style={{ background: colors.bgCard }}>
+                                            {t.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : getShipTypeName(mmsiStr, ship.shiptype, ship.ship_type_text)} 
                             colors={colors} 
                         />
                     </div>

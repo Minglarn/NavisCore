@@ -1,98 +1,69 @@
 # NavisCore 📡
 
-**NavisCore** is a comprehensive, autonomous AIS (Automatic Identification System) receiver and visualization platform. It features a modern SDR receiver, a Python-powered data processing engine, and a sleek React-based dashboard.
+**NavisCore** is an advanced, autonomous AIS (Automatic Identification System) receiving and visualization platform. It combines a high-performance SDR receiver with a Python-powered data engine and a premium React dashboard to provide real-time maritime situational awareness.
 
 ![Screenshot](https://github.com/Minglarn/NavisCore/blob/main/screenshot.png?raw=true)
 
-## Key Features
-- **All-in-One Solution**: Frontend, backend, and database packaged in a multi-stage Docker image.
-- **ITU-R M.1371-5 Standard**: Full support for international ship type codes with dynamic hazard mapping.
-- **Smart Image Persistence**: Automatically fetches vessel images with a 24h retry logic for missing images and 30-day cache for real ship photos.
-- **Real-time Map**: Interactive map with real-time ship positions, COG (Course Over Ground) lines, and persistence (saves your zoom/center).
-- **RF Resilience**: Intelligent range limiting (200 Nm) to filter out unrealistic tropo-propogation data from statistics.
-- **SDR Management UI**: Configure tuner gain and frequency correction (PPM) directly from the dashboard settings.
-- **Hybrid Data Feed**: Seamlessly integrates real-time AIS data from [AisStream.io](https://aisstream.io) alongside local SDR data with intelligent deduplication.
-- **Mock Mode**: Development-friendly mode to generate simulated AIS traffic without an SDR device.
+## 🚀 Key Features
 
-## Architecture
-1. **SDR (AIS-catcher)**: Interacts with the RTL-SDR hardware using the modern [AIS-catcher](https://github.com/jvde-github/AIS-catcher) receiver, decodes radio signals, and publishes NMEA 0183 data via UDP (Port 10110).
-2. **Backend (Python/FastAPI)**: Processes AIS messages, enriches data with vessel images, and broadcasts real-time updates via WebSockets.
-3. **Frontend (React/Vite)**: High-performance dashboard utilizing Leaflet for mapping and Lucide for iconography.
+- **All-in-One Docker Solution**: Fully containerized environment with separate services for SDR decoding and data processing.
+- **High Concurrency Database**: Optimized SQLite engine using **Write-Ahead Logging (WAL)** and centralized session management for lock-free performance under heavy traffic.
+- **Standardized Ship Mapping**: Full support for **ITU-R M.1371-5** AIS standards, including a smart editable ship category system with predefined dropdowns.
+- **Smart Data Hybridization**: Seamless integration of local SDR data (via [AIS-catcher](https://github.com/jvde-github/AIS-catcher)) and global feeds from [AisStream.io](https://aisstream.io) with intelligent deduplication.
+- **Vessel Enrichment**: Automatic vessel image fetching with intelligent caching (30-day persistence) and fallback logic.
+- **Advanced Visualization**: Sleek, high-performance map featuring real-time tracking, COG lines, and persistent user settings (zoom, center, layer preferences).
+- **Proactive Monitoring**: Built-in support for safety alerts, emergency signals, and advanced binary message decoding.
 
-## Prerequisites
-- **Docker & Docker Compose**
-- **RTL-SDR USB Stick** (Optional: only if you want to receive local radio signals)
-- **MQTT Broker** (Optional: NavisCore can also receive AIS data via MQTT)
+## 🛠 Architecture
 
-## Data Sources
-NavisCore is highly flexible and can receive AIS traffic from multiple sources:
-- **Local SDR**: Built-in support for RTL-SDR hardware via the `sdr` container.
-- **MQTT Interface**: Can subscribe to AIS NMEA strings on a remote MQTT broker.
-- **Mock Mode**: Generates simulated traffic for testing and demonstration.
-- **UDP Push**: Accepts NMEA data pushed to port `10110/udp`.
-- **AisStream.io Hybrid**: Real-time global AIS feed via WebSockets (requires API key).
+NavisCore is built with a modern, modular architecture:
 
-## Quick Start
+1.  **SDR Layer (AIS-catcher)**: Directly interfaces with RTL-SDR hardware. Decodes NMEA 0183 sentences and streams them via UDP.
+2.  **Processing Engine (FastAPI)**: A high-performance Python backend that handles NMEA parsing, database persistence, and enrichment worker queues.
+3.  **Real-time Layer (WebSockets)**: Provides sub-second updates to all connected clients.
+4.  **UI Layer (React/Vite)**: A premium, responsive dashboard built with modern CSS and Leaflet.
 
-The easiest way to run NavisCore is using the pre-built images from GitHub Container Registry.
+## 📦 Quick Start
 
-1. **Create a `docker-compose.yml` file**:
-```yaml
-version: '3.8'
+The easiest way to get started is with Docker Compose.
 
-services:
-  sdr:
-    image: ghcr.io/minglarn/naviscore-sdr:latest
-    container_name: naviscore_sdr
-    restart: always
-    # Avkommentera 'devices' för att tillåta USB-åtkomst på Linux/Raspberry Pi
-    devices:
-      - /dev/bus/usb:/dev/bus/usb
-    environment:
-      - SDR_INDEX=0 # Välj vilket USB-gränssnitt/enhet (Standard: 0)
-    volumes:
-      - ./sdr/udev-rules:/etc/udev/rules.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "lsusb | grep -i 'Realtek' || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+1.  **Configure `docker-compose.yml`**:
+    ```yaml
+    services:
+      sdr:
+        image: ghcr.io/minglarn/naviscore-sdr:latest
+        devices:
+          - /dev/bus/usb:/dev/bus/usb
+        environment:
+          - SDR_INDEX=0
+        networks:
+          - navis_net
+
+      app:
+        image: ghcr.io/minglarn/naviscore-app:latest
+        ports:
+          - "80:80"
+          - "10110:10110/udp"
+        volumes:
+          - ./data:/app/data
+        networks:
+          - navis_net
+
     networks:
-      - navis_net
+      navis_net:
+        driver: bridge
+    ```
 
-  app:
-    image: ghcr.io/minglarn/naviscore-app:latest
-    container_name: naviscore_app
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "10110:10110/udp"
-    environment:
-      - MOCK_MODE=false
-      - LOG_LEVEL=info
-    volumes:
-      - ./data:/app/data
-    depends_on:
-      - sdr
-    networks:
-      - navis_net
+2.  **Launch**:
+    ```bash
+    docker-compose up -d
+    ```
 
-networks:
-  navis_net:
-    driver: bridge
-```
+3.  **Explore**: Access the dashboard at `http://localhost`.
 
-2. **Start the application**:
-```bash
-docker-compose up -d
-```
+## 🔧 Development
 
-3. **Access the Dashboard**:
-Open `http://localhost` in your browser.
-
-## Development & Build from Source
-
-If you want to modify NavisCore and build it yourself:
+Build from source to customize the experience:
 
 ```bash
 git clone https://github.com/Minglarn/NavisCore.git
@@ -101,30 +72,12 @@ docker-compose up -d --build
 ```
 
 ### Mock Mode
-If you don't have an SDR device connected, set `MOCK_MODE=true` in the `app` service environment variables in `docker-compose.yml` to see simulated ship traffic in the Stockholm archipelago.
+No SDR? No problem. Set `MOCK_MODE=true` in the `app` environment to see simulated traffic in the Stockholm archipelago.
 
-### External AIS Source (UDP Only – No Built-in SDR)
-If you already run an external AIS-catcher, `rtl_ais`, or any other AIS decoder, you can skip the `sdr` container entirely and just send NMEA data to NavisCore over UDP port `10110`.
+## 📡 External Data Sources
+- **UDP Ingest**: Accepts NMEA data on port `10110/udp`.
+- **MQTT**: Subscribe to remote AIS topics.
+- **Hybrid Feed**: Enable `AisStream.io` in settings for global coverage.
 
-```yaml
-services:
-  app:
-    image: ghcr.io/minglarn/naviscore-app:latest
-    container_name: naviscore_app
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "10110:10110/udp"
-    environment:
-      - MOCK_MODE=false
-    volumes:
-      - ./data:/app/data
-```
-
-Then point your external decoder to send NMEA sentences to `<NavisCore-IP>:10110/udp`. Example with AIS-catcher:
-```bash
-AIS-catcher -u <NavisCore-IP> 10110
-```
-
-## Support & Contributing
-Feel free to open issues or pull requests on [GitHub](https://github.com/Minglarn/NavisCore).
+## 📄 License & Contributing
+Contributions are welcome! Feel free to open issues or submit pull requests.
