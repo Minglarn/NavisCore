@@ -80,10 +80,18 @@ docker-compose up -d --build
 ### Mock Mode
 No SDR? No problem. Set `MOCK_MODE=true` in the `app` environment to see simulated traffic in the Stockholm archipelago.
 
-## 📡 External Data Sources
-- **UDP Ingest**: Accepts NMEA data on port `10110/udp`.
-- **MQTT**: Subscribe to remote AIS topics.
-- **Hybrid Feed**: Enable `AisStream.io` in settings for global coverage.
+## 📡 Data Sources & Hybrid Feed
+
+NavisCore is designed to be a central hub for maritime data:
+
+- **Local SDR Layer**: Interfaces with RTL-SDR hardware to decode local traffic.
+- **UDP Ingest**: Accepts NMEA data from external decoders on port `10110/udp`.
+- **MQTT**: Subscribe to remote AIS topics for distributed monitoring.
+- **AisStream.io (Hybrid)**: This is a powerful feature that allows you to fetch real-time global AIS data.
+  - **API Key Required**: To use this, you need a free API key from [AisStream.io](https://aisstream.io).
+  - **Interactive Bounding Box**: You can define the geographic area you want to monitor directly on the map. Open **Settings -> Hybrid Data** and click **"Välj område på kartan"** to drag a selection box.
+  - **Coordinate System**: The system uses decimal degrees (WGS84). A Bounding Box is defined by its South-West (min lat, min lon) and North-East (max lat, max lon) corners.
+  - **Auto-Sync**: The backend automatically restarts the stream filtering as soon as you save your new coordinates.
 
 ## 📄 License & Contributing
 Contributions are welcome! Feel free to open issues or submit pull requests.

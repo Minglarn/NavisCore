@@ -189,39 +189,62 @@ def translate_aisstream_message(msg: dict) -> dict:
         logger.error(f"Error translating AisStream message: {e}")
         return None
 
+async def restart_aisstream():
+    global aisstream_task
+    if aisstream_task:
+        logger.info("Cancelling existing AisStream task...")
+        aisstream_task.cancel()
+        try: await aisstream_task
+        except asyncio.CancelledError: pass
+    aisstream_task = asyncio.create_task(aisstream_loop())
+    logger.info("New AisStream task started.")
+
 async def aisstream_loop():
     import websockets
     logger.info("AisStream.io background task started.")
-    while True:
-        try:
-            settings = await get_all_settings()
-            enabled = settings.get("aisstream_enabled") == "true"
-            api_key = settings.get("aisstream_api_key")
-            if not enabled or not api_key:
-                await asyncio.sleep(15)
-                continue
-            url = "wss://stream.aisstream.io/v0/stream"
-            logger.info(f"Connecting to AisStream.io at {url}...")
-            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
-                sub_msg = {
-                    "APIKey": api_key,
-                    "BoundingBoxes": [[[56.5, 15.5], [60.0, 21.0]]],
-                    "FiltersShipMMSI": [],
-                    "FilterMessageTypes": ["PositionReport", "ShipStaticData", "AidsToNavigationReport", "StandardSearchAndRescueAircraftReport", "SafetyBroadcastMessage"]
-                }
-                await ws.send(json.dumps(sub_msg))
-                logger.info("AisStream.io subscription sent successfully.")
-                async for message in ws:
-                    try:
-                        msg_json = json.loads(message)
-                        translated = translate_aisstream_message(msg_json)
-                        if translated:
-                            asyncio.create_task(process_ais_data(translated))
-                    except Exception as inner_e:
-                        logger.error(f"Error processing AisStream message: {inner_e}")
-        except Exception as e:
-            logger.error(f"AisStream.io loop error: {e}")
-            await asyncio.sleep(10)
+    try:
+        while True:
+            try:
+                settings = await get_all_settings()
+                enabled = settings.get("aisstream_enabled") == "true"
+                api_key = settings.get("aisstream_api_key")
+                if not enabled or not api_key:
+                    await asyncio.sleep(15)
+                    continue
+                
+                # Get dynamic bounding box
+                try:
+                    sw_lat = float(settings.get("aisstream_sw_lat", "56.5"))
+                    sw_lon = float(settings.get("aisstream_sw_lon", "15.5"))
+                    ne_lat = float(settings.get("aisstream_ne_lat", "60.0"))
+                    ne_lon = float(settings.get("aisstream_ne_lon", "21.0"))
+                except (ValueError, TypeError):
+                    sw_lat, sw_lon, ne_lat, ne_lon = 56.5, 15.5, 60.0, 21.0
+
+                url = "wss://stream.aisstream.io/v0/stream"
+                logger.info(f"Connecting to AisStream.io with BBox: SW({sw_lat},{sw_lon}) NE({ne_lat},{ne_lon})")
+                async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                    sub_msg = {
+                        "APIKey": api_key,
+                        "BoundingBoxes": [[[sw_lat, sw_lon], [ne_lat, ne_lon]]],
+                        "FiltersShipMMSI": [],
+                        "FilterMessageTypes": ["PositionReport", "ShipStaticData", "AidsToNavigationReport", "StandardSearchAndRescueAircraftReport", "SafetyBroadcastMessage"]
+                    }
+                    await ws.send(json.dumps(sub_msg))
+                    logger.info("AisStream.io subscription sent successfully.")
+                    async for message in ws:
+                        try:
+                            msg_json = json.loads(message)
+                            translated = translate_aisstream_message(msg_json)
+                            if translated:
+                                asyncio.create_task(process_ais_data(translated))
+                        except Exception as inner_e:
+                            logger.error(f"Error processing AisStream message: {inner_e}")
+            except Exception as e:
+                logger.error(f"AisStream.io loop error: {e}")
+                await asyncio.sleep(10)
+    except asyncio.CancelledError:
+        logger.info("AisStream.io task cancelled.")
 
 def haversine_distance(lat1, lon1, lat2, lon2):
     R = 6371.0
@@ -678,7 +701,7 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_ship_history_mmsi_ts ON ship_history (mmsi, timestamp)")
         await db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
-        for k, v in [('history_duration', '60'), ('show_names_on_map', 'true'), ('units', 'nautical'), ('ship_size', '1.0'), ('circle_size', '1.0'), ('trail_size', '2.0'), ('aisstream_enabled', 'false'), ('aisstream_api_key', ''), ('trail_mode', 'all'), ('show_aisstream_on_map', 'true'), ('sdr_enabled', 'true'), ('udp_enabled', 'true'), ('udp_port', str(UDP_PORT))]:
+        for k, v in [('history_duration', '60'), ('show_names_on_map', 'true'), ('units', 'nautical'), ('ship_size', '1.0'), ('circle_size', '1.0'), ('trail_size', '2.0'), ('aisstream_enabled', 'false'), ('aisstream_api_key', ''), ('aisstream_sw_lat', '56.5'), ('aisstream_sw_lon', '15.5'), ('aisstream_ne_lat', '60.0'), ('aisstream_ne_lon', '21.0'), ('trail_mode', 'all'), ('show_aisstream_on_map', 'true'), ('sdr_enabled', 'true'), ('udp_enabled', 'true'), ('udp_port', str(UDP_PORT))]:
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
         await db.execute('CREATE TABLE IF NOT EXISTS coverage_sectors (sector_id INTEGER PRIMARY KEY, range_km_24h REAL DEFAULT 0.0, range_km_alltime REAL DEFAULT 0.0, last_updated DATETIME)')
         await db.execute('CREATE TABLE IF NOT EXISTS daily_stats (date TEXT PRIMARY KEY, unique_ships INTEGER DEFAULT 0, new_ships INTEGER DEFAULT 0, total_messages INTEGER DEFAULT 0, max_range_km REAL DEFAULT 0.0)')
@@ -691,7 +714,7 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS sector_history (sector_id INTEGER, distance_km REAL, timestamp INTEGER)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_sector_history_ts ON sector_history (timestamp)')
         await db.commit()
-    asyncio.create_task(start_udp_listener()); restart_mqtt(); asyncio.create_task(mock_mode_loop()); asyncio.create_task(purge_job()); asyncio.create_task(coverage_24h_reset_job()); asyncio.create_task(aisstream_loop()); asyncio.create_task(enrichment_worker())
+    asyncio.create_task(start_udp_listener()); restart_mqtt(); asyncio.create_task(mock_mode_loop()); asyncio.create_task(purge_job()); asyncio.create_task(coverage_24h_reset_job()); await restart_aisstream(); asyncio.create_task(enrichment_worker())
 
 @app.get("/api/ships")
 async def get_ships():
@@ -819,6 +842,8 @@ async def set_settings_api(settings: dict):
     if str(settings.get("origin_lat")) != old.get("origin_lat") or str(settings.get("origin_lon")) != old.get("origin_lon"):
         async with db_session() as db: await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0'); await db.commit()
     if settings.get("udp_port") or settings.get("udp_enabled"): asyncio.create_task(start_udp_listener())
+    if any(k in settings for k in ["aisstream_enabled", "aisstream_api_key", "aisstream_sw_lat", "aisstream_sw_lon", "aisstream_ne_lat", "aisstream_ne_lon"]):
+        await restart_aisstream()
     restart_mqtt(); return {"success": True, "settings": await get_all_settings()}
 
 @app.get("/api/coverage")

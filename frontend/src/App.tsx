@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents, ZoomControl } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents, ZoomControl, Rectangle } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -42,7 +42,7 @@ function CenterButton({ originLat, originLon }: { originLat: number, originLon: 
     if (isNaN(originLat) || isNaN(originLon)) return null;
     return (
         <div style={{
-            position: 'absolute', bottom: '25px', left: '10px', zIndex: 1000
+            position: 'absolute', bottom: '100px', left: '10px', zIndex: 1000
         }}>
             <button
                 onClick={() => map.flyTo([originLat, originLon], map.getZoom(), { duration: 1.2 })}
@@ -1789,6 +1789,45 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     Get your free key at <a href="https://aisstream.io" target="_blank" rel="noreferrer" style={{color: '#44aaff'}}>aisstream.io</a>.
                                 </div>
                             </div>
+
+                            <div className="settings-section-title" style={{ marginTop: '20px' }}>Geographical Area (Bounding Box)</div>
+                            <div className="description" style={{ marginBottom: '15px' }}>
+                                Definiera det område som strömmen ska hämta data för. Du kan dra en box på kartan för att välja området.
+                            </div>
+                            
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                                <div className="form-group vertical">
+                                    <label>South West Lat</label>
+                                    <input type="number" step="0.001" value={settings.aisstream_sw_lat} onChange={e => setSettings({...settings, aisstream_sw_lat: e.target.value})} />
+                                </div>
+                                <div className="form-group vertical">
+                                    <label>South West Lon</label>
+                                    <input type="number" step="0.001" value={settings.aisstream_sw_lon} onChange={e => setSettings({...settings, aisstream_sw_lon: e.target.value})} />
+                                </div>
+                                <div className="form-group vertical">
+                                    <label>North East Lat</label>
+                                    <input type="number" step="0.001" value={settings.aisstream_ne_lat} onChange={e => setSettings({...settings, aisstream_ne_lat: e.target.value})} />
+                                </div>
+                                <div className="form-group vertical">
+                                    <label>North East Lon</label>
+                                    <input type="number" step="0.001" value={settings.aisstream_ne_lon} onChange={e => setSettings({...settings, aisstream_ne_lon: e.target.value})} />
+                                </div>
+                            </div>
+
+                            <button 
+                                className="styled-button" 
+                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px' }}
+                                onClick={() => {
+                                    // Start selection mode
+                                    onClose(); // Hide settings
+                                    // Wait for modal to close then enter mode
+                                    setTimeout(() => {
+                                        window.dispatchEvent(new CustomEvent('naviscore_enter_selection'));
+                                    }, 300);
+                                }}
+                            >
+                                <Radar size={18} /> Välj område på kartan
+                            </button>
                             <div className="form-group" style={{ marginTop: '10px' }}>
                                 <label>Show internet vessels on main map</label>
                                 <Toggle
@@ -1885,9 +1924,19 @@ export default function App() {
         udp_enabled: 'true',
         udp_port: '10110',
         vessel_detail_view: 'sidebar',
-        cluster_break_zoom: '11'
+        cluster_break_zoom: '11',
+        aisstream_sw_lat: '56.5',
+        aisstream_sw_lon: '15.5',
+        aisstream_ne_lat: '60.0',
+        aisstream_ne_lon: '21.0'
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    
+    // Selection Mode for BoundingBox
+    const [isSelectionMode, setIsSelectionMode] = useState(false);
+    const [selectionStart, setSelectionStart] = useState<L.LatLng | null>(null);
+    const [currentSelection, setCurrentSelection] = useState<[L.LatLng, L.LatLng] | null>(null);
+
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
     const [isNmeaModalOpen, setIsNmeaModalOpen] = useState(false);
     const [nmeaLogs, setNmeaLogs] = useState<any[]>([]);
@@ -2000,7 +2049,11 @@ export default function App() {
                     udp_enabled: data.udp_enabled || 'true',
                     udp_port: data.udp_port || '10110',
                     vessel_detail_view: data.vessel_detail_view || 'sidebar',
-                    cluster_break_zoom: data.cluster_break_zoom || '11'
+                    cluster_break_zoom: data.cluster_break_zoom || '11',
+                    aisstream_sw_lat: data.aisstream_sw_lat || '56.5',
+                    aisstream_sw_lon: data.aisstream_sw_lon || '15.5',
+                    aisstream_ne_lat: data.aisstream_ne_lat || '60.0',
+                    aisstream_ne_lon: data.aisstream_ne_lon || '21.0'
                 });
                 setLocalTimeoutStr(data.ship_timeout || '60');
                 setTheme(data.map_style === 'dark' ? 'dark' : 'light');
@@ -2167,6 +2220,42 @@ export default function App() {
             document.head.removeChild(style);
         };
     }, []);
+
+    // Handle selection mode from settings
+    useEffect(() => {
+        const handleEnter = () => setIsSelectionMode(true);
+        window.addEventListener('naviscore_enter_selection', handleEnter);
+        return () => window.removeEventListener('naviscore_enter_selection', handleEnter);
+    }, []);
+
+    const confirmSelection = () => {
+        if (currentSelection) {
+            const [p1, p2] = currentSelection;
+            const sw_lat = Math.min(p1.lat, p2.lat).toFixed(4);
+            const sw_lon = Math.min(p1.lng, p2.lng).toFixed(4);
+            const ne_lat = Math.max(p1.lat, p2.lat).toFixed(4);
+            const ne_lon = Math.max(p1.lng, p2.lng).toFixed(4);
+            
+            setMqttSettings(prev => ({
+                ...prev,
+                aisstream_sw_lat: sw_lat,
+                aisstream_sw_lon: sw_lon,
+                aisstream_ne_lat: ne_lat,
+                aisstream_ne_lon: ne_lon
+            }));
+        }
+        setIsSelectionMode(false);
+        setSelectionStart(null);
+        setCurrentSelection(null);
+        setIsSettingsModalOpen(true); // Return to settings
+    };
+
+    const cancelSelection = () => {
+        setIsSelectionMode(false);
+        setSelectionStart(null);
+        setCurrentSelection(null);
+        setIsSettingsModalOpen(true);
+    };
 
     // Sidebar resizing logic
     useEffect(() => {
@@ -2377,6 +2466,36 @@ export default function App() {
         return null;
     }
 
+    function BoundingBoxSelector() {
+        useMapEvents({
+            mousedown: (e) => {
+                if (!isSelectionMode) return;
+                setSelectionStart(e.latlng);
+                setCurrentSelection(null);
+                e.target.dragging.disable();
+            },
+            mousemove: (e) => {
+                if (!isSelectionMode || !selectionStart) return;
+                setCurrentSelection([selectionStart, e.latlng]);
+            },
+            mouseup: (e) => {
+                if (!isSelectionMode || !selectionStart) return;
+                setCurrentSelection([selectionStart, e.latlng]);
+                setSelectionStart(null);
+                e.target.dragging.enable();
+            }
+        });
+        return currentSelection ? (
+            <Rectangle 
+                bounds={[
+                    [currentSelection[0].lat, currentSelection[0].lng],
+                    [currentSelection[1].lat, currentSelection[1].lng]
+                ]} 
+                pathOptions={{ color: '#00f0ff', weight: 2, fillOpacity: 0.1, dashArray: '5,10' }} 
+            />
+        ) : null;
+    }
+
     const showRangeRings = mqttSettings.show_range_rings === 'true';
 
     return (
@@ -2521,6 +2640,36 @@ export default function App() {
                 </div>
             </header>
 
+            {isSelectionMode && (
+                <div style={{
+                    position: 'absolute', top: '100px', left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 2000, background: 'rgba(0,0,0,0.8)', color: 'white',
+                    padding: '20px 30px', borderRadius: '12px', border: '1px solid #44aaff',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)'
+                }}>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#00f0ff' }}>Interaktivt Val</div>
+                    <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Dra en box på kartan för att välja täckningsområde.</div>
+                    <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                        <button 
+                            className="styled-button" 
+                            style={{ flex: 1, borderColor: '#ff4444', color: '#ff4444' }}
+                            onClick={cancelSelection}
+                        >
+                            Avbryt
+                        </button>
+                        <button 
+                            className="styled-button primary" 
+                            style={{ flex: 1, background: 'linear-gradient(135deg, #00f0ff 0%, #0072ff 100%)', border: 'none' }}
+                            onClick={confirmSelection}
+                            disabled={!currentSelection}
+                        >
+                            Bekräfta Val
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div style={{ flex: 1, display: 'flex', position: 'relative', minHeight: 0, overflow: 'hidden' }}>
 
                 <div style={{ flex: 1, position: 'relative' }}>
@@ -2532,6 +2681,18 @@ export default function App() {
                         <MapContainer key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
                             <CenterButton originLat={originLat} originLon={originLon} />
                             <ZoomTracker setZoom={setCurrentZoom} />
+                            {isSelectionMode && <BoundingBoxSelector />}
+                            
+                            {/* Visual representation of current BoundingBox */}
+                            {!isSelectionMode && mqttSettings.aisstream_enabled === 'true' && (
+                                <Rectangle 
+                                    bounds={[
+                                        [parseFloat(mqttSettings.aisstream_sw_lat), parseFloat(mqttSettings.aisstream_sw_lon)],
+                                        [parseFloat(mqttSettings.aisstream_ne_lat), parseFloat(mqttSettings.aisstream_ne_lon)]
+                                    ]}
+                                    pathOptions={{ color: '#44aaff', weight: 1, fill: false, opacity: 0.3, dashArray: '10,10' }}
+                                />
+                            )}
                             <LayersControl position="topright">
                                 <LayersControl.BaseLayer name="Standard Map (Minimal)" checked={mqttSettings.base_layer === 'standard' || !mqttSettings.base_layer}>
                                     <TileLayer
