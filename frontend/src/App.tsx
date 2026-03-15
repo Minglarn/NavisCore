@@ -246,7 +246,7 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     const emergencyClass = isEmergency ? 'svg-emergency-pulse' : '';
 
     let svg = '';
-    const baseHitArea = 56;
+    const baseHitArea = 24;
     const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
     if (isMeteo) {
@@ -1720,6 +1720,8 @@ export default function App() {
     const [localTimeoutStr, setLocalTimeoutStr] = useState('60');
     const [coverageSectors, setCoverageSectors] = useState<any[]>([]);
     const [flashedMmsis, setFlashedMmsis] = useState<Set<string>>(new Set());
+    const flashedMmsisRef = useRef(flashedMmsis);
+    useEffect(() => { flashedMmsisRef.current = flashedMmsis; }, [flashedMmsis]);
     const [showFlash, setShowFlash] = useState(() => localStorage.getItem('naviscore_flash') !== 'false');
 
     // Theme and Settings State
@@ -1792,7 +1794,7 @@ export default function App() {
         const hasFlash = markers.some((m: any) => {
             const iconOptions = m.options?.icon?.options;
             //@ts-ignore
-            return iconOptions?.mmsi && flashedMmsis.has(iconOptions.mmsi);
+            return iconOptions?.mmsi && flashedMmsisRef.current.has(iconOptions.mmsi);
         });
 
         let sizeClass = 'small';
@@ -1806,7 +1808,7 @@ export default function App() {
             className: `marker-cluster marker-cluster-${sizeClass}${pulseClass}`,
             iconSize: L.point(40, 40)
         } as any);
-    }, [flashedMmsis]);
+    }, []);
 
 
     const filteredShipsCount = useMemo(() => {
@@ -2243,7 +2245,7 @@ export default function App() {
                 // To avoid tooltips sticking, clear hover if user moves mouse far from ships
                 // Markers handle their own hover, but this is a safety fallback
             },
-            mousedown: () => setHoveredMmsi(null) // Hard clear on click anywhere else
+            mousedown: () => { setHoveredMmsi(null); setSelectedShipMmsi(null); } // Hard clear on click anywhere else
         });
         return null;
     }
@@ -2467,7 +2469,7 @@ export default function App() {
                                 chunkedLoading={true} 
                                 maxClusterRadius={40} 
                                 spiderfyOnMaxZoom={true}
-                                disableClusteringAtZoom={12}
+                                disableClusteringAtZoom={11}
                                 showCoverageOnHover={false}
                                 zoomToBoundsOnClick={true}
                                 iconCreateFunction={createClusterCustomIcon}
@@ -2517,7 +2519,7 @@ export default function App() {
                                             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
                                             hoverTimerRef.current = setTimeout(() => {
                                                 setHoveredMmsi(mmsiStr);
-                                            }, 1000);
+                                            }, 300);
                                         },
                                         mouseout: () => {
                                             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -2527,6 +2529,7 @@ export default function App() {
                                             // If we have a tooltip open, clear it when clicking (opening popup)
                                             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
                                             setHoveredMmsi(null);
+                                            setSelectedShipMmsi(mmsiStr);
                                         },
                                         dblclick: (e) => {
                                             // Explicitly for double click as requested
@@ -2636,7 +2639,7 @@ export default function App() {
                                         )}
 
                                         {/* Detailed Popup on Click - NOT for meteo markers */}
-                                        {!s.is_meteo && <Popup className="custom-detailed-popup" offset={[0, -20]}>
+                                        {(selectedShipMmsi === mmsiStr && !s.is_meteo) && <Popup className="custom-detailed-popup" offset={[0, -20]}>
                                             <div style={{ display: 'flex', flexDirection: 'column', width: '460px' }}>
                                                 {/* SHIP NAME HEADER */}
                                                 <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'var(--bg-card)' }}>
