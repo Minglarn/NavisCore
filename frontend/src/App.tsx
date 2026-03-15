@@ -338,19 +338,20 @@ const extraStyles = `
     border: none;
 }
 .svg-flash-fill {
-    animation: svg-fill-flash 3.0s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: icon-pop-shine 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    will-change: transform, filter;
 }
-@keyframes svg-fill-flash {
-    0% { fill: #ffff00; stroke: #ffffff; stroke-width: 4px; filter: drop-shadow(0 0 5px #ffff00); }
-    30% { fill: #ffff00; stroke: #ffffff; stroke-width: 2px; filter: drop-shadow(0 0 10px #ffff00); }
-    100% { fill: inherit; stroke: inherit; stroke-width: inherit; filter: none; }
+@keyframes icon-pop-shine {
+    0% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px yellow); }
+    20% { transform: scale(1.3); filter: brightness(3) drop-shadow(0 0 10px yellow); }
+    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 3px rgba(0,0,0,0.4)); }
 }
 .ship-flash {
-    animation: side-flash-glow 3.0s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: side-flash-pop 0.8s ease-out;
 }
-@keyframes side-flash-glow {
-    0% { background-color: rgba(255, 255, 0, 0.4) !important; box-shadow: inset 0 0 15px rgba(255, 255, 0, 0.5); }
-    100% { background-color: transparent; box-shadow: none; }
+@keyframes side-flash-pop {
+    0% { background-color: rgba(255, 255, 0, 0.6) !important; }
+    100% { background-color: transparent; }
 }
 .svg-pulse {
     animation: svg-pulse-anim 2s infinite ease-in-out;
@@ -1906,7 +1907,7 @@ export default function App() {
                                 next.delete(mmsiKey);
                                 return next;
                             });
-                        }, 3000);
+                        }, 800);
                     }
                 }
 
