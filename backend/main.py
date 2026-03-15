@@ -754,14 +754,20 @@ async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
         if file.filename:
             parts = file.filename.split(".")
             if len(parts) > 1:
-                file_ext = parts[-1].lower()
+                ext = parts[-1].lower()
+                if ext in ["jpg", "jpeg", "png", "webp"]:
+                    file_ext = ext
                 
-        # We save everything as jpg in IMAGES_DIR for simplicity, or use original extension
-        # and update DB accordingly. Let's force standard .jpg or keep extension.
-        # Actually in other places code hardcodes .jpg or /images/{mmsi}.jpg 
-        safe_filename = f"{mmsi}.jpg"
+        safe_filename = f"{mmsi}.{file_ext}"
         file_path = os.path.join(IMAGES_DIR, safe_filename)
         
+        # Remove any existing images for this MMSI with different extensions to avoid confusion
+        for ext in ["jpg", "jpeg", "png", "webp"]:
+            old_path = os.path.join(IMAGES_DIR, f"{mmsi}.{ext}")
+            if os.path.exists(old_path) and old_path != file_path:
+                try: os.remove(old_path)
+                except Exception: pass
+
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
             
@@ -780,6 +786,43 @@ async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
         return {"success": True, "imageUrl": image_url}
     except Exception as e:
         logger.error(f"Error uploading image for {mmsi}: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/ships/{mmsi}/details")
+async def update_ship_details(mmsi: str, details: dict):
+    try:
+        if not mmsi.isdigit() or len(mmsi) != 9:
+            return {"error": "Invalid MMSI"}
+            
+        upd = []
+        vals = []
+        # Allow updating specific fields
+        allowed_fields = ["name", "imo", "callsign", "shiptype", "length", "width", "destination", "draught"]
+        
+        for f in allowed_fields:
+            if f in details:
+                # Map shiptype to type in DB
+                db_field = "type" if f == "shiptype" else f
+                upd.append(f"{db_field} = ?")
+                vals.append(details[f])
+        
+        if not upd:
+            return {"error": "No valid fields to update"}
+            
+        vals.append(mmsi)
+        async with db_session() as db:
+            await db.execute(f"UPDATE ships SET {', '.join(upd)} WHERE mmsi = ?", tuple(vals))
+            await db.commit()
+            
+        # Broadcast the update (minimal)
+        broadcast_data = {"mmsi": mmsi}
+        for i, f in enumerate(upd):
+            broadcast_data[f.split(' ')[0]] = vals[i]
+        await broadcast(broadcast_data)
+        
+        return {"success": True}
+    except Exception as e:
+        logger.error(f"Error updating details for {mmsi}: {e}")
         return {"error": str(e)}
 
 @app.get("/api/settings")

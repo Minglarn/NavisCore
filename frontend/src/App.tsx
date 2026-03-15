@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents, ZoomControl } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
@@ -867,12 +867,11 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
 }
 
 
-function Accordion({ title, children, defaultOpen = false, colors }: any) {
-    const [isOpen, setIsOpen] = useState(defaultOpen);
+function Accordion({ title, children, isOpen, setIsOpen, colors }: any) {
     return (
         <div style={{ borderBottom: `1px solid ${colors.border}` }}>
             <div 
-                onClick={() => setIsOpen(!isOpen)} 
+                onClick={setIsOpen} 
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: colors.bgSidebar, cursor: 'pointer' }}
             >
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#44aaff', fontWeight: 800, fontSize: '0.85rem' }}>
@@ -905,9 +904,48 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
     const [uploading, setUploading] = useState(false);
     const [localImage, setLocalImage] = useState<string | null>(null);
 
+    const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
+        const saved = localStorage.getItem('naviscore_expanded_sections');
+        return saved ? JSON.parse(saved) : { "Navigation & Signal": true };
+    });
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_expanded_sections', JSON.stringify(expandedSections));
+    }, [expandedSections]);
+
+    const toggleSection = (title: string) => {
+        setExpandedSections(prev => ({ ...prev, [title]: !prev[title] }));
+    };
+
+    const [isEditing, setIsEditing] = useState(false);
+    const [editData, setEditData] = useState<any>({});
+
     useEffect(() => {
         setLocalImage(ship ? ship.imageUrl : null);
+        setEditData(ship ? { ...ship } : {});
     }, [ship]);
+
+    const handleSave = async () => {
+        try {
+            const isDev = window.location.port === '5173';
+            const url = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/details` : `/api/ships/${mmsiStr}/details`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(editData)
+            });
+            if (res.ok) {
+                setIsEditing(false);
+                // The update will come back via WebSocket or we can update local ship object
+                Object.assign(ship, editData);
+            } else {
+                alert("Failed to save ship details");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Error saving ship details");
+        }
+    };
 
     if (!isOpen || !ship) return null;
 
@@ -944,6 +982,26 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                     <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#44aaff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         {ship.name || 'UNKNOWN'}
                     </h2>
+                    <button 
+                        onClick={() => isEditing ? handleSave() : setIsEditing(true)}
+                        style={{ 
+                            background: isEditing ? 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)' : 'transparent', 
+                            border: isEditing ? 'none' : `1px solid ${colors.border}`, 
+                            cursor: 'pointer', color: isEditing ? '#fff' : colors.textMuted, 
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold'
+                        }}
+                    >
+                        {isEditing ? 'SPARA' : 'ÄNDRA'}
+                    </button>
+                    {isEditing && (
+                        <button 
+                            onClick={() => { setIsEditing(false); setEditData({ ...ship }); }}
+                            style={{ background: 'transparent', border: `1px solid ${colors.border}`, cursor: 'pointer', color: colors.textMuted, padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem' }}
+                        >
+                            AVBRYT
+                        </button>
+                    )}
                 </div>
                 <span style={{ fontSize: '1.8rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
             </div>
@@ -1017,18 +1075,50 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
 
             {/* Details Content */}
             <div style={{ flex: 1 }}>
-                <Accordion title="Vessel Specifications" colors={colors} defaultOpen={true}>
+            {/* Details Content */}
+            <div style={{ flex: 1 }}>
+                <Accordion 
+                    title="Vessel Specifications" 
+                    colors={colors} 
+                    isOpen={expandedSections["Vessel Specifications"] ?? true} 
+                    setIsOpen={() => toggleSection("Vessel Specifications")}
+                >
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
                         <AccordionRow label="MMSI" value={mmsiStr} colors={colors} />
-                        <AccordionRow label="IMO" value={ship.imo || 'N/A'} colors={colors} />
-                        <AccordionRow label="Callsign" value={ship.callsign || 'N/A'} colors={colors} />
-                        <AccordionRow label="Type" value={ship.ship_type_text || 'Unknown'} colors={colors} />
-                        <AccordionRow label="Length" value={ship.length ? `${ship.length}m` : 'N/A'} colors={colors} />
-                        <AccordionRow label="Width" value={ship.width ? `${ship.width}m` : 'N/A'} colors={colors} />
+                        <AccordionRow 
+                            label="IMO" 
+                            value={isEditing ? <input type="text" value={editData.imo || ''} onChange={e => setEditData({...editData, imo: e.target.value})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.imo || 'N/A')} 
+                            colors={colors} 
+                        />
+                        <AccordionRow 
+                            label="Callsign" 
+                            value={isEditing ? <input type="text" value={editData.callsign || ''} onChange={e => setEditData({...editData, callsign: e.target.value})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.callsign || 'N/A')} 
+                            colors={colors} 
+                        />
+                        <AccordionRow 
+                            label="Name" 
+                            value={isEditing ? <input type="text" value={editData.name || ''} onChange={e => setEditData({...editData, name: e.target.value})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.name || 'N/A')} 
+                            colors={colors} 
+                        />
+                        <AccordionRow 
+                            label="Length" 
+                            value={isEditing ? <input type="number" value={editData.length || ''} onChange={e => setEditData({...editData, length: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.length ? `${ship.length}m` : 'N/A')} 
+                            colors={colors} 
+                        />
+                        <AccordionRow 
+                            label="Width" 
+                            value={isEditing ? <input type="number" value={editData.width || ''} onChange={e => setEditData({...editData, width: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.width ? `${ship.width}m` : 'N/A')} 
+                            colors={colors} 
+                        />
                     </div>
                 </Accordion>
 
-                <Accordion title="Real-time Movement" colors={colors} defaultOpen={true}>
+                <Accordion 
+                    title="Real-time Movement" 
+                    colors={colors} 
+                    isOpen={expandedSections["Real-time Movement"] ?? true} 
+                    setIsOpen={() => toggleSection("Real-time Movement")}
+                >
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
                         <AccordionRow label="Status" value={ship.status_text || 'Under way'} colors={colors} />
                         <AccordionRow label="Speed (SOG)" value={ship.sog ? `${ship.sog} kn` : '0.0 kn'} colors={colors} />
@@ -1037,12 +1127,22 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                     </div>
                 </Accordion>
 
-                <Accordion title="Navigation & Signal" colors={colors}>
+                <Accordion 
+                    title="Navigation & Signal" 
+                    colors={colors} 
+                    isOpen={expandedSections["Navigation & Signal"] ?? true} 
+                    setIsOpen={() => toggleSection("Navigation & Signal")}
+                >
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                        <AccordionRow label="Draught" value={ship.draught ? `${ship.draught}m` : 'N/A'} colors={colors} />
+                        <AccordionRow 
+                            label="Draught" 
+                            value={isEditing ? <input type="number" step="0.1" value={editData.draught || ''} onChange={e => setEditData({...editData, draught: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.draught ? `${ship.draught}m` : 'N/A')} 
+                            colors={colors} 
+                        />
                         <AccordionRow label="Source" value={ship.source || 'Local'} colors={colors} />
                     </div>
                 </Accordion>
+            </div>
             </div>
         </div>
     );
@@ -2772,6 +2872,7 @@ export default function App() {
                             })()}
 
 
+                            <ZoomControl position="bottomleft" />
                         </MapContainer>
                     )}
                 </div>
