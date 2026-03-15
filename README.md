@@ -1,5 +1,11 @@
 # NavisCore 📡
 
+![Version](https://img.shields.io/badge/version-26.2.93-blue)
+![License](https://img.shields.io/badge/License-MIT-yellow)
+![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
+![Status](https://img.shields.io/badge/status-active-success)
+![Docker](https://img.shields.io/badge/docker-ready-blue)
+
 **NavisCore** is an advanced, autonomous AIS (Automatic Identification System) receiving and visualization platform. It combines a high-performance SDR receiver with a Python-powered data engine and a premium React dashboard to provide real-time maritime situational awareness.
 
 ![Screenshot](https://github.com/Minglarn/NavisCore/blob/main/screenshot.png?raw=true)
