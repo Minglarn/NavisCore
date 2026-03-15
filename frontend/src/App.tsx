@@ -21,7 +21,7 @@ import {
   Filler,
   BarElement
 } from 'chart.js';
-import { PolarArea, Line, Bar } from 'react-chartjs-2';
+import { PolarArea, Line, Bar, Doughnut } from 'react-chartjs-2';
 
 ChartJS.register(
   RadialLinearScale,
@@ -611,26 +611,40 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
 
 function ChartCard({ title, children, colors }: any) {
     return (
-        <div style={{ background: colors.bgCard, borderRadius: '8px', padding: '25px', border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', alignItems: 'center', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', height: '100%' }}>
-            <div style={{ position: 'relative', display: 'flex', justifyContent: 'center', width: '100%', marginBottom: '30px' }}>
-                <div style={{ background: `${colors.accent}44`, borderRadius: '12px', padding: '4px 10px', width: '85%' }}>
-                     <div style={{ background: colors.accent, borderRadius: '4px', padding: '8px 0', color: 'white', textAlign: 'center', fontWeight: 'bold' }}>
-                         {title}
-                     </div>
-                </div>
-            </div>
-            <div style={{ width: '100%', flex: 1, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+        <div style={{ 
+            background: colors.bgCard, 
+            borderRadius: '16px', 
+            padding: '24px', 
+            border: `1px solid ${colors.border}`, 
+            display: 'flex', 
+            flexDirection: 'column', 
+            boxShadow: '0 8px 32px rgba(0,0,0,0.08)',
+            height: '100%',
+            overflow: 'hidden'
+        }}>
+            <h3 style={{ 
+                margin: '0 0 20px 0', 
+                fontSize: '1.1rem', 
+                fontWeight: 800, 
+                color: colors.textMain,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px'
+            }}>
+                {title}
+            </h3>
+            <div style={{ width: '100%', flex: 1, position: 'relative', minHeight: '250px' }}>
                 {children}
             </div>
         </div>
     );
 }
 
+
 function StatisticsModal({ isOpen, onClose, colors }: any) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState<'Hour'|'Day'|'Month'>('Hour');
 
     useEffect(() => {
         if (isOpen) {
@@ -651,241 +665,207 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
 
     if (!isOpen) return null;
 
-    const today = stats?.today || { unique_ships: 0, new_ships: 0, total_messages: 0, max_range_km: 0.0 };
-    
-    // Hour Tab Variables
-    const minuteBreakdown = stats?.minute_breakdown || [];
-    const avgVessels = minuteBreakdown.length > 0 ? minuteBreakdown.reduce((sum: number, m: any) => sum + m.unique_ships, 0) / minuteBreakdown.length : 0;
-    const vesselsPerMinuteData = {
-        labels: minuteBreakdown.map((_: any, i: number) => i - 60 + 1),
+    const history30d = stats?.history_30d || [];
+    const hourlyBreakdown = stats?.hourly_breakdown || [];
+    const typeBreakdown = stats?.type_breakdown || [];
+
+    // Summary Card colors
+    const chartColors = [
+        '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40', 
+        '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0ea5e9', '#ec4899'
+    ];
+
+    // 1. History 30d (Messages & Vessels)
+    const historyData = {
+        labels: history30d.map((h: any) => h.date.split('-').slice(1).join('/')),
         datasets: [
             {
-                label: 'Vessels',
-                data: minuteBreakdown.map((m: any) => m.unique_ships),
-                borderColor: '#dfa773',
-                tension: 0,
-                borderWidth: 2,
-                pointRadius: 0,
+                label: 'Fartyg',
+                data: history30d.map((h: any) => h.unique_ships),
+                backgroundColor: '#36A2EB',
+                borderRadius: 4,
+                yAxisID: 'y',
             },
             {
-                label: 'Average',
-                data: minuteBreakdown.map(() => avgVessels),
-                borderColor: '#0a58ca',
-                borderDash: [5, 5],
-                borderWidth: 2,
-                pointRadius: 0,
+                label: 'Meddelanden',
+                data: history30d.map((h: any) => h.total_messages),
+                backgroundColor: '#4BC0C088',
+                borderRadius: 4,
+                yAxisID: 'y1',
             }
         ]
     };
-    const lineOptions: any = {
+
+    const historyOptions: any = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { 
+            legend: { 
+                position: 'top' as const,
+                labels: { color: colors.textMain, usePointStyle: true, boxWidth: 8 }
+            } 
+        },
+        scales: { 
+            y: { 
+                type: 'linear' as const, display: true, position: 'left' as const,
+                title: { display: true, text: 'Fartyg', color: colors.textMuted },
+                grid: { color: colors.border }, ticks: { color: colors.textMuted } 
+            },
+            y1: { 
+                type: 'linear' as const, display: true, position: 'right' as const,
+                title: { display: true, text: 'Meddelanden', color: colors.textMuted },
+                grid: { drawOnChartArea: false }, ticks: { color: colors.textMuted } 
+            },
+            x: { grid: { display: false }, ticks: { color: colors.textMuted } } 
+        }
+    };
+
+    // 2. Ship Type Breakdown (Doughnut)
+    const typeData = {
+        labels: typeBreakdown.map((t: any) => t.label),
+        datasets: [{
+            data: typeBreakdown.map((t: any) => t.count),
+            backgroundColor: chartColors,
+            borderWidth: 0,
+            hoverOffset: 15
+        }]
+    };
+
+    const doughnutOptions: any = {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '70%',
+        plugins: {
+            legend: {
+                position: 'right' as const,
+                labels: {
+                    color: colors.textMain,
+                    padding: 20,
+                    font: { size: 11 },
+                    usePointStyle: true
+                }
+            }
+        }
+    };
+
+    // 3. Hourly Messages (Area Chart)
+    const hourlyData = {
+        labels: hourlyBreakdown.map((h: any) => `${h.hour}:00`),
+        datasets: [{
+            label: 'Meddelanden',
+            data: hourlyBreakdown.map((h: any) => h.count),
+            borderColor: '#0ea5e9',
+            backgroundColor: 'rgba(14, 165, 233, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#0ea5e9'
+        }]
+    };
+
+    const hourlyOptions: any = {
         responsive: true,
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
-        scales: {
-            x: {
-                grid: { display: true, color: colors.border },
-                ticks: { color: colors.textMuted }
-            },
-            y: {
-                min: 0,
-                max: Math.max(25, Math.ceil(Math.max(...minuteBreakdown.map((h: any) => h.unique_ships)) / 5) * 5),
-                grid: { display: true, color: colors.border },
-                ticks: { color: colors.textMuted, stepSize: 5 }
-            }
+        scales: { 
+            y: { beginAtZero: true, grid: { color: colors.border }, ticks: { color: colors.textMuted } },
+            x: { grid: { display: false }, ticks: { color: colors.textMuted } }
         }
     };
-
-    const sectorMaxNmi = (stats?.sector_max_last_hour || Array(72).fill(0)).map((km: number) => km / 1.852);
-    const maxPolar = Math.max(...sectorMaxNmi);
-    const polarMaxAxis = maxPolar > 0 ? (Math.ceil(maxPolar / 5) * 5) : 30;
-
-    const polarData = {
-        labels: Array.from({length: 72}, (_, i) => `${i*5}°`),
-        datasets: [{
-            data: sectorMaxNmi,
-            backgroundColor: 'rgba(223, 167, 115, 0.7)',
-            borderColor: 'rgba(223, 167, 115, 1)',
-            borderWidth: 1,
-        }]
-    };
-    const polarOptions: any = {
-        responsive: true,
-        plugins: { legend: { display: false } },
-        scales: {
-            r: {
-                beginAtZero: true,
-                max: Math.max(polarMaxAxis, 30),
-                ticks: { stepSize: 5, backdropColor: 'transparent', color: colors.textMuted },
-                grid: { color: colors.border }
-            }
-        }
-    };
-
-    // Day Tab Variables
-    const hourlyBreakdown = stats?.hourly_breakdown || [];
-    const vesselsPerHourData = {
-        labels: hourlyBreakdown.map((h: any) => `${h.hour}:00`),
-        datasets: [{
-            label: 'Messages',
-            data: hourlyBreakdown.map((h: any) => h.count),
-            backgroundColor: '#0a58ca',
-            borderRadius: 4
-        }]
-    };
-    const barOptions: any = {
-        responsive: true, maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, grid: { color: colors.border }, ticks: { color: colors.textMuted } }, x: { grid: { display: false }, ticks: { color: colors.textMuted } } }
-    };
-
-    // Month Tab Variables
-    const history30d = stats?.history_30d || [];
-    const historyData = {
-        labels: history30d.map((h: any) => h.date.split('-').slice(1).join('/')),
-        datasets: [{
-            label: 'Unique Vessels',
-            data: history30d.map((h: any) => h.unique_ships),
-            backgroundColor: '#10b981',
-            borderRadius: 4
-        }]
-    };
-
-    const tabs = [
-        { id: 'Hour', label: 'Senaste Timmen' },
-        { id: 'Day', label: 'Dagens Statistik' },
-        { id: 'Month', label: 'Månadsöversikt (30d)' }
-    ];
 
     return (
-        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000 }}>
+        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
-                width: '90vw', 
-                height: '90vh',
-                maxWidth: 'none',
+                width: '95vw', 
+                height: '92vh',
+                maxWidth: '1400px',
                 padding: '0',
                 display: 'flex',
                 flexDirection: 'column',
-                background: colors.bgMain,
-                border: `1px solid ${colors.border}`
+                background: colors.bgMain === '#ffffff' ? '#f8fafc' : colors.bgMain, // Light blue-ish background for depth
+                border: `1px solid ${colors.border}`,
+                borderRadius: '24px',
+                overflow: 'hidden'
             }}>
-                {/* Header */}
-                <div style={{ padding: '20px 40px', background: colors.bgCard, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {/* Header Area */}
+                <div style={{ padding: '30px 40px', background: colors.bgCard, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h2 style={{ margin: 0, fontSize: '1.6rem', fontWeight: 800, color: colors.textMain }}>Statistikcentralen</h2>
-                        <div style={{ color: colors.textMuted, fontSize: '0.9rem', marginTop: '4px' }}>Senaste aktivitet och global prestanda.</div>
+                        <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: colors.textMain, letterSpacing: '-0.5px' }}>Statistics & Analysis</h1>
+                        <div style={{ color: colors.textMuted, fontSize: '1rem', marginTop: '4px' }}>Analyze historical data and system performance metrics.</div>
                     </div>
                     
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        {/* Tab Switcher */}
-                        <div style={{ display: 'flex', background: colors.bgMain, padding: '4px', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-                            {tabs.map(t => (
-                                <button
-                                    key={t.id}
-                                    onClick={() => setActiveTab(t.id as any)}
-                                    style={{
-                                        padding: '8px 24px', outline: 'none', border: 'none',
-                                        background: activeTab === t.id ? colors.bgCard : 'transparent',
-                                        color: activeTab === t.id ? colors.accent : colors.textMuted,
-                                        borderRadius: '8px', fontWeight: 600, fontSize: '0.9rem',
-                                        boxShadow: activeTab === t.id ? '0 2px 4px rgba(0,0,0,0.1)' : 'none',
-                                        cursor: 'pointer', transition: 'all 0.2s'
-                                    }}
-                                >
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div style={{ position: 'relative' }}>
-                            <Calendar size={18} style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted, pointerEvents: 'none' }} />
-                            <input 
-                                type="date" 
-                                value={selectedDate}
-                                onChange={(e) => setSelectedDate(e.target.value)}
-                                style={{ 
-                                    padding: '10px 40px 10px 15px', borderRadius: '8px',
-                                    border: `1px solid ${colors.border}`, fontSize: '0.9rem', outline: 'none', 
-                                    color: colors.textMain, background: colors.bgMain
-                                }}
-                            />
-                        </div>
-                        <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px', color: colors.textMuted }}>
-                            <X size={24} />
-                        </button>
-                    </div>
+                    <button onClick={onClose} style={{ background: colors.bgMain, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: '12px', borderRadius: '12px', color: colors.textMuted, transition: 'all 0.2s' }}>
+                        <X size={24} />
+                    </button>
                 </div>
-
-                {/* Dashboard Area */}
+                
+                {/* Dashboard Scroll View */}
                 <div style={{ flex: 1, padding: '30px 40px', overflowY: 'auto' }}>
-                    {loading ? (
-                        <div style={{ textAlign: 'center', padding: '100px 0' }}>
-                            <div className="spinner"></div>
-                            <div style={{ marginTop: '20px', color: colors.textMuted }}>Beräknar statistik...</div>
-                        </div>
-                    ) : (
-                        <div style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '25px' }}>
-                            {/* Summaries always show above */}
-                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '25px', flexShrink: 0 }}>
-                                {[
-                                    { label: 'Unika Fartyg', value: today.unique_ships, icon: <Ship size={24} /> },
-                                    { label: 'Meddelanden', value: today.total_messages, icon: <Activity size={24} color={colors.accent} /> },
-                                    { label: 'Nya Fartyg', value: today.new_ships, icon: <Plus size={24} color="#10b981" /> },
-                                    { label: 'Max Räckvidd', value: `${today.max_range_km?.toFixed(1) || '0.0'} km / ${(today.max_range_km/1.852).toFixed(1)} NMI`, icon: <Radar size={24} color="#ff3b3b" /> },
-                                ].map((card, i) => (
-                                    <div key={i} style={{ background: colors.bgCard, padding: '25px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                        <div style={{ width: '60px', height: '60px', borderRadius: '16px', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMain }}>
-                                            {card.icon}
-                                        </div>
-                                        <div>
-                                            <div style={{ fontSize: '0.8rem', color: colors.textMuted, fontWeight: 600, textTransform: 'uppercase' }}>{card.label}</div>
-                                            <div style={{ fontSize: '1.5rem', fontWeight: 800, color: colors.textMain }}>{card.value}</div>
-                                        </div>
-                                    </div>
-                                ))}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
+                        
+                        {/* Select Date Card */}
+                        <div style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: colors.textMain }}>Select Date</h2>
+                                <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: colors.textMuted }}>Viewing data for {selectedDate}</p>
                             </div>
-
-                            {/* View Modes */}
-                            {activeTab === 'Hour' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '25px', flex: 1, minHeight: '400px' }}>
-                                    <ChartCard title="Max Distance Last Hour (NMI)" colors={colors}>
-                                        <div style={{ width: '100%', height: '100%' }}>
-                                            <PolarArea data={polarData} options={polarOptions} />
-                                        </div>
-                                    </ChartCard>
-                                    <ChartCard title="Vessels per Minute" colors={colors}>
-                                        <div style={{ width: '100%', height: '100%' }}>
-                                            <Line data={vesselsPerMinuteData} options={lineOptions} />
-                                        </div>
-                                    </ChartCard>
-                                </div>
-                            )}
-
-                            {activeTab === 'Day' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '25px', flex: 1, minHeight: '400px' }}>
-                                    <ChartCard title="Messages per Hour" colors={colors}>
-                                        <div style={{ width: '100%', height: '100%' }}>
-                                            <Bar data={vesselsPerHourData} options={barOptions} />
-                                        </div>
-                                    </ChartCard>
-                                </div>
-                            )}
-
-                            {activeTab === 'Month' && (
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '25px', flex: 1, minHeight: '400px' }}>
-                                    <ChartCard title="Vessels per Day (30d)" colors={colors}>
-                                        <div style={{ width: '100%', height: '100%' }}>
-                                            <Bar data={historyData} options={barOptions} />
-                                        </div>
-                                    </ChartCard>
-                                </div>
-                            )}
+                            <div style={{ position: 'relative', width: '220px' }}>
+                                <Calendar size={18} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted, pointerEvents: 'none' }} />
+                                <input 
+                                    type="date" 
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    style={{ 
+                                        width: '100%',
+                                        padding: '12px 45px 12px 15px', borderRadius: '12px',
+                                        border: `1px solid ${colors.border}`, fontSize: '1rem', outline: 'none', 
+                                        color: colors.textMain, background: colors.bgMain,
+                                        cursor: 'pointer',
+                                        fontWeight: 600
+                                    }}
+                                />
+                            </div>
                         </div>
-                    )}
+
+                        {loading ? (
+                            <div style={{ textAlign: 'center', padding: '100px 0', flex: 1 }}>
+                                <div className="spinner"></div>
+                                <div style={{ marginTop: '20px', color: colors.textMuted, fontSize: '1.1rem' }}>Aggregating data...</div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Middle Row Grid */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '30px' }}>
+                                    <ChartCard title="Messages & Vessels per Day (30d)" colors={colors}>
+                                        <Bar data={historyData} options={historyOptions} />
+                                    </ChartCard>
+                                    
+                                    <ChartCard title="Ship types (Total)" colors={colors}>
+                                        {typeBreakdown.length > 0 ? (
+                                            <Doughnut data={typeData} options={doughnutOptions} />
+                                        ) : (
+                                            <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
+                                                Ingen data tillgänglig
+                                            </div>
+                                        )}
+                                    </ChartCard>
+                                </div>
+
+                                {/* Bottom Row Wide Chart */}
+                                <div style={{ minHeight: '450px' }}>
+                                    <ChartCard title="Messages per Hour (Selected Day)" colors={colors}>
+                                        <Line data={hourlyData} options={hourlyOptions} />
+                                    </ChartCard>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
     );
 }
+
 
 function Accordion({ title, children, defaultOpen = false, colors }: any) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
