@@ -338,11 +338,19 @@ const extraStyles = `
     border: none;
 }
 .svg-flash-fill {
-    animation: svg-fill-flash 1.5s ease-out;
+    animation: svg-fill-flash 3.0s cubic-bezier(0.4, 0, 0.2, 1);
 }
 @keyframes svg-fill-flash {
-    0% { fill: #ffff00; stroke: #ffffff; stroke-width: 3px; }
-    100% { }
+    0% { fill: #ffff00; stroke: #ffffff; stroke-width: 4px; filter: drop-shadow(0 0 5px #ffff00); }
+    30% { fill: #ffff00; stroke: #ffffff; stroke-width: 2px; filter: drop-shadow(0 0 10px #ffff00); }
+    100% { fill: inherit; stroke: inherit; stroke-width: inherit; filter: none; }
+}
+.ship-flash {
+    animation: side-flash-glow 3.0s cubic-bezier(0.4, 0, 0.2, 1);
+}
+@keyframes side-flash-glow {
+    0% { background-color: rgba(255, 255, 0, 0.4) !important; box-shadow: inset 0 0 15px rgba(255, 255, 0, 0.5); }
+    100% { background-color: transparent; box-shadow: none; }
 }
 .svg-pulse {
     animation: svg-pulse-anim 2s infinite ease-in-out;
@@ -1799,7 +1807,6 @@ export default function App() {
             });
 
             // Refetch coverage sectors manually
-            const isDev = window.location.port === '5173';
             const coveragePath = isDev ? 'http://127.0.0.1:8080/api/coverage' : '/api/coverage';
             fetch(coveragePath)
                 .then(r => r.json())
@@ -1899,7 +1906,7 @@ export default function App() {
                                 next.delete(mmsiKey);
                                 return next;
                             });
-                        }, 1500);
+                        }, 3000);
                     }
                 }
 
