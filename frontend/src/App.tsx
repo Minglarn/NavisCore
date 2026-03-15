@@ -1,5 +1,8 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react'
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { MapContainer, TileLayer, Marker, Popup, Tooltip, LayersControl, useMap, Circle, Polygon, Polyline, useMapEvents } from 'react-leaflet'
+import MarkerClusterGroup from 'react-leaflet-cluster'
+import 'leaflet.markercluster/dist/MarkerCluster.css'
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
 import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
@@ -283,26 +286,86 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
         const size = 26 * shipScale;
         svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" style="transform: rotate(${cog}deg);" class="${emergencyClass}">
                  <polygon points="12,2 19,10 17,22 7,22 5,10" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
-                          class="${shouldFlash ? 'svg-flash-fill' : ''}" />
+                           />
                </svg>`;
     } else {
         const size = 16 * circleScale;
         svg = `<svg width="${size}" height="${size}" viewBox="0 0 16 16" class="${emergencyClass}">
                  <circle cx="8" cy="8" r="6" fill="${color}" stroke="${borderColor}" stroke-width="1.5"
-                         class="${shouldFlash ? 'svg-flash-fill' : ''}" />
+                          />
                </svg>`;
     }
 
     return L.divIcon({
-        html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%;">${svg}</div>`,
+        html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%; position: relative;">
+                 ${shouldFlash ? `<div class="ship-update-flash"></div>` : ''}
+                 <div style="z-index: 1; display:flex;">${svg}</div>
+               </div>`,
         className: 'ship-custom-icon-container',
         iconSize: [hitAreaSize, hitAreaSize],
-        iconAnchor: [hitAreaSize / 2, hitAreaSize / 2]
-    });
+        iconAnchor: [hitAreaSize / 2, hitAreaSize / 2],
+        mmsi: mmsi
+    } as any);
 }
 
 // Injected css
 const extraStyles = `
+/* Custom Marker Cluster Styles */
+.marker-cluster-small {
+    background-color: rgba(0, 229, 255, 0.4);
+}
+.marker-cluster-small div {
+    background-color: rgba(0, 229, 255, 0.8);
+    color: #fff;
+    font-weight: bold;
+}
+.marker-cluster-medium {
+    background-color: rgba(255, 171, 64, 0.4);
+}
+.marker-cluster-medium div {
+    background-color: rgba(255, 171, 64, 0.8);
+    color: #fff;
+    font-weight: bold;
+}
+.marker-cluster-large {
+    background-color: rgba(255, 82, 82, 0.4);
+}
+.marker-cluster-large div {
+    background-color: rgba(255, 82, 82, 0.8);
+    color: #fff;
+    font-weight: bold;
+}
+.marker-cluster {
+    background-clip: padding-box;
+    border-radius: 20px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease-in-out;
+}
+.marker-cluster div {
+    width: 30px;
+    height: 30px;
+    margin-left: 5px;
+    margin-top: 5px;
+    text-align: center;
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-family: system-ui, -apple-system, sans-serif;
+    font-size: 14px;
+}
+.leaflet-cluster-anim .marker-cluster {
+    transition: transform 0.2s ease-out, opacity 0.2s ease-in;
+}
+.cluster-update-pulse {
+    animation: cluster-pulse-anim 0.8s ease-out;
+}
+@keyframes cluster-pulse-anim {
+    0% { box-shadow: 0 0 0px #00e5ff; border: 0px solid #00e5ff; }
+    50% { box-shadow: 0 0 20px #00e5ff; border: 2px solid #00e5ff; }
+    100% { box-shadow: 0 0 0px #00e5ff; border: 0px solid #00e5ff; }
+}
+
 .ship-custom-icon-container { background: transparent; border: none; }
 .ship-custom-icon svg { filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.4)); }
 
@@ -337,14 +400,33 @@ const extraStyles = `
     color: white;
     border: none;
 }
-.svg-flash-fill {
-    animation: icon-pop-shine 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    will-change: transform, filter;
+.ship-update-flash {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin-top: -12px;
+    margin-left: -12px;
+    border-radius: 50%;
+    border: 2px solid #00e5ff;
+    box-sizing: border-box;
+    animation: radar-ping 0.8s cubic-bezier(0, 0, 0.2, 1) forwards;
+    pointer-events: none;
+    z-index: 0;
 }
-@keyframes icon-pop-shine {
-    0% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px yellow); }
-    20% { transform: scale(1.3); filter: brightness(3) drop-shadow(0 0 10px yellow); }
-    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 3px rgba(0,0,0,0.4)); }
+
+@keyframes radar-ping {
+    0% {
+        transform: scale(0.5);
+        opacity: 1;
+        border-width: 4px;
+    }
+    100% {
+        transform: scale(3.5);
+        opacity: 0;
+        border-width: 1px;
+    }
 }
 .ship-flash {
     animation: side-flash-pop 0.8s ease-out;
@@ -1704,6 +1786,28 @@ export default function App() {
     // Performance & Hybrid Visibility
     const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, mmsi: string } | null>(null);
+    const createClusterCustomIcon = useCallback((cluster: any) => {
+        const count = cluster.getChildCount();
+        const markers = cluster.getAllChildMarkers();
+        const hasFlash = markers.some((m: any) => {
+            const iconOptions = m.options?.icon?.options;
+            //@ts-ignore
+            return iconOptions?.mmsi && flashedMmsis.has(iconOptions.mmsi);
+        });
+
+        let sizeClass = 'small';
+        if (count >= 10 && count < 100) sizeClass = 'medium';
+        else if (count >= 100) sizeClass = 'large';
+
+        const pulseClass = hasFlash ? ' cluster-update-pulse' : '';
+
+        return L.divIcon({
+            html: `<div><span>${count}</span></div>`,
+            className: `marker-cluster marker-cluster-${sizeClass}${pulseClass}`,
+            iconSize: L.point(40, 40)
+        } as any);
+    }, [flashedMmsis]);
+
 
     const filteredShipsCount = useMemo(() => {
         const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
@@ -2359,6 +2463,15 @@ export default function App() {
                                 </>
                             )}
 
+                            <MarkerClusterGroup 
+                                chunkedLoading={true} 
+                                maxClusterRadius={40} 
+                                spiderfyOnMaxZoom={true}
+                                disableClusteringAtZoom={12}
+                                showCoverageOnHover={false}
+                                zoomToBoundsOnClick={true}
+                                iconCreateFunction={createClusterCustomIcon}
+                            >
                             {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
                                 const nameUpper = (s.name || "").toUpperCase();
@@ -2627,6 +2740,7 @@ export default function App() {
                                     </Marker>
                                 );
                             })}
+                            </MarkerClusterGroup>
 
                             {/* Ship History Trails */}
                             {ships.map((s: any) => {
