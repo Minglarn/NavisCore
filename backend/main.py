@@ -638,6 +638,9 @@ async def process_ais_data(data: dict):
                                 "event_type": event_type,
                                 "timestamp": ship_data.get("timestamp")
                             }
+                            if ship_data.get("manual_image"):
+                                pub_payload["image_url"] = ship_data.get("imageUrl")
+                                
                             mqtt_pub_queue.put_nowait(pub_payload)
                 except Exception as e:
                     logger.error(f"Error queuing MQTT pub message: {e}")
