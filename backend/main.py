@@ -627,20 +627,38 @@ async def process_ais_data(data: dict):
                                 "mmsi": mmsi_str,
                                 "name": ship_data.get("name"),
                                 "lat": ship_data.get("lat"),
+                                # Basic Identification
                                 "lon": ship_data.get("lon"),
+                                "imo": ship_data.get("imo"),
+                                "callsign": ship_data.get("callsign"),
+                                "country_code": ship_data.get("country_code"),
+                                # Movement & Position
                                 "sog": ship_data.get("sog"),
                                 "cog": ship_data.get("cog"),
                                 "heading": ship_data.get("heading"),
+                                "rot": ship_data.get("rot"),
+                                # Type & Category
+                                "shiptype": ship_data.get("shiptype"),
                                 "ship_type_label": ship_data.get("ship_type_text"),
                                 "icon_category": ship_data.get("ship_category"),
                                 "is_nav_aid": bool(ship_data.get("is_aton")),
+                                # Dimensions
+                                "length": ship_data.get("length"),
+                                "width": ship_data.get("width"),
+                                "draught": ship_data.get("draught"),
+                                # Status & Voyage
+                                "status_text": ship_data.get("status_text"),
+                                "nav_status": ship_data.get("nav_status"),
+                                "destination": ship_data.get("destination"),
+                                "eta": ship_data.get("eta"),
+                                # History & Meta
+                                "last_seen": ship_data.get("timestamp"),
+                                "previous_seen": ship_data.get("previous_seen"),
                                 "source": source,
                                 "event_type": event_type,
-                                "timestamp": ship_data.get("timestamp")
+                                "timestamp": ship_data.get("timestamp"),
+                                "image_url": ship_data.get("imageUrl") if ship_data.get("manual_image") else None
                             }
-                            if ship_data.get("manual_image"):
-                                pub_payload["image_url"] = ship_data.get("imageUrl")
-                                
                             mqtt_pub_queue.put_nowait(pub_payload)
                 except Exception as e:
                     logger.error(f"Error queuing MQTT pub message: {e}")
