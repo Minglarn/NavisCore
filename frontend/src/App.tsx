@@ -965,7 +965,6 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
             });
             if (res.ok) {
                 setIsEditing(false);
-                // The update will come back via WebSocket or we can update local ship object
                 Object.assign(ship, editData);
             } else {
                 alert("Failed to save ship details");
@@ -977,7 +976,6 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
     };
 
     if (!isOpen || !ship) return null;
-
 
     return (
         <div style={{ 
@@ -1102,8 +1100,6 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
 
             {/* Details Content */}
             <div style={{ flex: 1 }}>
-            {/* Details Content */}
-            <div style={{ flex: 1 }}>
                 <Accordion 
                     title="Vessel Specifications" 
                     colors={colors} 
@@ -1154,6 +1150,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             ) : getShipTypeName(mmsiStr, ship.shiptype, ship.ship_type_text)} 
                             colors={colors} 
                         />
+                        <AccordionRow label="Meddelanden" value={ship.message_count || '1'} colors={colors} />
                     </div>
                 </Accordion>
 
@@ -1168,6 +1165,8 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         <AccordionRow label="Speed (SOG)" value={ship.sog ? `${ship.sog} kn` : '0.0 kn'} colors={colors} />
                         <AccordionRow label="Course (COG)" value={ship.cog ? `${ship.cog}°` : '0°'} colors={colors} />
                         <AccordionRow label="Heading" value={ship.heading ? `${ship.heading}°` : 'N/A'} colors={colors} />
+                        <AccordionRow label="Senaste signal" value={getTimeAgo(ship.timestamp)} colors={colors} />
+                        <AccordionRow label="Sett tidigare" value={ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--'} colors={colors} />
                     </div>
                 </Accordion>
 
@@ -1186,7 +1185,6 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         <AccordionRow label="Source" value={ship.source || 'Local'} colors={colors} />
                     </div>
                 </Accordion>
-            </div>
             </div>
         </div>
     );
