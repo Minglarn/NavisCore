@@ -627,8 +627,9 @@ async def process_ais_data(data: dict):
                                 "mmsi": mmsi_str,
                                 "name": ship_data.get("name"),
                                 "lat": ship_data.get("lat"),
-                                # Basic Identification
                                 "lon": ship_data.get("lon"),
+                                # Basic Identification
+                                "msg_type": msg_type,
                                 "imo": ship_data.get("imo"),
                                 "callsign": ship_data.get("callsign"),
                                 "country_code": ship_data.get("country_code"),
@@ -651,6 +652,13 @@ async def process_ais_data(data: dict):
                                 "nav_status": ship_data.get("nav_status"),
                                 "destination": ship_data.get("destination"),
                                 "eta": ship_data.get("eta"),
+                                # Meteo Data
+                                "wind_speed": ship_data.get("wind_speed"),
+                                "wind_gust": ship_data.get("wind_gust"),
+                                "wind_direction": ship_data.get("wind_direction"),
+                                "water_level": ship_data.get("water_level"),
+                                "air_temp": ship_data.get("air_temp"),
+                                "air_pressure": ship_data.get("air_pressure"),
                                 # History & Meta
                                 "last_seen": ship_data.get("timestamp"),
                                 "previous_seen": ship_data.get("previous_seen"),
