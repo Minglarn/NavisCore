@@ -57,6 +57,11 @@ udp_server_transport = None
 # Tracking local vessels for AisStream deduplication. Key: MMSI, Value: last_seen timestamp
 local_vessels = {}
 aisstream_task = None
+# MQTT Publisher Queue and task for outgoing data
+mqtt_pub_queue = asyncio.Queue()
+mqtt_pub_task = None
+mqtt_pub_connected = False
+mqtt_pub_queued_mmsis = set()
 
 # Enrichment Queue for ship images to avoid rate limiting
 enrichment_queue = asyncio.Queue()
@@ -132,6 +137,14 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "trail_size": "1.0", "aisstream_enabled": "false", "aisstream_api_key": os.getenv("AISSTREAM_API_KEY", ""),
         "include_aisstream_in_range": "false", "trail_mode": "all", "show_aisstream_on_map": "true",
         "sdr_enabled": "true", "udp_enabled": "true", "udp_port": str(UDP_PORT),
+        "mqtt_pub_enabled": os.getenv("MQTT_PUB_ENABLED", "false").lower(),
+        "mqtt_pub_url": os.getenv("MQTT_PUB_URL", os.getenv("MQTT_BROKER", "")),
+        "mqtt_pub_topic": os.getenv("MQTT_PUB_TOPIC", os.getenv("MQTT_TOPIC", "naviscore/objects")),
+        "mqtt_pub_user": os.getenv("MQTT_PUB_USER", os.getenv("MQTT_USER", "")),
+        "mqtt_pub_pass": os.getenv("MQTT_PUB_PASS", os.getenv("MQTT_PASS", "")),
+        "mqtt_pub_only_new": os.getenv("MQTT_PUB_ONLY_NEW", "false").lower(),
+        "mqtt_pub_forward_sdr": "true",
+        "mqtt_pub_forward_aisstream": "false",
     }
     for k, v in defaults.items():
         if k not in settings:
@@ -592,6 +605,43 @@ async def process_ais_data(data: dict):
                 except Exception as e: logger.error(f"Range err: {e}")
 
             await db.commit()
+            
+            # --- MQTT Publisher Logic ---
+            if settings.get("mqtt_pub_enabled") == "true":
+                try:
+                    forward_sdr = settings.get("mqtt_pub_forward_sdr", "true") == "true"
+                    forward_stream = settings.get("mqtt_pub_forward_aisstream", "false") == "true"
+                    
+                    should_forward = False
+                    if (source == "local" or source == "sdr") and forward_sdr:
+                        should_forward = True
+                    elif source == "aisstream" and forward_stream:
+                        should_forward = True
+                        
+                    if should_forward:
+                        event_type = "new" if is_new_v or reset_count else "update"
+                        only_new = settings.get("mqtt_pub_only_new") == "true"
+                        
+                        if not only_new or event_type == "new":
+                            pub_payload = {
+                                "mmsi": mmsi_str,
+                                "name": ship_data.get("name"),
+                                "lat": ship_data.get("lat"),
+                                "lon": ship_data.get("lon"),
+                                "sog": ship_data.get("sog"),
+                                "cog": ship_data.get("cog"),
+                                "heading": ship_data.get("heading"),
+                                "ship_type_label": ship_data.get("ship_type_text"),
+                                "icon_category": ship_data.get("ship_category"),
+                                "is_nav_aid": bool(ship_data.get("is_aton")),
+                                "source": source,
+                                "event_type": event_type,
+                                "timestamp": ship_data.get("timestamp")
+                            }
+                            mqtt_pub_queue.put_nowait(pub_payload)
+                except Exception as e:
+                    logger.error(f"Error queuing MQTT pub message: {e}")
+
             await broadcast(ship_data)
     except Exception as e:
         logger.error(f"Error for MMSI {mmsi_str}: {e}")
@@ -653,6 +703,55 @@ def restart_mqtt():
     if mqtt_client_task: mqtt_client_task.cancel()
     mqtt_client_task = asyncio.create_task(mqtt_loop())
 
+async def mqtt_publisher_worker():
+    global mqtt_pub_connected
+    while True:
+        try:
+            s = await get_all_settings()
+            if s.get("mqtt_pub_enabled") != "true" or not s.get("mqtt_pub_url"):
+                mqtt_pub_connected = False
+                await asyncio.sleep(5)
+                continue
+            
+            p = s["mqtt_pub_url"].replace("mqtt://", "").replace("mqtts://", "").split(":")
+            host = p[0]
+            port = int(p[1]) if len(p) > 1 else 1883
+            
+            async with aiomqtt.Client(
+                hostname=host, 
+                port=port, 
+                username=s.get("mqtt_pub_user") or None, 
+                password=s.get("mqtt_pub_pass") or None,
+                timeout=10
+            ) as client:
+                mqtt_pub_connected = True
+                logger.info(f"MQTT Publisher connected to {host}:{port}")
+                while True:
+                    # Get outgoing message from queue
+                    data = await mqtt_pub_queue.get()
+                    try:
+                        topic = s.get("mqtt_pub_topic", "naviscore/objects")
+                        await client.publish(topic, payload=json.dumps(data))
+                    except Exception as e:
+                        logger.error(f"MQTT Publish error: {e}")
+                        # Put back in queue if it failed? Maybe not to avoid infinite loops
+                        raise e # Trigger reconnect
+                    finally:
+                        mqtt_pub_queue.task_done()
+        except asyncio.CancelledError:
+            mqtt_pub_connected = False
+            break
+        except Exception as e:
+            logger.error(f"MQTT Publisher error: {e}")
+            mqtt_pub_connected = False
+            await asyncio.sleep(10)
+
+def restart_mqtt_pub():
+    global mqtt_pub_task
+    if mqtt_pub_task:
+        mqtt_pub_task.cancel()
+    mqtt_pub_task = asyncio.create_task(mqtt_publisher_worker())
+
 async def mock_mode_loop():
     mock_lat, mock_lon = 59.3293, 18.0686
     while True:
@@ -701,7 +800,21 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
         await db.execute("CREATE INDEX IF NOT EXISTS idx_ship_history_mmsi_ts ON ship_history (mmsi, timestamp)")
         await db.execute('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)')
-        for k, v in [('history_duration', '60'), ('show_names_on_map', 'true'), ('units', 'nautical'), ('ship_size', '1.0'), ('circle_size', '1.0'), ('trail_size', '2.0'), ('aisstream_enabled', 'false'), ('aisstream_api_key', ''), ('aisstream_sw_lat', '56.5'), ('aisstream_sw_lon', '15.5'), ('aisstream_ne_lat', '60.0'), ('aisstream_ne_lon', '21.0'), ('trail_mode', 'all'), ('show_aisstream_on_map', 'true'), ('sdr_enabled', 'true'), ('udp_enabled', 'true'), ('udp_port', str(UDP_PORT))]:
+        for k, v in [
+            ('history_duration', '60'), ('show_names_on_map', 'true'), ('units', 'nautical'), 
+            ('ship_size', '1.0'), ('circle_size', '1.0'), ('trail_size', '2.0'), 
+            ('aisstream_enabled', 'false'), ('aisstream_api_key', ''), 
+            ('aisstream_sw_lat', '56.5'), ('aisstream_sw_lon', '15.5'), 
+            ('aisstream_ne_lat', '60.0'), ('aisstream_ne_lon', '21.0'), 
+            ('trail_mode', 'all'), ('show_aisstream_on_map', 'true'), 
+            ('sdr_enabled', 'true'), ('udp_enabled', 'true'), ('udp_port', str(UDP_PORT)),
+            ('mqtt_pub_enabled', os.getenv("MQTT_PUB_ENABLED", "false").lower()),
+            ('mqtt_pub_url', os.getenv("MQTT_PUB_URL", os.getenv("MQTT_BROKER", ""))),
+            ('mqtt_pub_topic', os.getenv("MQTT_PUB_TOPIC", os.getenv("MQTT_TOPIC", "naviscore/objects"))),
+            ('mqtt_pub_user', os.getenv("MQTT_PUB_USER", os.getenv("MQTT_USER", ""))),
+            ('mqtt_pub_pass', os.getenv("MQTT_PUB_PASS", os.getenv("MQTT_PASS", ""))),
+            ('mqtt_pub_only_new', os.getenv("MQTT_PUB_ONLY_NEW", "false").lower())
+        ]:
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
         await db.execute('CREATE TABLE IF NOT EXISTS coverage_sectors (sector_id INTEGER PRIMARY KEY, range_km_24h REAL DEFAULT 0.0, range_km_alltime REAL DEFAULT 0.0, last_updated DATETIME)')
         await db.execute('CREATE TABLE IF NOT EXISTS daily_stats (date TEXT PRIMARY KEY, unique_ships INTEGER DEFAULT 0, new_ships INTEGER DEFAULT 0, total_messages INTEGER DEFAULT 0, max_range_km REAL DEFAULT 0.0)')
@@ -714,7 +827,7 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS sector_history (sector_id INTEGER, distance_km REAL, timestamp INTEGER)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_sector_history_ts ON sector_history (timestamp)')
         await db.commit()
-    asyncio.create_task(start_udp_listener()); restart_mqtt(); asyncio.create_task(mock_mode_loop()); asyncio.create_task(purge_job()); asyncio.create_task(coverage_24h_reset_job()); await restart_aisstream(); asyncio.create_task(enrichment_worker())
+    asyncio.create_task(start_udp_listener()); restart_mqtt(); restart_mqtt_pub(); asyncio.create_task(mock_mode_loop()); asyncio.create_task(purge_job()); asyncio.create_task(coverage_24h_reset_job()); await restart_aisstream(); asyncio.create_task(enrichment_worker())
 
 @app.get("/api/ships")
 async def get_ships():
@@ -844,6 +957,8 @@ async def set_settings_api(settings: dict):
     if settings.get("udp_port") or settings.get("udp_enabled"): asyncio.create_task(start_udp_listener())
     if any(k in settings for k in ["aisstream_enabled", "aisstream_api_key", "aisstream_sw_lat", "aisstream_sw_lon", "aisstream_ne_lat", "aisstream_ne_lon"]):
         await restart_aisstream()
+    if any(k in settings for k in ["mqtt_pub_enabled", "mqtt_pub_url", "mqtt_pub_topic", "mqtt_pub_user", "mqtt_pub_pass", "mqtt_pub_only_new"]):
+        restart_mqtt_pub()
     restart_mqtt(); return {"success": True, "settings": await get_all_settings()}
 
 @app.get("/api/coverage")

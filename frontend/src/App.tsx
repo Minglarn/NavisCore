@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -1537,31 +1537,102 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                     )}
 
                     {activeTab === 'mqtt' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">Connection</div>
-                            <div className="form-group">
-                                <label>MQTT Enabled</label>
-                                <Toggle
-                                    checked={settings.mqtt_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group vertical">
-                                <label>MQTT Broker URL</label>
-                                <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_url} onChange={e => setSettings({ ...settings, mqtt_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
-                            </div>
-                            <div className="form-group vertical">
-                                <label>MQTT Topic</label>
-                                <input type="text" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
-                            </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Authentication (Optional)</div>
-                            <div className="form-group">
-                                <label>Username</label>
-                                <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label>Password</label>
-                                <input type="password" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} />
+                        <div className="settings-section" style={{ maxWidth: '1000px', width: '100%' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: '30px' }}>
+                                {/* Left Column: Incoming (Subscriber) */}
+                                <div>
+                                    <div className="settings-section-title" style={{ color: '#44aaff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <ArrowDownLeft size={18} /> INCOMING (AIS Data)
+                                    </div>
+                                    <div className="form-group" style={{ marginTop: '15px' }}>
+                                        <label>MQTT Enabled</label>
+                                        <Toggle
+                                            checked={settings.mqtt_enabled === 'true'}
+                                            onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
+                                        />
+                                    </div>
+                                    <div className="form-group vertical">
+                                        <label>MQTT Broker URL</label>
+                                        <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_url} onChange={e => setSettings({ ...settings, mqtt_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                                    </div>
+                                    <div className="form-group vertical">
+                                        <label>MQTT Topic</label>
+                                        <input type="text" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                                    </div>
+                                    <div className="settings-section-title" style={{ marginTop: '15px', fontSize: '0.85rem', opacity: 0.7 }}>Authentication</div>
+                                    <div className="form-group">
+                                        <label>Username</label>
+                                        <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Password</label>
+                                        <input type="password" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} />
+                                    </div>
+                                </div>
+
+                                {/* Divider */}
+                                <div style={{ background: colors.border, width: '1px', alignSelf: 'stretch' }}></div>
+
+                                {/* Right Column: Outgoing (Publisher) */}
+                                <div>
+                                    <div className="settings-section-title" style={{ color: '#00f0ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <ArrowUpRight size={18} /> OUTGOING (Publisher)
+                                    </div>
+                                    <div className="form-group" style={{ marginTop: '15px' }}>
+                                        <label>Publisher Enabled</label>
+                                        <Toggle
+                                            checked={settings.mqtt_pub_enabled === 'true'}
+                                            onChange={val => setSettings({ ...settings, mqtt_pub_enabled: String(val) })}
+                                        />
+                                    </div>
+                                    <div className="form-group vertical">
+                                        <label>Broker URL</label>
+                                        <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_pub_url} onChange={e => setSettings({ ...settings, mqtt_pub_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                                    </div>
+                                    <div className="form-group vertical">
+                                        <label>Topic</label>
+                                        <input type="text" placeholder="naviscore/objects" value={settings.mqtt_pub_topic} onChange={e => setSettings({ ...settings, mqtt_pub_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
+                                    </div>
+                                    <div className="form-group" style={{ marginTop: '5px' }}>
+                                        <div>
+                                            <label>Only New Objects</label>
+                                            <div className="description">Reduce traffic by only sending updates for newly discovered vessels</div>
+                                        </div>
+                                        <Toggle
+                                            checked={settings.mqtt_pub_only_new === 'true'}
+                                            onChange={val => setSettings({ ...settings, mqtt_pub_only_new: String(val) })}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginTop: '5px' }}>
+                                        <div>
+                                            <label>Forward Local SDR</label>
+                                            <div className="description">Skicka data från lokal mottagare</div>
+                                        </div>
+                                        <Toggle
+                                            checked={settings.mqtt_pub_forward_sdr === 'true'}
+                                            onChange={val => setSettings({ ...settings, mqtt_pub_forward_sdr: String(val) })}
+                                        />
+                                    </div>
+                                    <div className="form-group" style={{ marginTop: '5px' }}>
+                                        <div>
+                                            <label>Forward AisStream</label>
+                                            <div className="description">Skicka data från internet-källor</div>
+                                        </div>
+                                        <Toggle
+                                            checked={settings.mqtt_pub_forward_aisstream === 'true'}
+                                            onChange={val => setSettings({ ...settings, mqtt_pub_forward_aisstream: String(val) })}
+                                        />
+                                    </div>
+                                    <div className="settings-section-title" style={{ marginTop: '15px', fontSize: '0.85rem', opacity: 0.7 }}>Authentication</div>
+                                    <div className="form-group">
+                                        <label>Username</label>
+                                        <input type="text" value={settings.mqtt_pub_user} onChange={e => setSettings({ ...settings, mqtt_pub_user: e.target.value })} />
+                                    </div>
+                                    <div className="form-group">
+                                        <label>Password</label>
+                                        <input type="password" value={settings.mqtt_pub_pass} onChange={e => setSettings({ ...settings, mqtt_pub_pass: e.target.value })} />
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
@@ -1898,6 +1969,15 @@ export default function App() {
         mqtt_topic: 'ais',
         mqtt_user: '',
         mqtt_pass: '',
+        mqtt_pub_enabled: 'false',
+        mqtt_pub_url: '',
+        mqtt_pub_topic: 'naviscore/objects',
+        mqtt_pub_user: '',
+        mqtt_pub_pass: '',
+        mqtt_pub_only_new: 'false',
+        mqtt_pub_forward_sdr: 'true',
+        mqtt_pub_forward_aisstream: 'false',
+        forward_enabled: 'false',
         ship_timeout: '60',
         origin_lat: '',
         origin_lon: '',
@@ -2023,6 +2103,15 @@ export default function App() {
                     mqtt_topic: data.mqtt_topic || 'ais',
                     mqtt_user: data.mqtt_user || '',
                     mqtt_pass: data.mqtt_pass || '',
+                    mqtt_pub_enabled: data.mqtt_pub_enabled || 'false',
+                    mqtt_pub_url: data.mqtt_pub_url || '',
+                    mqtt_pub_topic: data.mqtt_pub_topic || 'naviscore/objects',
+                    mqtt_pub_user: data.mqtt_pub_user || '',
+                    mqtt_pub_pass: data.mqtt_pub_pass || '',
+                    mqtt_pub_only_new: data.mqtt_pub_only_new || 'false',
+                    mqtt_pub_forward_sdr: data.mqtt_pub_forward_sdr || 'true',
+                    mqtt_pub_forward_aisstream: data.mqtt_pub_forward_aisstream || 'false',
+                    forward_enabled: data.forward_enabled || 'false',
                     ship_timeout: data.ship_timeout || '60',
                     origin_lat: data.origin_lat || '',
                     origin_lon: data.origin_lon || '',
