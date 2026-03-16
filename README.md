@@ -89,9 +89,45 @@ NavisCore is designed to be a central hub for maritime data:
 - **MQTT**: Subscribe to remote AIS topics for distributed monitoring.
 - **AisStream.io (Hybrid)**: This is a powerful feature that allows you to fetch real-time global AIS data.
   - **API Key Required**: To use this, you need a free API key from [AisStream.io](https://aisstream.io).
-  - **Interactive Bounding Box**: You can define the geographic area you want to monitor directly on the map. Open **Settings -> Hybrid Data** and click **"Välj område på kartan"** to drag a selection box.
+  - **Interactive Bounding Box**: You can define the geographic area you want to monitor directly on the map. Open **Settings -> Hybrid Data** and click **"Select area on map"** to drag a selection box.
   - **Coordinate System**: The system uses decimal degrees (WGS84). A Bounding Box is defined by its South-West (min lat, min lon) and North-East (max lat, max lon) corners.
   - **Auto-Sync**: The backend automatically restarts the stream filtering as soon as you save your new coordinates.
+
+## 🏠 Home Assistant Integration
+
+NavisCore can easily be integrated with [Home Assistant](https://www.home-assistant.io/) using its MQTT feed. Below is an example of an automation that notifies you when a new vessel is detected.
+
+```yaml
+alias: "AIS: New Vessel Detected"
+description: "Sends a notification with a ship image when a new object appears in NavisCore"
+trigger:
+  - platform: mqtt
+    topic: "naviscore/objects"
+condition:
+  - condition: template
+    # Only trigger for new vessels (not updates)
+    value_template: "{{ trigger.payload_json.event_type == 'new' }}"
+  - condition: template
+    # Filter out buoys and beacons
+    value_template: "{{ trigger.payload_json.is_nav_aid == false }}"
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "🚢 {{ trigger.payload_json.name }}"
+      message: >
+        Type: {{ trigger.payload_json.ship_type_label }}
+        Source: {{ trigger.payload_json.source }}
+      data:
+        # Includes the vessel image in the notification
+        image: "{{ trigger.payload_json.image_url }}"
+        # Opens NavisCore when the notification is clicked
+        clickAction: "http://192.168.1.125"
+        # Grouping and replacement tag
+        group: "ais-vessels"
+        tag: "ais-new-vessel"
+mode: parallel
+max: 10
+```
 
 ## 📄 License & Contributing
 Contributions are welcome! Feel free to open issues or submit pull requests.
