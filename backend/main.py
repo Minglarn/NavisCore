@@ -438,42 +438,27 @@ async def process_ais_data(data: dict):
         async with db_session() as db:
             settings = await get_all_settings(db)
             
-            if msg_type in [5, 24] and lat is None:
-                if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
-                async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
-                    row = await cursor.fetchone()
-                    reset_count = False
-                    if row:
-                        try:
-                            last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                            if (datetime.utcnow() - last_seen_dt).total_seconds() > (int(settings.get("ship_timeout", 60)) * 60): reset_count = True
-                        except Exception: pass
-                await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
-                update_fields = ["last_seen = CURRENT_TIMESTAMP", ("previous_seen = last_seen, message_count = 1" if reset_count else "message_count = message_count + 1")]
-                vals = []
-                if ship_name: update_fields.append("name = ?"); vals.append(ship_name)
-                if data.get("callsign"): update_fields.append("callsign = ?"); vals.append(data.get("callsign"))
-                stype = data.get("ship_type") or data.get("shiptype")
-                if stype is not None: update_fields.append("type = ?"); vals.append(stype)
-                update_fields.append("source = ?"); vals.append(source)
-                if data.get("destination"): update_fields.append("destination = ?"); vals.append(data.get("destination"))
-                if data.get("eta"): update_fields.append("eta = ?"); vals.append(data.get("eta"))
-                if data.get("imo"): update_fields.append("imo = ?"); vals.append(data.get("imo"))
-                vals.append(mmsi_str)
-                await db.execute(f'UPDATE ships SET {", ".join(update_fields)} WHERE mmsi = ?', tuple(vals))
-                
-                # Dimensions
-                to_b, to_s, to_p, to_st = data.get("to_bow"), data.get("to_stern"), data.get("to_port"), data.get("to_starboard")
-                if to_b is not None and to_s is not None: await db.execute("UPDATE ships SET length = ? WHERE mmsi = ?", (to_b + to_s, mmsi_str))
-                if to_p is not None and to_st is not None: await db.execute("UPDATE ships SET width = ? WHERE mmsi = ?", (to_p + to_st, mmsi_str))
-                await db.commit()
-                return
-
-            if (lat is None or lon is None) and msg_type != 8: return
+            # 1. Determine Event Type (New, Re-acquired, or Update)
+            async with db.execute('SELECT last_seen, latitude, longitude FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+                row = await cursor.fetchone()
             
+            is_new_v = row is None
+            reset_count = False
+            last_known_lat, last_known_lon = None, None
+            
+            if row:
+                last_known_lat, last_known_lon = row[1], row[2]
+                try:
+                    last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
+                    if (datetime.utcnow() - last_seen_dt).total_seconds() > (int(settings.get("ship_timeout", 60)) * 60):
+                        reset_count = True
+                        logger.info(f"Vessel {mmsi_str} re-acquired. Resetting count.")
+                except Exception: pass
+
+            # 2. Prepare ship data dictionary
             is_meteo = data.get("is_meteo", False) or msg_type in [4, 8]
             if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
-        
+            
             ship_data = {
                 "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
                 "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype"),
@@ -493,38 +478,43 @@ async def process_ais_data(data: dict):
                 ship_data["status_text"] = f"Advanced Binary (DAC:{dac}, FI:{fid})" if dac is not None and fid is not None else "Advanced Binary Message"
 
             if ship_data.get("sog") is not None and ship_data["sog"] < 0.1:
-                if data.get("nav_status") in [0, 8]: ship_data["status_text"] = "Moored (Stationary)"; ship_data["nav_status"] = 5
+                if data.get("nav_status") in [0, 8]: ship_data["status_text"] = "Moored (Stationary)"
 
-            async with db.execute('SELECT last_seen FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
-                row = await cursor.fetchone()
-                reset_count = False
-                if row:
-                    try:
-                        last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                        if (datetime.utcnow() - last_seen_dt).total_seconds() > (int(settings.get("ship_timeout", 60)) * 60):
-                            reset_count = True; logger.info(f"Vessel {mmsi_str} re-acquired. Resetting count.")
-                    except Exception as e: logger.error(f"Error checking last_seen: {e}")
+            # If current message has no lat/lon but we have it in DB, use it for the broadcast/mqtt
+            if ship_data.get("lat") is None and last_known_lat is not None:
+                ship_data["lat"], ship_data["lon"] = last_known_lat, last_known_lon
 
-            is_new_v = row is None
+            # 3. Update Database
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
             
-            flds, vals = ["last_seen = CURRENT_TIMESTAMP", "message_count = message_count + 1"], []
-            for f, k in [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type"), ("wind_speed", "wind_speed"), ("wind_gust", "wind_gust"), ("wind_direction", "wind_direction"), ("water_level", "water_level"), ("air_temp", "air_temp"), ("air_pressure", "air_pressure")]:
+            flds = ["last_seen = CURRENT_TIMESTAMP"]
+            if reset_count: flds.append("previous_seen = last_seen, message_count = 1")
+            else: flds.append("message_count = message_count + 1")
+            
+            vals = []
+            db_fields = [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type"), ("wind_speed", "wind_speed"), ("wind_gust", "wind_gust"), ("wind_direction", "wind_direction"), ("water_level", "water_level"), ("air_temp", "air_temp"), ("air_pressure", "air_pressure"), ("destination", "destination"), ("draught", "draught"), ("eta", "eta"), ("imo", "imo")]
+            for f, k in db_fields:
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(v)
+            
             for f, k in [("is_meteo", "is_meteo"), ("is_emergency", "is_emergency"), ("virtual_aton", "virtual_aton"), ("is_advanced_binary", "is_advanced_binary"), ("dac", "dac"), ("fid", "fid"), ("raw_payload", "raw_payload")]:
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(1 if v is True else (0 if v is False else v))
             
+            # Dimensions
+            to_b, to_s, to_p, to_st = data.get("to_bow"), data.get("to_stern"), data.get("to_port"), data.get("to_starboard")
+            if to_b is not None and to_s is not None: flds.append("length = ?"); vals.append(to_b + to_s)
+            if to_p is not None and to_st is not None: flds.append("width = ?"); vals.append(to_p + to_st)
+
             vals.append(mmsi_str)
             await db.execute(f'UPDATE ships SET {", ".join(flds)} WHERE mmsi = ?', tuple(vals))
             
-            # History
-            now_ms = int(datetime.now().timestamp() * 1000)
-            async with db.execute('SELECT latitude, longitude FROM ship_history WHERE mmsi = ? ORDER BY timestamp DESC LIMIT 1', (mmsi_str,)) as cursor:
-                hr = await cursor.fetchone()
-                if not hr or haversine_distance(hr[0], hr[1], lat, lon) > 0.05:
-                    await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, now_ms))
+            # 4. History Tracking (only if position exists)
+            if lat is not None and lon is not None:
+                async with db.execute('SELECT latitude, longitude FROM ship_history WHERE mmsi = ? ORDER BY timestamp DESC LIMIT 1', (mmsi_str,)) as cursor:
+                    hr = await cursor.fetchone()
+                    if not hr or haversine_distance(hr[0], hr[1], lat, lon) > 0.05:
+                        await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, int(datetime.now().timestamp() * 1000)))
             
             # Stats
             today, time_min = datetime.utcnow().strftime('%Y-%m-%d'), datetime.utcnow().strftime('%Y-%m-%d %H:%M')
@@ -562,18 +552,15 @@ async def process_ais_data(data: dict):
                     ship_data["manual_image"] = bool(r[15])
                     if ship_data.get("lat") is None: ship_data["lat"] = r[16]
                     if ship_data.get("lon") is None: ship_data["lon"] = r[17]
-                    if len(r) > 19:
-                        if r[18]: ship_data["is_meteo"] = True
-                        if r[19]: ship_data["is_emergency"] = True
-                        if r[20]: ship_data["emergency_type"] = r[20]
-                        if r[21]: ship_data["virtual_aton"] = True
-                        if r[22]: ship_data["is_advanced_binary"] = True
-                        if r[23] is not None: ship_data["dac"] = r[23]
-                        if r[24] is not None: ship_data["fid"] = r[24]
-                        if r[25]: ship_data["raw_payload"] = r[25]
-                        if len(r) > 26:
-                            ship_data["wind_speed"], ship_data["wind_gust"], ship_data["wind_direction"], ship_data["water_level"], ship_data["air_temp"] = r[26], r[27], r[28], r[29], r[30]
-                            if len(r) > 31: ship_data["air_pressure"] = r[31]
+                    # Unified field mapping for extra parameters
+                    ship_data["is_meteo"] = bool(r[18])
+                    ship_data["is_emergency"] = bool(r[19])
+                    ship_data["emergency_type"] = r[20]
+                    ship_data["virtual_aton"] = bool(r[21])
+                    ship_data["is_advanced_binary"] = bool(r[22])
+                    ship_data["dac"], ship_data["fid"], ship_data["raw_payload"] = r[23], r[24], r[25]
+                    ship_data["wind_speed"], ship_data["wind_gust"], ship_data["wind_direction"] = r[26], r[27], r[28]
+                    ship_data["water_level"], ship_data["air_temp"], ship_data["air_pressure"] = r[29], r[30], r[31]
             
             if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
                 try:
@@ -581,28 +568,29 @@ async def process_ais_data(data: dict):
                     ship_data["ship_type_text"], ship_data["ship_category"] = get_ship_type_name(c), get_ship_category(c)
                 except Exception: pass
             
-            # Range tracking
-            origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
-            if (source != "aisstream" or settings.get("include_aisstream_in_range") == "true") and \
-               origin_lat and origin_lon and not is_meteo and not ship_data.get("is_aton") and \
-               not ship_data.get("is_sar") and not mmsi_str.startswith("99"):
-                try:
-                    dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
-                    if ship_data.get("message_count", 0) >= 1 and 1.0 <= dist <= 370.4:
-                        bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
-                        sector = int(bearing // 5) % 72
-                        async with db.execute('SELECT range_km_24h, range_km_alltime FROM coverage_sectors WHERE sector_id = ?', (sector,)) as cursor:
-                            row = await cursor.fetchone()
-                            rng_24h, rng_all = (row[0] if row else 0.0), (row[1] if row else 0.0)
-                            updated = False
-                            if dist > rng_24h: rng_24h = dist; updated = True
-                            if dist > rng_all: rng_all = dist; updated = True
-                            if updated or not row:
-                                await db.execute('INSERT INTO coverage_sectors (sector_id, range_km_24h, range_km_alltime, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(sector_id) DO UPDATE SET range_km_24h = ?, range_km_alltime = ?, last_updated = CURRENT_TIMESTAMP', (sector, rng_24h, rng_all, rng_24h, rng_all))
-                                await db.execute('UPDATE daily_stats SET max_range_km = ? WHERE date = ? AND ? > max_range_km', (dist, today, dist))
-                                await db.execute('INSERT INTO sector_history (sector_id, distance_km, timestamp) VALUES (?, ?, ?)', (sector, dist, int(datetime.utcnow().timestamp() * 1000)))
-                                await broadcast({"type": "coverage_update", "sector_id": sector, "range_km_24h": rng_24h, "range_km_alltime": rng_all})
-                except Exception as e: logger.error(f"Range err: {e}")
+            # Range tracking (only if current message has position)
+            if lat is not None and lon is not None:
+                origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
+                if (source != "aisstream" or settings.get("include_aisstream_in_range") == "true") and \
+                   origin_lat and origin_lon and not is_meteo and not ship_data.get("is_aton") and \
+                   not ship_data.get("is_sar") and not mmsi_str.startswith("99"):
+                    try:
+                        dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
+                        if ship_data.get("message_count", 0) >= 1 and 1.0 <= dist <= 370.4:
+                            bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
+                            sector = int(bearing // 5) % 72
+                            async with db.execute('SELECT range_km_24h, range_km_alltime FROM coverage_sectors WHERE sector_id = ?', (sector,)) as cursor:
+                                row = await cursor.fetchone()
+                                rng_24h, rng_all = (row[0] if row else 0.0), (row[1] if row else 0.0)
+                                updated = False
+                                if dist > rng_24h: rng_24h = dist; updated = True
+                                if dist > rng_all: rng_all = dist; updated = True
+                                if updated or not row:
+                                    await db.execute('INSERT INTO coverage_sectors (sector_id, range_km_24h, range_km_alltime, last_updated) VALUES (?, ?, ?, CURRENT_TIMESTAMP) ON CONFLICT(sector_id) DO UPDATE SET range_km_24h = ?, range_km_alltime = ?, last_updated = CURRENT_TIMESTAMP', (sector, rng_24h, rng_all, rng_24h, rng_all))
+                                    await db.execute('UPDATE daily_stats SET max_range_km = ? WHERE date = ? AND ? > max_range_km', (dist, today, dist))
+                                    await db.execute('INSERT INTO sector_history (sector_id, distance_km, timestamp) VALUES (?, ?, ?)', (sector, dist, int(datetime.utcnow().timestamp() * 1000)))
+                                    await broadcast({"type": "coverage_update", "sector_id": sector, "range_km_24h": rng_24h, "range_km_alltime": rng_all})
+                    except Exception as e: logger.error(f"Range err: {e}")
 
             await db.commit()
             
