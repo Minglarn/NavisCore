@@ -707,14 +707,14 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
         labels: history30d.map((h: any) => h.date.split('-').slice(1).join('/')),
         datasets: [
             {
-                label: 'Fartyg',
+                label: 'Vessels',
                 data: history30d.map((h: any) => h.unique_ships),
                 backgroundColor: '#36A2EB',
                 borderRadius: 4,
                 yAxisID: 'y',
             },
             {
-                label: 'Meddelanden',
+                label: 'Messages',
                 data: history30d.map((h: any) => h.total_messages),
                 backgroundColor: '#4BC0C088',
                 borderRadius: 4,
@@ -735,12 +735,12 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
         scales: { 
             y: { 
                 type: 'linear' as const, display: true, position: 'left' as const,
-                title: { display: true, text: 'Fartyg', color: colors.textMuted },
+                title: { display: true, text: 'Vessels', color: colors.textMuted },
                 grid: { color: colors.border }, ticks: { color: colors.textMuted } 
             },
             y1: { 
                 type: 'linear' as const, display: true, position: 'right' as const,
-                title: { display: true, text: 'Meddelanden', color: colors.textMuted },
+                title: { display: true, text: 'Messages', color: colors.textMuted },
                 grid: { drawOnChartArea: false }, ticks: { color: colors.textMuted } 
             },
             x: { grid: { display: false }, ticks: { color: colors.textMuted } } 
@@ -779,7 +779,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
     const hourlyData = {
         labels: hourlyBreakdown.map((h: any) => `${h.hour}:00`),
         datasets: [{
-            label: 'Meddelanden',
+            label: 'Messages',
             data: hourlyBreakdown.map((h: any) => h.count),
             borderColor: '#0ea5e9',
             backgroundColor: 'rgba(14, 165, 233, 0.1)',
@@ -872,7 +872,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                                             <Doughnut data={typeData} options={doughnutOptions} />
                                         ) : (
                                             <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-                                                Ingen data tillgänglig
+                                                No data available
                                             </div>
                                         )}
                                     </ChartCard>
@@ -1018,14 +1018,14 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold'
                         }}
                     >
-                        {isEditing ? 'SPARA' : 'ÄNDRA'}
+                        {isEditing ? 'SAVE' : 'EDIT'}
                     </button>
                     {isEditing && (
                         <button 
                             onClick={() => { setIsEditing(false); setEditData({ ...ship }); }}
                             style={{ background: 'transparent', border: `1px solid ${colors.border}`, cursor: 'pointer', color: colors.textMuted, padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem' }}
                         >
-                            AVBRYT
+                            CANCEL
                         </button>
                     )}
                 </div>
@@ -1092,7 +1092,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         style={{ textAlign: 'center', color: colors.textMuted, cursor: 'pointer', padding: '20px' }}
                     >
                         <Ship size={48} style={{ marginBottom: '10px', opacity: 0.3 }} />
-                        <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>KLICKA FÖR ATT LADDA UPP BILD</div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 600 }}>CLICK TO UPLOAD IMAGE</div>
                     </div>
                 )}
                 {uploading && <div className="spinner" style={{ position: 'absolute' }}></div>}
@@ -1150,7 +1150,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             ) : getShipTypeName(mmsiStr, ship.shiptype, ship.ship_type_text)} 
                             colors={colors} 
                         />
-                        <AccordionRow label="Meddelanden" value={ship.message_count || '1'} colors={colors} />
+                        <AccordionRow label="Messages" value={ship.message_count || '1'} colors={colors} />
                     </div>
                 </Accordion>
 
@@ -1165,8 +1165,8 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         <AccordionRow label="Speed (SOG)" value={ship.sog ? `${ship.sog} kn` : '0.0 kn'} colors={colors} />
                         <AccordionRow label="Course (COG)" value={ship.cog ? `${ship.cog}°` : '0°'} colors={colors} />
                         <AccordionRow label="Heading" value={ship.heading ? `${ship.heading}°` : 'N/A'} colors={colors} />
-                        <AccordionRow label="Senaste signal" value={getTimeAgo(ship.timestamp)} colors={colors} />
-                        <AccordionRow label="Sett tidigare" value={ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--'} colors={colors} />
+                        <AccordionRow label="Last signal" value={getTimeAgo(ship.timestamp)} colors={colors} />
+                        <AccordionRow label="Seen previously" value={ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--'} colors={colors} />
                     </div>
                 </Accordion>
 
@@ -1207,31 +1207,31 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'MMSI', value: mmsiStr },
         { label: 'IMO', value: ship.imo || '--' },
         { label: 'Callsign', value: ship.callsign || '--' },
-        { label: 'Fartygstyp', value: ship.ship_type_text || (ship.shiptype ? `Typ ${ship.shiptype}` : 'N/A') },
+        { label: 'Vessel Type', value: ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'N/A') },
     ];
 
     const navBlocks = [
         { label: 'Position', value: `${ship.lat.toFixed(3)}, ${ship.lon.toFixed(3)}` },
-        { label: 'Fart (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
-        { label: 'Kurs (COG)', value: ship.cog != null ? `${ship.cog.toFixed(0)}°` : '--' },
-        { label: 'Styrning', value: ship.heading != null ? `${ship.heading}°` : '--' },
+        { label: 'Speed (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
+        { label: 'Course (COG)', value: ship.cog != null ? `${ship.cog.toFixed(0)}°` : '--' },
+        { label: 'Heading', value: ship.heading != null ? `${ship.heading}°` : '--' },
         { label: 'ROT', value: ship.rot != null ? `${ship.rot}°/min` : '--' },
-        { label: 'Status', value: ship.status_text || 'Okänd' },
+        { label: 'Status', value: ship.status_text || 'Unknown' },
     ];
 
     const voyageBlocks = [
         { label: 'Destination', value: ship.destination || '--' },
         { label: 'ETA', value: ship.eta || '--' },
-        { label: 'Djupgående', value: ship.draught ? `${ship.draught}m` : '--' },
+        { label: 'Draught', value: ship.draught ? `${ship.draught}m` : '--' },
     ];
 
     const specBlocks = [
-        { label: 'Längd', value: ship.length ? `${ship.length}m` : '--' },
-        { label: 'Bredd', value: ship.width ? `${ship.width}m` : '--' },
-        { label: 'Meddelanden', value: ship.message_count || '--' },
-        { label: 'Senaste', value: getTimeAgo(ship.timestamp) },
-        { label: 'Källa', value: ship.source === 'aisstream' ? 'Stream' : 'Lokal' },
-        { label: 'Sett tidigare', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
+        { label: 'Length', value: ship.length ? `${ship.length}m` : '--' },
+        { label: 'Width', value: ship.width ? `${ship.width}m` : '--' },
+        { label: 'Messages', value: ship.message_count || '--' },
+        { label: 'Latest', value: getTimeAgo(ship.timestamp) },
+        { label: 'Source', value: ship.source === 'aisstream' ? 'Stream' : 'Local' },
+        { label: 'Seen previously', value: ship.previous_seen ? getTimeAgo(ship.previous_seen) : '--' },
     ];
 
     return (
@@ -1297,11 +1297,11 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                         />
                     ) : (
                         <div 
-                            title="Klicka för att ladda upp egen bild"
+                            title="Click to upload custom image"
                             onClick={() => fileInputRef.current?.click()}
                             style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
                             <Ship size={80} strokeWidth={1} />
-                            <span style={{ fontSize: '0.9rem' }}>{uploading ? 'Laddar upp...' : 'Klicka för att ladda upp egen bild'}</span>
+                            <span style={{ fontSize: '0.9rem' }}>{uploading ? 'Uploading...' : 'Click to upload custom image'}</span>
                         </div>
                     )}
                     
@@ -1317,7 +1317,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                             <span style={{ fontSize: '3.5rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
                             <div style={{ flex: 1 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
-                                    <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{ship.name || 'Okänt Fartyg'}</h1>
+                                    <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{ship.name || 'Unknown Vessel'}</h1>
                                     <div style={{
                                         background: ship.source === 'aisstream' ? '#44aaff33' : '#00ff8033',
                                         color: ship.source === 'aisstream' ? '#44aaff' : '#00ff80',
@@ -1335,7 +1335,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                                 </div>
                                 <div style={{ opacity: 0.9, fontSize: '1rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Anchor size={16} />
-                                    {ship.ship_type_text || (ship.shiptype ? `Typ ${ship.shiptype}` : 'Okänd Typ')}
+                                    {ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : 'Unknown Type')}
                                     <span style={{ opacity: 0.5 }}>•</span>
                                     <span>MMSI: {mmsiStr}</span>
                                 </div>
@@ -1369,7 +1369,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                         <div style={{ padding: '0 15px' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', color: '#44aaff' }}>
                                 <Navigation size={16} />
-                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>RESA</span>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, letterSpacing: '1px' }}>VOYAGE</span>
                             </div>
                             <div style={{ display: 'grid', gap: '14px' }}>
                                 {voyageBlocks.map(b => (
@@ -1437,7 +1437,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                             cursor: 'pointer'
                         }}
                     >
-                        Stäng
+                        Close
                     </button>
                 </div>
             </div>
@@ -1604,7 +1604,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     <div className="form-group" style={{ marginTop: '5px' }}>
                                         <div>
                                             <label>Forward Local SDR</label>
-                                            <div className="description">Skicka data från lokal mottagare</div>
+                                            <div className="description">Forward data from local receiver</div>
                                         </div>
                                         <Toggle
                                             checked={settings.mqtt_pub_forward_sdr === 'true'}
@@ -1614,7 +1614,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     <div className="form-group" style={{ marginTop: '5px' }}>
                                         <div>
                                             <label>Forward AisStream</label>
-                                            <div className="description">Skicka data från internet-källor</div>
+                                            <div className="description">Forward data from internet sources</div>
                                         </div>
                                         <Toggle
                                             checked={settings.mqtt_pub_forward_aisstream === 'true'}
@@ -1727,7 +1727,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             <div className="form-group">
                                 <div>
                                     <label>Cluster Break Zoom</label>
-                                    <div className="description">Zoomnivå där fartygskluster delas upp (standard: 11)</div>
+                                    <div className="description">Zoom level where vessel clusters are split (default: 11)</div>
                                 </div>
                                 <input
                                     type="number"
@@ -1861,7 +1861,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
                             <div className="settings-section-title" style={{ marginTop: '20px' }}>Geographical Area (Bounding Box)</div>
                             <div className="description" style={{ marginBottom: '15px' }}>
-                                Definiera det område som strömmen ska hämta data för. Du kan dra en box på kartan för att välja området.
+                                Define the area the stream will fetch data for. You can draw a box on the map to select the area.
                             </div>
                             
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
@@ -1895,7 +1895,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     }, 300);
                                 }}
                             >
-                                <Radar size={18} /> Välj område på kartan
+                                <Radar size={18} /> Select area on map
                             </button>
                             <div className="form-group" style={{ marginTop: '10px' }}>
                                 <label>Show internet vessels on main map</label>
@@ -1947,7 +1947,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 
 export default function App() {
     const [ships, setShips] = useState<any[]>([]);
-    const [status, setStatus] = useState('Ansluter...');
+    const [status, setStatus] = useState('Connecting...');
     const [mqttConnected, setMqttConnected] = useState(false);
     const [hoveredMmsi, setHoveredMmsi] = useState<string | null>(null);
     const [localTimeoutStr, setLocalTimeoutStr] = useState('60');
@@ -2735,15 +2735,15 @@ export default function App() {
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)'
                 }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#00f0ff' }}>Interaktivt Val</div>
-                    <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Dra en box på kartan för att välja täckningsområde.</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#00f0ff' }}>Interactive Selection</div>
+                    <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Draw a box on the map to select the coverage area.</div>
                     <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
                         <button 
                             className="styled-button" 
                             style={{ flex: 1, borderColor: '#ff4444', color: '#ff4444' }}
                             onClick={cancelSelection}
                         >
-                            Avbryt
+                            Cancel
                         </button>
                         <button 
                             className="styled-button primary" 
@@ -2751,7 +2751,7 @@ export default function App() {
                             onClick={confirmSelection}
                             disabled={!currentSelection}
                         >
-                            Bekräfta Val
+                            Confirm Selection
                         </button>
                     </div>
                 </div>
@@ -2790,7 +2790,7 @@ export default function App() {
                                 <LayersControl.BaseLayer name="Satellite (Esri)" checked={mqttSettings.base_layer === 'satellite'}>
                                     <TileLayer
                                         url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-                                        attribution='Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
+                                        attribution='Tiles &copy; Esri — Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
                                     />
                                 </LayersControl.BaseLayer>
                                 <LayersControl.BaseLayer name="Sea Chart / OSM" checked={mqttSettings.base_layer === 'osm'}>
@@ -2950,7 +2950,7 @@ export default function App() {
                                                     }}>
                                                         <div style={{ background: '#44aaff', padding: '10px 15px', color: '#fff', fontSize: '1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <Activity size={18} />
-                                                            {s.name || 'Meteorologisk Station'}
+                                                            {s.name || 'Meteorological Station'}
                                                         </div>
                                                         <div style={{ background: isDark ? '#1a1a2e' : '#fff', padding: '15px', color: colors.textMain }}>
                                                             <div style={{ fontSize: '0.8rem', color: colors.textMuted, marginBottom: '10px', textAlign: 'center' }}>
@@ -2958,27 +2958,27 @@ export default function App() {
                                                             </div>
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                                                 <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
-                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Vind</div>
+                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Wind</div>
                                                                     <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#00f0ff' }}>{s.wind_speed ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>m/s</span></div>
                                                                     <div style={{ fontSize: '0.7rem', marginTop: '2px' }}>{s.wind_direction ?? '--'}°</div>
                                                                 </div>
                                                                 <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
-                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Miljö</div>
+                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Environment</div>
                                                                     <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#ffab40' }}>{s.air_temp ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>°C</span></div>
-                                                                    <div style={{ fontSize: '0.7rem' }}>Vatten: {s.water_level ?? '--'} m</div>
+                                                                    <div style={{ fontSize: '0.7rem' }}>Water: {s.water_level ?? '--'} m</div>
                                                                     {s.air_pressure && (
-                                                                        <div style={{ fontSize: '0.7rem', color: colors.textMuted }}>Tryck: {s.air_pressure} hPa</div>
+                                                                        <div style={{ fontSize: '0.7rem', color: colors.textMuted }}>Pressure: {s.air_pressure} hPa</div>
                                                                     )}
                                                                 </div>
                                                             </div>
                                                             {s.visibility !== undefined && (
                                                                 <div style={{ marginTop: '10px', fontSize: '0.75rem', textAlign: 'center', color: colors.textMuted }}>
-                                                                    Sikt: <strong>{s.visibility} NM</strong>
+                                                                    Visibility: <strong>{s.visibility} NM</strong>
                                                                 </div>
                                                             )}
                                                             {s.wind_gust > s.wind_speed && (
                                                                 <div style={{ marginTop: '10px', padding: '6px', background: 'rgba(255, 50, 50, 0.1)', color: '#ff3333', borderRadius: '6px', fontSize: '0.75rem', textAlign: 'center', fontWeight: 'bold' }}>
-                                                                    ⚠️ Vindbyar upp till {s.wind_gust} m/s
+                                                                    ⚠️ Wind gusts up to {s.wind_gust} m/s
                                                                 </div>
                                                             )}
                                                         </div>
@@ -2988,12 +2988,12 @@ export default function App() {
                                                         <strong style={{ fontSize: '1rem' }}>{s.name || s.mmsi}</strong>
                                                         {s.is_emergency && (
                                                             <div style={{ background: '#ff0000', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                                                ⚠️ NÖDSITUATION
+                                                                ⚠️ EMERGENCY
                                                             </div>
                                                         )}
                                                         {s.virtual_aton && (
                                                             <div style={{ background: '#ff00ff', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                                                                VIRTUELLT SJÖMÄRKE
+                                                                VIRTUAL AIS STATION
                                                             </div>
                                                         )}
                                                         {s.status_text && (
@@ -3071,12 +3071,12 @@ export default function App() {
                                                                 </div>
                                                                 {s.is_emergency && (
                                                                     <div style={{ gridColumn: 'span 2', background: '#ff0000', color: '#fff', padding: '8px', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', animation: 'emergency-flash 1s infinite alternate' }}>
-                                                                        ⚠️ NÖDSITUATION
+                                                                        ⚠️ EMERGENCY
                                                                     </div>
                                                                 )}
                                                                 {s.virtual_aton && (
                                                                     <div style={{ gridColumn: 'span 2', background: '#ff00ff', color: '#fff', padding: '4px', borderRadius: '4px', textAlign: 'center', fontSize: '0.75rem' }}>
-                                                                        VIRTUELT SJÖMÄRKE
+                                                                        VIRTUAL AIS STATION
                                                                     </div>
                                                                 )}
                                                                 <div>
