@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -2025,7 +2025,25 @@ export default function App() {
     const [isResizing, setIsResizing] = useState(false);
     const isResizingRef = useRef(isResizing);
     const [currentZoom, setCurrentZoom] = useState(10);
-    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>({ key: 'last_seen', direction: 'desc' });
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' }>(() => {
+        try {
+            const saved = localStorage.getItem('naviscore_sort_config');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { console.error("Could not load sort config", e); }
+        return { key: 'last_seen', direction: 'desc' };
+    });
+    const [sidebarViewMode, setSidebarViewMode] = useState<'detail' | 'compact'>(() => {
+        const saved = localStorage.getItem('naviscore_sidebar_view_mode');
+        return (saved === 'compact' || saved === 'detail') ? saved : 'detail';
+    });
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_sort_config', JSON.stringify(sortConfig));
+    }, [sortConfig]);
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_sidebar_view_mode', sidebarViewMode);
+    }, [sidebarViewMode]);
     const [sidebarWidth, setSidebarWidth] = useState(() => {
         const saved = localStorage.getItem('naviscore_sidebar_width');
         return saved ? parseInt(saved) : 380;
@@ -3205,6 +3223,13 @@ export default function App() {
                                     Seen Objects
                                 </h1>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <button 
+                                        onClick={() => setSidebarViewMode(sidebarViewMode === 'detail' ? 'compact' : 'detail')} 
+                                        style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}
+                                        title={sidebarViewMode === 'detail' ? 'Switch to Compact View' : 'Switch to Detail View'}
+                                    >
+                                        {sidebarViewMode === 'detail' ? <Rows size={18} /> : <LayoutGrid size={18} />}
+                                    </button>
                                     <button onClick={() => setSortConfig({ ...sortConfig, direction: sortConfig.direction === 'asc' ? 'desc' : 'asc' })} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px', display: 'flex', alignItems: 'center' }}>
                                         <Navigation size={16} style={{
                                             transform: sortConfig.direction === 'asc' ? 'rotate(0deg)' : 'rotate(180deg)',
@@ -3302,11 +3327,15 @@ export default function App() {
                                     <option value="all">All Ship Types</option>
                                     <option value="cargo">Cargo Vessels</option>
                                     <option value="tanker">Tankers</option>
-                                    <option value="passenger">Passenger Ships</option>
+                                    <option value="passenger">Passenger</option>
+                                    <option value="pilot_sar">Pilot / SAR</option>
+                                    <option value="tug">Tugs / Towing</option>
                                     <option value="fishing">Fishing</option>
-                                    <option value="pleasure">Pleasure/Sailing</option>
-                                    <option value="tug">Tugs/Towing</option>
+                                    <option value="pleasure">Pleasure / Sailing</option>
                                     <option value="highspeed">High Speed Craft</option>
+                                    <option value="military">Military / Law</option>
+                                    <option value="wig">Wing In Ground (WIG)</option>
+                                    <option value="special">Special / Ops</option>
                                     <option value="other">Other Types</option>
                                 </select>
                             </div>
@@ -3345,14 +3374,25 @@ export default function App() {
 
                                             // Ship Type Filter
                                             if (filterShipType !== 'all') {
-                                                if (filterShipType === 'cargo' && !(type >= 70 && type <= 79)) return false;
-                                                if (filterShipType === 'tanker' && !(type >= 80 && type <= 89)) return false;
-                                                if (filterShipType === 'passenger' && !(type >= 60 && type <= 69)) return false;
-                                                if (filterShipType === 'fishing' && type !== 30) return false;
-                                                if (filterShipType === 'pleasure' && !(type >= 36 && type <= 37)) return false;
-                                                if (filterShipType === 'tug' && !(type >= 31 && type <= 32 || type === 52)) return false;
-                                                if (filterShipType === 'highspeed' && !(type >= 40 && type <= 49)) return false;
-                                                if (filterShipType === 'other' && (type >= 30 && type <= 89)) return false; // Simple logic: not any above but still defined
+                                                const typeNum = parseInt(String(type));
+                                                const typeStr = (s.ship_type_text || "").toUpperCase();
+                                                
+                                                if (filterShipType === 'cargo' && !(typeNum >= 70 && typeNum <= 79 || typeStr.includes('CARGO'))) return false;
+                                                if (filterShipType === 'tanker' && !(typeNum >= 80 && typeNum <= 89 || typeStr.includes('TANKER'))) return false;
+                                                if (filterShipType === 'passenger' && !(typeNum >= 60 && typeNum <= 69 || typeStr.includes('PASSENGER'))) return false;
+                                                if (filterShipType === 'fishing' && !(typeNum === 30 || typeStr.includes('FISHING'))) return false;
+                                                if (filterShipType === 'pleasure' && !(typeNum >= 36 && typeNum <= 37 || typeStr.includes('SAILING') || typeStr.includes('PLEASURE'))) return false;
+                                                if (filterShipType === 'tug' && !(typeNum === 52 || typeNum === 31 || typeNum === 32 || typeStr.includes('TUG') || typeStr.includes('TOWING'))) return false;
+                                                if (filterShipType === 'pilot_sar' && !(typeNum === 50 || typeNum === 51 || typeStr.includes('PILOT') || typeStr.includes('SAR'))) return false;
+                                                if (filterShipType === 'highspeed' && !(typeNum >= 40 && typeNum <= 49 || typeStr.includes('HSC') || typeStr.includes('HIGH SPEED'))) return false;
+                                                if (filterShipType === 'military' && !(typeNum === 35 || typeNum === 55 || typeNum === 59 || typeStr.includes('MILITARY') || typeStr.includes('LAW'))) return false;
+                                                if (filterShipType === 'wig' && !(typeNum >= 20 && typeNum <= 29 || typeStr.includes('WIG') || typeStr.includes('WING'))) return false;
+                                                if (filterShipType === 'special' && !(typeNum === 33 || typeNum === 34 || typeNum === 53 || typeNum === 54 || typeNum === 58 || typeStr.includes('DREDGING') || typeStr.includes('DIVING') || typeStr.includes('PORT') || typeStr.includes('MEDICAL'))) return false;
+                                                
+                                                if (filterShipType === 'other') {
+                                                    const known = (typeNum >= 20 && typeNum <= 89) || typeStr.includes('CARGO') || typeStr.includes('TANKER') || typeStr.includes('PASSENGER') || typeStr.includes('FISHING') || typeStr.includes('SAILING') || typeStr.includes('PLEASURE') || typeStr.includes('TUG') || typeStr.includes('TOWING') || typeStr.includes('PILOT') || typeStr.includes('SAR') || typeStr.includes('HSC') || typeStr.includes('MILITARY') || typeStr.includes('WIG') || typeStr.includes('SPECIAL');
+                                                    if (known) return false;
+                                                }
                                             }
 
                                             return true;
@@ -3383,17 +3423,17 @@ export default function App() {
                                             <div key={ship.mmsi}
                                                 className={showFlash && flashedMmsis.has(String(ship.mmsi)) ? 'ship-flash' : ''}
                                                 style={{
-                                                    padding: '10px',
-                                                    background: idx % 2 === 0 ? colors.bgCard : colors.bgSidebar,
-                                                    borderRadius: '8px',
-                                                    borderLeft: `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}`,
+                                                    padding: sidebarViewMode === 'compact' ? '6px 10px' : '10px',
+                                                    background: idx % 2 === 0 ? colors.bgCard : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
+                                                    borderRadius: sidebarViewMode === 'compact' ? '4px' : '8px',
+                                                    borderLeft: sidebarViewMode === 'compact' ? `3px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}` : `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}`,
                                                     display: 'flex',
-                                                    gap: '12px',
+                                                    gap: sidebarViewMode === 'compact' ? '10px' : '15px',
                                                     alignItems: 'center',
                                                     cursor: 'pointer',
-                                                    transition: 'all 0.2s',
+                                                    transition: 'all 0.15s',
                                                     border: `1px solid ${colors.border}`,
-                                                    marginBottom: '8px'
+                                                    marginBottom: sidebarViewMode === 'compact' ? '2px' : '8px'
                                                 }}
                                                 onClick={() => {
                                                     setHoveredMmsi(String(ship.mmsi));
@@ -3410,31 +3450,35 @@ export default function App() {
                                                 onMouseEnter={e => {
                                                     e.currentTarget.style.transform = 'translateX(-4px)';
                                                     e.currentTarget.style.borderColor = '#44aaff';
+                                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
                                                 }}
                                                 onMouseLeave={e => {
                                                     e.currentTarget.style.transform = 'translateX(0)';
                                                     e.currentTarget.style.borderColor = colors.border;
+                                                    e.currentTarget.style.boxShadow = 'none';
                                                 }}
                                             >
-                                                {/* Thumbnail or Icon */}
-                                                <div style={{ width: '60px', minWidth: '60px', height: '45px', borderRadius: '4px', overflow: 'hidden', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.border}` }}>
-                                                    {ship.imageUrl ? (
-                                                        <img src={ship.imageUrl} alt={ship.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }} />
-                                                    ) : (
-                                                        <Ship size={20} color={getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)} />
-                                                    )}
-                                                </div>
+                                                {/* Thumbnail or Icon (Only in Detail Mode) */}
+                                                {sidebarViewMode === 'detail' && (
+                                                    <div style={{ width: '60px', minWidth: '60px', height: '45px', borderRadius: '4px', overflow: 'hidden', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.border}` }}>
+                                                        {ship.imageUrl ? (
+                                                            <img src={ship.imageUrl} alt={ship.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }} />
+                                                        ) : (
+                                                            <Ship size={20} color={getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)} />
+                                                        )}
+                                                    </div>
+                                                )}
 
                                                 {/* Info Section */}
                                                 <div style={{ flex: 1, minWidth: 0 }}>
                                                     <div style={{
                                                         fontWeight: 700,
-                                                        fontSize: '0.9rem',
+                                                        fontSize: sidebarViewMode === 'compact' ? '0.85rem' : '0.9rem',
                                                         color: 'var(--text-main)',
                                                         display: 'flex',
                                                         alignItems: 'center',
                                                         gap: '6px',
-                                                        marginBottom: '2px'
+                                                        marginBottom: '1px'
                                                     }}>
                                                         <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
                                                         <span style={{
@@ -3443,10 +3487,17 @@ export default function App() {
                                                             textOverflow: 'ellipsis'
                                                         }}>
                                                             {ship.name || ship.mmsi}
+                                                            {sidebarViewMode === 'compact' && ship.name && (
+                                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>
+                                                                    ({ship.mmsi})
+                                                                </span>
+                                                            )}
                                                         </span>
                                                     </div>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
-                                                        <span>{getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}</span>
+                                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: sidebarViewMode === 'compact' ? '120px' : 'none' }}>
+                                                            {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}
+                                                        </span>
                                                         <span style={{ opacity: 0.5 }}>•</span>
                                                         <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}</span>
                                                         <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(0,255,128,0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#00ff80', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}` }}>
