@@ -2956,7 +2956,7 @@ export default function App() {
                                                 direction="top"
                                                 offset={[0, -15]}
                                                 opacity={0.98}
-                                                className={s.is_meteo ? "custom-meteo-tooltip" : ""}
+                                                className="custom-tooltip"
                                             >
                                                 {s.is_meteo ? (
                                                     <div style={{
@@ -3002,31 +3002,93 @@ export default function App() {
                                                         </div>
                                                     </div>
                                                 ) : (
-                                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', background: 'var(--bg-card)', padding: '8px', borderRadius: '8px', color: 'var(--text-main)' }}>
-                                                        <strong style={{ fontSize: '1rem' }}>{s.name || s.mmsi}</strong>
-                                                        {s.is_emergency && (
-                                                            <div style={{ background: '#ff0000', color: '#fff', padding: '4px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: 'bold' }}>
-                                                                ⚠️ EMERGENCY
+                                                    <div style={{ 
+                                                        display: 'flex', 
+                                                        flexDirection: 'row', 
+                                                        alignItems: 'center', 
+                                                        gap: '12px', 
+                                                        background: colors.bgCard, 
+                                                        padding: '10px 14px', 
+                                                        borderRadius: '12px', 
+                                                        color: colors.textMain,
+                                                        boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
+                                                        border: `1px solid ${colors.border}`,
+                                                        minWidth: '320px',
+                                                        fontFamily: 'system-ui, -apple-system, sans-serif'
+                                                    }}>
+                                                        {/* Left: Vessel Image */}
+                                                        <div style={{ position: 'relative', width: '64px', height: '64px', minWidth: '64px', borderRadius: '8px', overflow: 'hidden', background: '#0a0a0a' }}>
+                                                            {s.imageUrl ? (
+                                                                <img
+                                                                    src={s.imageUrl}
+                                                                    onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
+                                                                    alt={s.name}
+                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                />
+                                                            ) : (
+                                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
+                                                                    <Ship size={24} />
+                                                                </div>
+                                                            )}
+                                                        </div>
+
+                                                        {/* Right: Info Area */}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px' }}>
+                                                            {/* Top Row: Flag, Name, Speed */}
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                                    <span style={{ fontSize: '1.4rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                                    <strong style={{ fontSize: '1rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                                        {s.name || mmsiStr}
+                                                                    </strong>
+                                                                </div>
+                                                                <span style={{ color: '#00ff40', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap', marginLeft: '8px' }}>
+                                                                    {formatSpeed(s.sog, mqttSettings.units)}
+                                                                </span>
                                                             </div>
-                                                        )}
-                                                        {s.virtual_aton && (
-                                                            <div style={{ background: '#ff00ff', color: '#fff', padding: '2px 6px', borderRadius: '4px', fontSize: '0.7rem' }}>
-                                                                VIRTUAL AIS STATION
+
+                                                            {/* Bottom Row: Type, Distance, Source, Bearing */}
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500 }}>
+                                                                <span style={{ whiteSpace: 'nowrap' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}</span>
+                                                                <span>•</span>
+                                                                <span style={{ color: '#44aaff', fontWeight: 800 }}>{formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}</span>
+                                                                
+                                                                {/* Source Tag */}
+                                                                {s.source && (
+                                                                    <span style={{ 
+                                                                        background: s.source === 'aisstream' ? 'rgba(68,170,255,0.15)' : 'rgba(0,255,128,0.15)',
+                                                                        color: s.source === 'aisstream' ? '#44aaff' : '#00ff80',
+                                                                        padding: '1px 6px',
+                                                                        borderRadius: '4px',
+                                                                        fontSize: '0.65rem',
+                                                                        fontWeight: 800,
+                                                                        border: `1px solid ${s.source === 'aisstream' ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}`
+                                                                    }}>
+                                                                        {s.source.toUpperCase() === 'AISSTREAM' ? 'STRM' : s.source.toUpperCase()}
+                                                                    </span>
+                                                                )}
+
+                                                                {/* Bearing Icon & Angle */}
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: 'auto' }}>
+                                                                    <Navigation 
+                                                                        size={12} 
+                                                                        style={{ 
+                                                                            transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, 
+                                                                            color: colors.textMuted,
+                                                                            opacity: 0.8
+                                                                        }} 
+                                                                    />
+                                                                    <span>{calculateBearing(originLat, originLon, s.lat, s.lon).toFixed(0)}°</span>
+                                                                </div>
                                                             </div>
-                                                        )}
-                                                        {s.status_text && (
-                                                            <span style={{ fontSize: '0.8rem', fontStyle: 'italic', color: 'var(--text-muted)' }}>
-                                                                {s.status_text}
-                                                            </span>
-                                                        )}
-                                                        {s.imageUrl && (
-                                                            <img
-                                                                src={s.imageUrl}
-                                                                onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
-                                                                alt={s.name}
-                                                                style={{ width: '120px', height: '80px', objectFit: 'cover', borderRadius: '4px', marginTop: '4px' }}
-                                                            />
-                                                        )}
+                                                            
+                                                            {/* Emergency indicator if active */}
+                                                            {s.is_emergency && (
+                                                                <div style={{ background: '#ff0000', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', marginTop: '2px' }}>
+                                                                    ⚠️ EMERGENCY
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )}
                                             </Tooltip>

@@ -26,7 +26,11 @@ UDP_PORT = int(os.getenv("UDP_PORT", 10110))
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
-logging.basicConfig(level=getattr(logging, LOG_LEVEL))
+logging.basicConfig(
+    level=getattr(logging, LOG_LEVEL),
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
 logger = logging.getLogger("NavisCore")
 
 app = FastAPI()
@@ -653,7 +657,7 @@ async def process_ais_data(data: dict):
                                 "source": source,
                                 "event_type": event_type,
                                 "timestamp": ship_data.get("timestamp"),
-                                "image_url": ship_data.get("imageUrl") if ship_data.get("manual_image") else None
+                                "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None
                             }
                             mqtt_pub_queue.put_nowait(pub_payload)
                 except Exception as e:
@@ -930,17 +934,35 @@ async def update_ship_details(mmsi: str, details: dict):
         if not mmsi.isdigit() or len(mmsi) != 9:
             return {"error": "Invalid MMSI"}
             
+        # Prepare filtered details for logging and processing
+        allowed_fields = ["name", "imo", "callsign", "shiptype", "length", "width", "destination", "draught"]
+        filtered_details = {k: v for k, v in details.items() if k in allowed_fields}
+        
+        if filtered_details:
+            logger.info(f"Updating details for ship {mmsi}: {filtered_details}")
+        
         upd = []
         vals = []
-        # Allow updating specific fields
-        allowed_fields = ["name", "imo", "callsign", "shiptype", "length", "width", "destination", "draught"]
+        broadcast_data = {"mmsi": mmsi}
         
-        for f in allowed_fields:
-            if f in details:
-                # Map shiptype to type in DB
-                db_field = "type" if f == "shiptype" else f
-                upd.append(f"{db_field} = ?")
-                vals.append(details[f])
+        for f, val in filtered_details.items():
+            # Map shiptype to type in DB
+            db_field = "type" if f == "shiptype" else f
+            upd.append(f"{db_field} = ?")
+            vals.append(val)
+            broadcast_data[f] = val
+            
+            # If shiptype is updated, also update text and category for broadcast
+            if f == "shiptype":
+                try:
+                    code = int(val)
+                    broadcast_data["ship_type_text"] = get_ship_type_name(code)
+                    broadcast_data["ship_category"] = get_ship_category(code)
+                except Exception as e:
+                    logger.error(f"Error calculating type info for {mmsi}: {e}")
+        
+        if not upd:
+            return {"success": True, "message": "No relevant fields to update"}
         
         if not upd:
             return {"error": "No valid fields to update"}
@@ -950,11 +972,24 @@ async def update_ship_details(mmsi: str, details: dict):
             await db.execute(f"UPDATE ships SET {', '.join(upd)} WHERE mmsi = ?", tuple(vals))
             await db.commit()
             
-        # Broadcast the update (minimal)
-        broadcast_data = {"mmsi": mmsi}
-        for i, f in enumerate(upd):
-            broadcast_data[f.split(' ')[0]] = vals[i]
+        # Re-fetch from DB to get the most accurate state for broadcast
+        async with db_session() as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute("SELECT * FROM ships WHERE mmsi = ?", (mmsi,))
+            row = await cursor.fetchone()
+            if row:
+                d = dict(row)
+                broadcast_data.update({
+                    "shiptype": d["type"],
+                    "ship_type_text": get_ship_type_name(d["type"]) if d["type"] else "Unknown",
+                    "ship_category": get_ship_category(d["type"]) if d["type"] else "default",
+                    "name": d["name"],
+                    "callsign": d["callsign"],
+                    "imo": d["imo"]
+                })
+        
         await broadcast(broadcast_data)
+        logger.info(f"Successfully updated and broadcasted details for {mmsi}")
         
         return {"success": True}
     except Exception as e:

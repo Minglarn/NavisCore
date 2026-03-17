@@ -31,14 +31,15 @@ html,
     background: #4a627a;
 }
 
-/* Custom Meteo Tooltip overriding Leaflet defaults */
-.custom-meteo-tooltip {
+/* Custom Vessel Tooltip overriding Leaflet defaults */
+.custom-tooltip {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    white-space: nowrap;
 }
 
-.custom-meteo-tooltip::before {
+.custom-tooltip::before {
     display: none !important;
 }

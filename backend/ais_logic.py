@@ -90,8 +90,7 @@ def get_ship_type_info(code: int) -> dict:
             base_name = SHIP_TYPE_MAP.get(parent_cat, "Unknown")
             desc = f"{base_name}, Reserved"
         elif last_digit == 9:
-             base_name = SHIP_TYPE_MAP.get(parent_cat, "Unknown")
-             desc = f"{base_name}, No additional information"
+             desc = SHIP_TYPE_MAP.get(parent_cat, "Unknown")
         elif 1 <= code <= 19:
             desc = "Reserved"
         else:
@@ -168,48 +167,6 @@ ATON_TYPE_MAP = {
     30: "Buoy, Safe water",
     31: "Buoy, Special mark",
 }
-
-
-def get_ship_type_name(code: int) -> str:
-    """Returns human-readable ship type name from AIS ship type code."""
-    if code in SHIP_TYPE_MAP:
-        return SHIP_TYPE_MAP[code]
-    if 21 <= code <= 29:
-        return "Wing in ground (WIG)"
-    if 61 <= code <= 68:
-        return "Passenger"
-    if 71 <= code <= 78:
-        return "Cargo"
-    if 81 <= code <= 88:
-        return "Tanker"
-    if 91 <= code <= 98:
-        return "Other"
-    if 1 <= code <= 19:
-        return "Reserved"
-    return "Unknown"
-
-
-def get_ship_category(code: int) -> str:
-    """Returns a simplified icon category for the frontend."""
-    if code == 30:
-        return "fishing"
-    if 31 <= code <= 32:
-        return "towing"
-    if 36 <= code <= 37:
-        return "sailing"
-    if 40 <= code <= 49:
-        return "hsc"
-    if 50 <= code <= 59:
-        return "special"
-    if 60 <= code <= 69:
-        return "passenger"
-    if 70 <= code <= 79:
-        return "cargo"
-    if 80 <= code <= 89:
-        return "tanker"
-    if 90 <= code <= 99:
-        return "other"
-    return "default"
 
 
 # ═══════════════════════════════════════════════════════
