@@ -396,6 +396,16 @@ const extraStyles = `
 .ship-custom-icon-container { background: transparent; border: none; }
 .ship-custom-icon svg { filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.4)); }
 
+.ship-name-label {
+    background: rgba(15, 15, 26, 0.8) !important;
+    border: none !important;
+    border-radius: 4px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important;
+    color: #fff !important;
+    padding: 2px 6px !important;
+    pointer-events: none !important;
+}
+
 /* Detailed Custom Popup Styles */
 .custom-detailed-popup .leaflet-popup-content-wrapper {
     padding: 0;
@@ -444,17 +454,31 @@ const extraStyles = `
 }
 
 @keyframes radar-ping {
-    0% {
-        transform: scale(0.5);
-        opacity: 1;
-        border-width: 4px;
-    }
-    100% {
-        transform: scale(3.5);
-        opacity: 0;
-        border-width: 1px;
-    }
+    0% { transform: scale(0.5); opacity: 1; border-width: 4px; }
+    100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
 }
+
+.blink-source {
+    animation: blink-anim 0.4s ease-in-out;
+}
+
+@keyframes blink-anim {
+    0% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px #00ff80); }
+    50% { transform: scale(1.3); filter: brightness(2) drop-shadow(0 0 8px #00ff80); }
+    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px #00ff80); }
+}
+
+@keyframes slideUpFade {
+    from { opacity: 0; transform: translateX(-50%) translateY(20px); }
+    to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
 .ship-flash {
     animation: side-flash-pop 0.8s ease-out;
 }
@@ -481,6 +505,7 @@ const extraStyles = `
     from { background-color: #ff0000; }
     to { background-color: #880000; }
 }
+
 .settings-modal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
@@ -513,7 +538,6 @@ const extraStyles = `
 }
 .settings-content {
     flex: 1; padding: 30px; overflow-y: auto; color: var(--text-main);
-    display: flex; flexDirection: column; gap: 25px;
 }
 .settings-section {
     display: flex; flex-direction: column; gap: 15px;
@@ -559,7 +583,7 @@ const extraStyles = `
 input:checked + .slider { background-color: #44aaff; }
 input:checked + .slider:before { transform: translateX(20px); }
 
-@keyframes emergency-flash {
+@keyframes emergency-flash-alt {
     from { background: #ff0000; box-shadow: 0 0 5px #ff0000; }
     to { background: #990000; box-shadow: 0 0 20px #ff0000; }
 }
@@ -2215,10 +2239,10 @@ export default function App() {
                 .then(data => setCoverageSectors(data))
                 .catch(console.error);
 
-            alert('Settings saved!');
+            // alert('Settings saved!');
         } catch (err) {
             console.error(err);
-            alert('Could not save settings');
+            // alert('Could not save settings');
         }
     };
 
@@ -2248,7 +2272,7 @@ export default function App() {
                 const data = JSON.parse(event.data);
                 
                 const nowTime = Date.now();
-                if (data.source === 'sdr') setLastSdrTime(nowTime);
+                if (data.source === 'sdr' || data.source === 'local') setLastSdrTime(nowTime);
                 else if (data.source === 'udp') setLastUdpTime(nowTime);
                 else if (data.source === 'aisstream') setLastStreamTime(nowTime);
 
@@ -2650,30 +2674,18 @@ export default function App() {
                     {/* Activity Indicators */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 15px', borderLeft: `1px solid ${colors.border}` }}>
                         <div title="SDR Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastSdrTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
-                            <Radio size={14} color={Date.now() - lastSdrTime < 3000 ? '#00ff80' : colors.textMuted} />
+                            <Radio size={14} color={Date.now() - lastSdrTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastSdrTime < 500 ? 'blink-source' : ''} />
                             <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>SDR</span>
                         </div>
                         <div title="UDP Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastUdpTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
-                            <Database size={14} color={Date.now() - lastUdpTime < 3000 ? '#00ff80' : colors.textMuted} />
+                            <Database size={14} color={Date.now() - lastUdpTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastUdpTime < 500 ? 'blink-source' : ''} />
                             <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>UDP</span>
                         </div>
                         <div title="Stream Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastStreamTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
-                            <Wifi size={14} color={Date.now() - lastStreamTime < 3000 ? '#00ff80' : colors.textMuted} />
+                            <Wifi size={14} color={Date.now() - lastStreamTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastStreamTime < 500 ? 'blink-source' : ''} />
                             <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>STR</span>
                         </div>
                     </div>
-
-                    {/* Latest Update Ticker */}
-                    {lastUpdatedShip && (Date.now() - lastUpdatedShip.time < 10000) && (
-                        <div style={{ 
-                            fontSize: '0.75rem', color: colors.textMuted, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)', 
-                            padding: '4px 12px', borderRadius: '4px', border: `1px solid ${colors.border}`,
-                            display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.5s'
-                        }}>
-                             <span style={{ fontWeight: 800, color: '#44aaff' }}>LAST:</span>
-                             <span style={{ color: colors.textMain, fontWeight: 600 }}>{lastUpdatedShip.name}</span>
-                        </div>
-                    )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
@@ -2748,7 +2760,7 @@ export default function App() {
                             background: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? '#00ff80' : '#10b981') : (isDark ? '#ff3333' : '#ef4444'),
                             boxShadow: isDark ? `0 0 10px ${(status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? '#00ff80' : '#ff3333'}` : 'none'
                         }} />
-                        {status}
+                        {/* {status} */}
                     </div>
 
                     {mqttSettings.mqtt_enabled === 'true' && (
@@ -3797,6 +3809,38 @@ export default function App() {
                         }
                     ]}
                 />
+            )}
+
+            {/* Mini Console (Ticker) at the bottom */}
+            {lastUpdatedShip && (
+                <div style={{
+                    position: 'fixed',
+                    bottom: '20px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    background: isDark ? 'rgba(15, 15, 26, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                    backdropFilter: 'blur(12px)',
+                    padding: '8px 20px',
+                    borderRadius: '30px',
+                    border: `1px solid ${isDark ? 'rgba(0, 240, 255, 0.3)' : 'rgba(0, 131, 143, 0.2)'}`,
+                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '12px',
+                    zIndex: 10000,
+                    animation: 'slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
+                    pointerEvents: 'none',
+                    maxWidth: '90vw'
+                }}>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff80', animation: 'pulse 2s infinite' }}></div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px' }}>LATEST EVENT:</span>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isDark ? '#00f0ff' : '#007080' }}>
+                        {lastUpdatedShip.name} <span style={{ opacity: 0.6, fontWeight: 400, marginLeft: '5px' }}>(MMSI {lastUpdatedShip.mmsi})</span>
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: colors.textMuted, opacity: 0.8, marginLeft: '10px' }}>
+                        {new Date(lastUpdatedShip.time).toLocaleTimeString()}
+                    </span>
+                </div>
             )}
         </div>
     );
