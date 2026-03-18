@@ -1183,6 +1183,11 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             colors={colors} 
                         />
                         <AccordionRow label="Source" value={ship.source || 'Local'} colors={colors} />
+                        <AccordionRow 
+                            label="Distans till Station" 
+                            value={formatDistance(haversineDistance(parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon), ship.lat, ship.lon), mqttSettings.units)} 
+                            colors={colors} 
+                        />
                     </div>
                 </Accordion>
             </div>
@@ -1223,6 +1228,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
         { label: 'Destination', value: ship.destination || '--' },
         { label: 'ETA', value: ship.eta || '--' },
         { label: 'Draught', value: ship.draught ? `${ship.draught}m` : '--' },
+        { label: 'Distans till Station', value: formatDistance(haversineDistance(parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon), ship.lat, ship.lon), mqttSettings.units) },
     ];
 
     const specBlocks = [
@@ -3584,7 +3590,10 @@ export default function App() {
                                                             {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}
                                                         </span>
                                                         <span style={{ opacity: 0.5 }}>•</span>
-                                                        <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}</span>
+                                                        <span style={{ color: '#44aaff', fontWeight: 600 }}>
+                                                            <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distans:</span>
+                                                            {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}
+                                                        </span>
                                                         <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(0,255,128,0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#00ff80', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}` }}>
                                                             {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
                                                         </span>
