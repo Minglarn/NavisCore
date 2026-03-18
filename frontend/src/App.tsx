@@ -3061,7 +3061,10 @@ export default function App() {
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500 }}>
                                                                 <span style={{ whiteSpace: 'nowrap' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}</span>
                                                                 <span>•</span>
-                                                                <span style={{ color: '#44aaff', fontWeight: 800 }}>{formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}</span>
+                                                                <span style={{ color: '#44aaff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                                                    <span style={{ fontSize: '0.65rem', color: colors.textMuted }}>Distans:</span>
+                                                                    {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
+                                                                </span>
                                                                 
                                                                 {/* Source Tag */}
                                                                 {s.source && (
@@ -3164,6 +3167,10 @@ export default function App() {
                                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
                                                                     {(s.shiptype === 9 || s.is_sar) ? (s.altitude !== undefined ? `${s.altitude * 10} ft` : '--') : (s.length && s.width ? `${s.length}x${s.width}m` : '--')}
                                                                 </div>
+                                                            </div>
+                                                            <div>
+                                                                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Station Distance</div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#44aaff' }}>{formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}</div>
                                                             </div>
                                                                 {s.is_emergency && (
                                                                     <div style={{ gridColumn: 'span 2', background: '#ff0000', color: '#fff', padding: '8px', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', animation: 'emergency-flash 1s infinite alternate' }}>

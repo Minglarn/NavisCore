@@ -684,14 +684,23 @@ async def process_ais_data(data: dict):
                                 "timestamp": ship_data.get("timestamp"),
                                 "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None
                             }
-                            mqtt_pub_queue.put_nowait(pub_payload)
-                            
+                            origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
+                            if origin_lat and origin_lon and lat is not None and lon is not None:
+                                try:
+                                    dist_km = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
+                                    pub_payload["dist_to_station_km"] = round(dist_km, 2)
+                                    pub_payload["dist_to_station_nm"] = round(dist_km * 0.539957, 2)
+                                except: pass
+
                             if event_type == "new":
                                 img_bytes = get_image_bytes(mmsi_str)
                                 if img_bytes:
-                                    # For binary payload, we wrap it in a special tuple or object to pass the topic
                                     new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
                                     mqtt_pub_queue.put_nowait((new_topic, img_bytes))
+                                    # Wait 1s before sending the object details as requested
+                                    await asyncio.sleep(1)
+                            
+                            mqtt_pub_queue.put_nowait(pub_payload)
                 except Exception as e:
                     logger.error(f"Error queuing MQTT pub message: {e}")
 
