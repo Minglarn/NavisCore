@@ -12,6 +12,7 @@ import socket
 import math
 from datetime import datetime, timedelta
 from contextlib import asynccontextmanager
+import base64
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -147,6 +148,7 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_user": os.getenv("MQTT_PUB_USER", os.getenv("MQTT_USER", "")),
         "mqtt_pub_pass": os.getenv("MQTT_PUB_PASS", os.getenv("MQTT_PASS", "")),
         "mqtt_pub_only_new": os.getenv("MQTT_PUB_ONLY_NEW", "false").lower(),
+        "mqtt_pub_new_topic": os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected"),
         "mqtt_pub_forward_sdr": "true",
         "mqtt_pub_forward_aisstream": "false",
     }
@@ -197,6 +199,7 @@ def translate_aisstream_message(msg: dict) -> dict:
             internal_data["is_aton"] = True
         elif msg_type_str == "StandardSearchAndRescueAircraftReport":
             internal_data["is_sar"] = True
+            internal_data["altitude"] = body.get("Altitude")
         elif msg_type_str == "SafetyBroadcastMessage":
             internal_data["is_safety"] = True
             internal_data["safety_text"] = body.get("Text", "")
@@ -317,6 +320,27 @@ def get_country_code_from_mmsi(mmsi_str: str) -> str:
         "740": "fk", "745": "gy", "750": "py", "755": "pe", "760": "sr", "765": "uy", "770": "ve"
     }
     return mid_map.get(mid)
+
+def get_image_bytes(mmsi: str) -> bytes:
+    """Read image file and return its raw binary content."""
+    try:
+        image_path = os.path.join(IMAGES_DIR, f"{mmsi}.jpg")
+        if not os.path.exists(image_path):
+            image_path = os.path.join(IMAGES_DIR, "0.jpg")
+            
+        if os.path.exists(image_path):
+            with open(image_path, "rb") as f:
+                return f.read()
+    except Exception as e:
+        logger.error(f"Error reading image bytes for {mmsi}: {e}")
+    return None
+
+def get_image_base64(mmsi: str) -> str:
+    """Read image file and return its base64 encoded content."""
+    img_bytes = get_image_bytes(mmsi)
+    if img_bytes:
+        return base64.b64encode(img_bytes).decode('utf-8')
+    return None
 
 async def handle_fallback_image(mmsi: str):
     source_file = os.path.join(IMAGES_DIR, '0.jpg')
@@ -465,10 +489,10 @@ async def process_ais_data(data: dict):
             
             ship_data = {
                 "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
-                "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype"),
+                "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype") or (9 if msg_type == 9 else None),
                 "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
                 "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": data.get("is_aton", False),
-                "is_sar": data.get("is_sar", False), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
+                "is_sar": data.get("is_sar", False) or msg_type == 9, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
                 "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
                 "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False), "is_advanced_binary": data.get("is_advanced_binary", False),
                 "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
@@ -496,7 +520,7 @@ async def process_ais_data(data: dict):
             else: flds.append("message_count = message_count + 1")
             
             vals = []
-            db_fields = [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type"), ("wind_speed", "wind_speed"), ("wind_gust", "wind_gust"), ("wind_direction", "wind_direction"), ("water_level", "water_level"), ("air_temp", "air_temp"), ("air_pressure", "air_pressure"), ("destination", "destination"), ("draught", "draught"), ("eta", "eta"), ("imo", "imo")]
+            db_fields = [("name", "name"), ("callsign", "callsign"), ("type", "shiptype"), ("status_text", "status_text"), ("country_code", "country_code"), ("latitude", "lat"), ("longitude", "lon"), ("sog", "sog"), ("cog", "cog"), ("heading", "heading"), ("source", "source"), ("emergency_type", "emergency_type"), ("altitude", "altitude"), ("wind_speed", "wind_speed"), ("wind_gust", "wind_gust"), ("wind_direction", "wind_direction"), ("water_level", "water_level"), ("air_temp", "air_temp"), ("air_pressure", "air_pressure"), ("destination", "destination"), ("draught", "draught"), ("eta", "eta"), ("imo", "imo")]
             for f, k in db_fields:
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(v)
@@ -538,7 +562,7 @@ async def process_ais_data(data: dict):
             except Exception: pass
             
             # Read back missing data
-            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 r = await cursor.fetchone()
                 if r:
                     ship_data["imageUrl"] = r[0] or "/images/0.jpg"
@@ -565,6 +589,7 @@ async def process_ais_data(data: dict):
                     ship_data["dac"], ship_data["fid"], ship_data["raw_payload"] = r[23], r[24], r[25]
                     ship_data["wind_speed"], ship_data["wind_gust"], ship_data["wind_direction"] = r[26], r[27], r[28]
                     ship_data["water_level"], ship_data["air_temp"], ship_data["air_pressure"] = r[29], r[30], r[31]
+                    ship_data["altitude"] = r[32]
             
             if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
                 try:
@@ -660,6 +685,13 @@ async def process_ais_data(data: dict):
                                 "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None
                             }
                             mqtt_pub_queue.put_nowait(pub_payload)
+                            
+                            if event_type == "new":
+                                img_bytes = get_image_bytes(mmsi_str)
+                                if img_bytes:
+                                    # For binary payload, we wrap it in a special tuple or object to pass the topic
+                                    new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
+                                    mqtt_pub_queue.put_nowait((new_topic, img_bytes))
                 except Exception as e:
                     logger.error(f"Error queuing MQTT pub message: {e}")
 
@@ -749,10 +781,15 @@ async def mqtt_publisher_worker():
                 logger.info(f"MQTT Publisher connected to {host}:{port}")
                 while True:
                     # Get outgoing message from queue
-                    data = await mqtt_pub_queue.get()
+                    item = await mqtt_pub_queue.get()
                     try:
-                        topic = s.get("mqtt_pub_topic", "naviscore/objects")
-                        await client.publish(topic, payload=json.dumps(data))
+                        if isinstance(item, tuple) and len(item) == 2:
+                            topic, payload = item
+                        else:
+                            topic = item.pop("_topic", s.get("mqtt_pub_topic", "naviscore/objects"))
+                            payload = json.dumps(item)
+                        
+                        await client.publish(topic, payload=payload)
                     except Exception as e:
                         logger.error(f"MQTT Publish error: {e}")
                         # Put back in queue if it failed? Maybe not to avoid infinite loops
@@ -815,7 +852,7 @@ async def startup_event():
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
         await db.execute('CREATE TABLE IF NOT EXISTS ships (mmsi TEXT PRIMARY KEY, imo TEXT, name TEXT, callsign TEXT, type INTEGER, image_url TEXT, image_fetched_at DATETIME, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP)')
-        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL"]:
+        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER"]:
             try: await db.execute(f"ALTER TABLE ships ADD COLUMN {c}")
             except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
@@ -834,7 +871,8 @@ async def startup_event():
             ('mqtt_pub_topic', os.getenv("MQTT_PUB_TOPIC", os.getenv("MQTT_TOPIC", "naviscore/objects"))),
             ('mqtt_pub_user', os.getenv("MQTT_PUB_USER", os.getenv("MQTT_USER", ""))),
             ('mqtt_pub_pass', os.getenv("MQTT_PUB_PASS", os.getenv("MQTT_PASS", ""))),
-            ('mqtt_pub_only_new', os.getenv("MQTT_PUB_ONLY_NEW", "false").lower())
+            ('mqtt_pub_only_new', os.getenv("MQTT_PUB_ONLY_NEW", "false").lower()),
+            ('mqtt_pub_new_topic', os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected"))
         ]:
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
         await db.execute('CREATE TABLE IF NOT EXISTS coverage_sectors (sector_id INTEGER PRIMARY KEY, range_km_24h REAL DEFAULT 0.0, range_km_alltime REAL DEFAULT 0.0, last_updated DATETIME)')
@@ -874,7 +912,7 @@ async def get_ships():
                 d["lat"], d["lon"] = d["latitude"], d["longitude"]
                 for f in ["manual_image", "is_emergency", "virtual_aton", "is_advanced_binary"]: d[f] = bool(d.get(f, 0))
                 # Include binary and weather metadata
-                for f in ["dac", "fid", "raw_payload", "emergency_type", "wind_speed", "wind_gust", "wind_direction", "water_level", "air_temp", "air_pressure"]: 
+                for f in ["dac", "fid", "raw_payload", "emergency_type", "wind_speed", "wind_gust", "wind_direction", "water_level", "air_temp", "air_pressure", "altitude"]: 
                     val = d.get(f)
                     if val is not None: d[f] = val
                 if d["previous_seen"]:

@@ -3042,8 +3042,18 @@ export default function App() {
                                                                         {s.name || mmsiStr}
                                                                     </strong>
                                                                 </div>
-                                                                <span style={{ color: '#00ff40', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap', marginLeft: '8px' }}>
-                                                                    {formatSpeed(s.sog, mqttSettings.units)}
+                                                                <span style={{ color: '#00ff40', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap', marginLeft: '8px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                        <span style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>
+                                                                            {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
+                                                                        </span>
+                                                                        {formatSpeed(s.sog, mqttSettings.units)}
+                                                                    </div>
+                                                                    {(s.shiptype === 9 || s.is_sar) && s.altitude !== undefined && (
+                                                                        <div style={{ fontSize: '0.75rem', color: '#44aaff', fontWeight: 800 }}>
+                                                                            {s.altitude * 10} ft
+                                                                        </div>
+                                                                    )}
                                                                 </span>
                                                             </div>
 
@@ -3142,13 +3152,19 @@ export default function App() {
                                                     <div style={{ flex: 1, padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                                             <div>
-                                                                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>SOG / COG</div>
+                                                                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>
+                                                                    {(s.shiptype === 9 || s.is_sar) ? 'Airspeed / Course' : 'SOG / COG'}
+                                                                </div>
                                                                 <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{formatSpeed(s.sog, mqttSettings.units)} / {s.cog?.toFixed(0) ?? '--'}°</div>
                                                             </div>
                                                             <div>
-                                                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Dimensions</div>
-                                                                    <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>{s.length && s.width ? `${s.length}x${s.width}m` : '--'}</div>
+                                                                <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>
+                                                                    {(s.shiptype === 9 || s.is_sar) ? 'Altitude' : 'Dimensions'}
                                                                 </div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                                                    {(s.shiptype === 9 || s.is_sar) ? (s.altitude !== undefined ? `${s.altitude * 10} ft` : '--') : (s.length && s.width ? `${s.length}x${s.width}m` : '--')}
+                                                                </div>
+                                                            </div>
                                                                 {s.is_emergency && (
                                                                     <div style={{ gridColumn: 'span 2', background: '#ff0000', color: '#fff', padding: '8px', borderRadius: '4px', textAlign: 'center', fontWeight: 'bold', animation: 'emergency-flash 1s infinite alternate' }}>
                                                                         ⚠️ EMERGENCY
