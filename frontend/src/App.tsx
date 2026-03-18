@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -2027,6 +2027,10 @@ export default function App() {
     const [settingsTab, setSettingsTab] = useState('general');
 
     const [selectedShipMmsi, setSelectedShipMmsi] = useState<string | null>(null);
+    const [lastSdrTime, setLastSdrTime] = useState(0);
+    const [lastUdpTime, setLastUdpTime] = useState(0);
+    const [lastStreamTime, setLastStreamTime] = useState(0);
+    const [lastUpdatedShip, setLastUpdatedShip] = useState<any>(null);
 
     const [isResizing, setIsResizing] = useState(false);
     const isResizingRef = useRef(isResizing);
@@ -2193,7 +2197,7 @@ export default function App() {
         return () => clearInterval(interval);
     }, [localTimeoutStr]);
 
-    const saveSettings = async () => {
+    const saveSettings = async (newSettings?: any) => {
         const isDev = window.location.port === '5173';
         const fetchPath = isDev ? 'http://127.0.0.1:8080/api/settings' : '/api/settings';
 
@@ -2201,7 +2205,7 @@ export default function App() {
             await fetch(fetchPath, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(mqttSettings)
+                body: JSON.stringify(newSettings || mqttSettings)
             });
 
             // Refetch coverage sectors manually
@@ -2241,7 +2245,20 @@ export default function App() {
         const ws = new WebSocket(wsUrl);
             ws.onopen = () => setStatus('Connected to NavisCore');
             ws.onmessage = (event: MessageEvent) => {
-            const data = JSON.parse(event.data);
+                const data = JSON.parse(event.data);
+                
+                const nowTime = Date.now();
+                if (data.source === 'sdr') setLastSdrTime(nowTime);
+                else if (data.source === 'udp') setLastUdpTime(nowTime);
+                else if (data.source === 'aisstream') setLastStreamTime(nowTime);
+
+                if (data.mmsi && (data.name || data.mmsi)) {
+                    setLastUpdatedShip({
+                        name: data.name || `MMSI ${data.mmsi}`,
+                        mmsi: data.mmsi,
+                        time: nowTime
+                    });
+                }
             
             // Allow weather objects
             // const nameUpper = (data.name || "").toUpperCase();
@@ -2624,12 +2641,60 @@ export default function App() {
                 boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.5)' : '0 2px 10px rgba(0,0,0,0.05)',
                 zIndex: 1000
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Anchor size={28} />
-                    <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, letterSpacing: '1px' }}>NavisCore</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Anchor size={28} />
+                        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, letterSpacing: '1px' }}>NavisCore</h1>
+                    </div>
+
+                    {/* Activity Indicators */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 15px', borderLeft: `1px solid ${colors.border}` }}>
+                        <div title="SDR Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastSdrTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
+                            <Radio size={14} color={Date.now() - lastSdrTime < 3000 ? '#00ff80' : colors.textMuted} />
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>SDR</span>
+                        </div>
+                        <div title="UDP Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastUdpTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
+                            <Database size={14} color={Date.now() - lastUdpTime < 3000 ? '#00ff80' : colors.textMuted} />
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>UDP</span>
+                        </div>
+                        <div title="Stream Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastStreamTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
+                            <Wifi size={14} color={Date.now() - lastStreamTime < 3000 ? '#00ff80' : colors.textMuted} />
+                            <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>STR</span>
+                        </div>
+                    </div>
+
+                    {/* Latest Update Ticker */}
+                    {lastUpdatedShip && (Date.now() - lastUpdatedShip.time < 10000) && (
+                        <div style={{ 
+                            fontSize: '0.75rem', color: colors.textMuted, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)', 
+                            padding: '4px 12px', borderRadius: '4px', border: `1px solid ${colors.border}`,
+                            display: 'flex', alignItems: 'center', gap: '6px', animation: 'fadeIn 0.5s'
+                        }}>
+                             <span style={{ fontWeight: 800, color: '#44aaff' }}>LAST:</span>
+                             <span style={{ color: colors.textMain, fontWeight: 600 }}>{lastUpdatedShip.name}</span>
+                        </div>
+                    )}
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                    {/* SAR / Emergency Badge */}
+                    {(() => {
+                        const hasEmergency = ships.some(s => s.is_emergency);
+                        const hasSar = ships.some(s => s.is_sar || s.shiptype === 51 || s.ship_type === 51);
+                        if (!hasEmergency && !hasSar) return null;
+                        return (
+                            <div style={{ 
+                                background: hasEmergency ? 'rgba(255, 50, 50, 0.15)' : 'rgba(255, 170, 0, 0.15)',
+                                color: hasEmergency ? '#ff3333' : '#ffaa00',
+                                padding: '6px 14px', borderRadius: '4px', border: `1px solid ${hasEmergency ? '#ff3333aa' : '#ffaa00aa'}`,
+                                display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.8rem',
+                                animation: hasEmergency ? 'pulse-red 2s infinite' : 'none'
+                             }}>
+                                {hasEmergency ? <AlertTriangle size={16} /> : <Ship size={16} />}
+                                {hasEmergency ? 'EMERGENCY DETECTED' : 'SAR ACTIVITY'}
+                            </div>
+                        );
+                    })()}
                     <div style={{
                         background: isDark ? 'rgba(0, 240, 255, 0.1)' : '#e0f7fa',
                         color: isDark ? '#00f0ff' : '#006064',
@@ -2709,6 +2774,39 @@ export default function App() {
                             MQTT: {mqttConnected ? 'OK' : 'FAIL'}
                         </div>
                     )}
+
+                    {/* Quick Toggles */}
+                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center', marginLeft: '10px', paddingLeft: '15px', borderLeft: `1px solid ${colors.border}` }}>
+                        <button 
+                            onClick={() => {
+                                const newVal = mqttSettings.show_names_on_map === 'true' ? 'false' : 'true';
+                                setMqttSettings(prev => ({ ...prev, show_names_on_map: newVal }));
+                                saveSettings({ ...mqttSettings, show_names_on_map: newVal });
+                            }}
+                            title="Toggle Vessel Names"
+                            style={{ background: mqttSettings.show_names_on_map === 'true' ? 'rgba(68,170,255,0.1)' : 'transparent', border: 'none', color: mqttSettings.show_names_on_map === 'true' ? '#44aaff' : colors.textMuted, cursor: 'pointer', padding: '6px', borderRadius: '6px' }}
+                        >
+                            <User size={18} />
+                        </button>
+                        <button 
+                            onClick={() => {
+                                const newVal = mqttSettings.trail_enabled === 'true' ? 'false' : 'true';
+                                setMqttSettings(prev => ({ ...prev, trail_enabled: newVal }));
+                                saveSettings({ ...mqttSettings, trail_enabled: newVal });
+                            }}
+                            title="Toggle Trails"
+                            style={{ background: mqttSettings.trail_enabled === 'true' ? 'rgba(68,170,255,0.1)' : 'transparent', border: 'none', color: mqttSettings.trail_enabled === 'true' ? '#44aaff' : colors.textMuted, cursor: 'pointer', padding: '6px', borderRadius: '6px' }}
+                        >
+                            <TrendingUp size={18} />
+                        </button>
+                        <button 
+                            onClick={toggleTheme}
+                            title="Toggle Theme"
+                            style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '6px', borderRadius: '6px' }}
+                        >
+                            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                        </button>
+                    </div>
 
                     <div style={{ display: 'flex', gap: '5px', borderLeft: `1px solid ${colors.border}`, paddingLeft: '15px' }}>
                         <button
