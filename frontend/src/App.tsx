@@ -701,6 +701,11 @@ input:checked + .slider:before { transform: translateX(20px); }
     from { background: #ff0000; box-shadow: 0 0 5px #ff0000; }
     to { background: #990000; box-shadow: 0 0 20px #ff0000; }
 }
+@keyframes pulse-angry-red {
+    0% { background: #ff0000; transform: scale(1); box-shadow: 0 0 0px #ff0000; }
+    50% { background: #ff5555; transform: scale(1.05); box-shadow: 0 0 15px #ff0000; }
+    100% { background: #ff0000; transform: scale(1); box-shadow: 0 0 0px #ff0000; }
+}
 `;
 
 function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -3083,79 +3088,24 @@ export default function App() {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    {/* SAR / Emergency Badge */}
-                    {(() => {
-                        const hasEmergency = ships.some(s => s.is_emergency);
-                        const hasSar = ships.some(s => s.is_sar || s.shiptype === 51 || s.ship_type === 51);
-                        if (!hasEmergency && !hasSar) return null;
-                        return (
-                            <div style={{ 
-                                background: hasEmergency ? 'rgba(255, 50, 50, 0.15)' : 'rgba(255, 170, 0, 0.15)',
-                                color: hasEmergency ? '#ff3333' : '#ffaa00',
-                                padding: '6px 14px', borderRadius: '4px', border: `1px solid ${hasEmergency ? '#ff3333aa' : '#ffaa00aa'}`,
-                                display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, fontSize: '0.8rem',
-                                animation: hasEmergency ? 'pulse-red 2s infinite' : 'none'
-                             }}>
-                                {hasEmergency ? <AlertTriangle size={16} /> : <Ship size={16} />}
-                                {hasEmergency ? 'EMERGENCY DETECTED' : 'SAR ACTIVITY'}
-                            </div>
-                        );
-                    })()}
-                    <div style={{
-                        background: isDark ? 'rgba(0, 240, 255, 0.1)' : '#e0f7fa',
-                        color: isDark ? '#00f0ff' : '#006064',
-                        padding: '6px 16px',
-                        borderRadius: '20px',
-                        fontSize: '0.9rem',
-                        fontWeight: 600,
-                        border: `1px solid ${isDark ? 'rgba(0, 240, 255, 0.3)' : '#b2ebf2'}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <Ship size={16} />
-                        Vessels: {filteredShipsCount}
-                    </div>
 
-                    {!isNaN(originLat) && !isNaN(originLon) && maxDistance > 0 && (
-                        <div style={{
-                            background: isDark ? 'rgba(0, 240, 255, 0.1)' : '#e0f7fa',
-                            color: isDark ? '#00f0ff' : '#0097a7',
-                            padding: '6px 16px',
-                            borderRadius: '20px',
-                            fontSize: '0.9rem',
-                            fontWeight: 600,
-                            border: `1px solid ${isDark ? 'rgba(0, 240, 255, 0.3)' : '#b2ebf2'}`,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '8px'
-                        }}>
-                            <Navigation size={16} />
-                            Station Range: {formatDistance(maxDistance, mqttSettings.units)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', color: colors.textMain, fontSize: '0.9rem', fontWeight: 600, paddingLeft: '10px', borderLeft: `1px solid ${colors.border}` }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Ship size={16} color={isDark ? '#44aaff' : '#00838f'} />
+                            <span>Vessels: {filteredShipsCount}</span>
                         </div>
-                    )}
-
-                    <div style={{
-                        background: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? 'rgba(0, 255, 128, 0.1)' : '#e6fffa') : (isDark ? 'rgba(255, 50, 50, 0.1)' : '#fff5f5'),
-                        color: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? '#00ff80' : '#047857') : (isDark ? '#ff3333' : '#c53030'),
-                        padding: '6px 16px',
-                        borderRadius: '20px',
-                        fontSize: '0.9rem',
-                        fontWeight: 500,
-                        border: `1px solid ${(status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? 'rgba(0, 255, 128, 0.3)' : '#a7f3d0') : (isDark ? 'rgba(255, 50, 50, 0.3)' : '#feb2b2')}`,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}>
-                        <div style={{
-                            width: '8px',
-                            height: '8px',
-                            borderRadius: '50%',
-                            background: (status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? (isDark ? '#00ff80' : '#10b981') : (isDark ? '#ff3333' : '#ef4444'),
-                            boxShadow: isDark ? `0 0 10px ${(status.toLowerCase().includes('ansluten') || status.toLowerCase().includes('connected')) ? '#00ff80' : '#ff3333'}` : 'none'
-                        }} />
-                        {/* {status} */}
+                        
+                        {!isNaN(originLat) && !isNaN(originLon) && maxDistance > 0 && (
+                            <>
+                                <div style={{ width: '1px', height: '16px', background: colors.border }} />
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Navigation size={16} color={isDark ? '#44aaff' : '#0097a7'} />
+                                    <span>Station Range: {formatDistance(maxDistance, mqttSettings.units)}</span>
+                                </div>
+                            </>
+                        )}
                     </div>
+
 
                     {mqttSettings.mqtt_enabled === 'true' && (
                         <div style={{
@@ -3368,22 +3318,22 @@ export default function App() {
                                                 />
                                             )}
 
-                                            <Circle center={[originLat, originLon]} radius={10000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                            <Circle center={[originLat, originLon]} radius={10000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
                                                 <Tooltip sticky direction="top" opacity={0.7}>
                                                     {formatDistance(10, mqttSettings.units)}
                                                 </Tooltip>
                                             </Circle>
-                                            <Circle center={[originLat, originLon]} radius={20000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                            <Circle center={[originLat, originLon]} radius={20000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
                                                 <Tooltip sticky direction="top" opacity={0.7}>
                                                     {formatDistance(20, mqttSettings.units)}
                                                 </Tooltip>
                                             </Circle>
-                                            <Circle center={[originLat, originLon]} radius={50000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                            <Circle center={[originLat, originLon]} radius={50000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
                                                 <Tooltip sticky direction="top" opacity={0.7}>
                                                     {formatDistance(50, mqttSettings.units)}
                                                 </Tooltip>
                                             </Circle>
-                                            <Circle center={[originLat, originLon]} radius={100000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                            <Circle center={[originLat, originLon]} radius={100000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
                                                 <Tooltip sticky direction="top" opacity={0.7}>
                                                     {formatDistance(100, mqttSettings.units)}
                                                 </Tooltip>
