@@ -513,10 +513,10 @@ async def process_ais_data(data: dict):
                 ship_data["lat"], ship_data["lon"] = last_known_lat, last_known_lon
 
             # 3. Update Database
-            await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0)', (mmsi_str, ship_name, data.get("callsign")))
+            await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count, registration_count) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0, 1)', (mmsi_str, ship_name, data.get("callsign")))
             
             flds = ["last_seen = CURRENT_TIMESTAMP"]
-            if reset_count: flds.append("previous_seen = last_seen, message_count = 1")
+            if reset_count: flds.append("previous_seen = last_seen, message_count = 1, registration_count = registration_count + 1")
             else: flds.append("message_count = message_count + 1")
             
             vals = []
@@ -562,7 +562,7 @@ async def process_ais_data(data: dict):
             except Exception: pass
             
             # Read back missing data
-            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude, registration_count FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 r = await cursor.fetchone()
                 if r:
                     ship_data["imageUrl"] = r[0] or "/images/0.jpg"
@@ -574,6 +574,7 @@ async def process_ais_data(data: dict):
                     if not ship_data["destination"]: ship_data["destination"] = r[7]
                     if not ship_data["draught"]: ship_data["draught"] = r[8]
                     ship_data["message_count"], ship_data["eta"], ship_data["rot"], ship_data["imo"], ship_data["callsign"] = r[9], r[10], r[11], r[12], r[13]
+                    ship_data["registration_count"] = r[33]
                     if r[14]:
                         try: ship_data["previous_seen"] = datetime.strptime(r[14], "%Y-%m-%d %H:%M:%S").timestamp() * 1000
                         except Exception: pass
@@ -861,7 +862,7 @@ async def startup_event():
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
         await db.execute('CREATE TABLE IF NOT EXISTS ships (mmsi TEXT PRIMARY KEY, imo TEXT, name TEXT, callsign TEXT, type INTEGER, image_url TEXT, image_fetched_at DATETIME, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP)')
-        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER"]:
+        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER"]:
             try: await db.execute(f"ALTER TABLE ships ADD COLUMN {c}")
             except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
@@ -930,6 +931,39 @@ async def get_ships():
                 res.append(d)
             except Exception: continue
         return res
+
+@app.get("/api/database")
+async def get_database(q: str = None, limit: int = 50, offset: int = 0, sort: str = "last_seen", order: str = "desc"):
+    # Security check for sort and order to avoid SQL injection
+    allowed_sorts = ["mmsi", "name", "type", "message_count", "registration_count", "last_seen", "length", "width"]
+    if sort not in allowed_sorts:
+        sort = "last_seen"
+    if order.lower() not in ["asc", "desc"]:
+        order = "desc"
+
+    async with db_session() as db:
+        db.row_factory = aiosqlite.Row
+        query = "SELECT * FROM ships"
+        params = []
+        if q:
+            query += " WHERE mmsi LIKE ? OR name LIKE ?"
+            params.extend([f"%{q}%", f"%{q}%"])
+        
+        query += f" ORDER BY {sort} {order} LIMIT ? OFFSET ?"
+        params.extend([limit, offset])
+        
+        async with db.execute(query, tuple(params)) as cursor:
+            res = []
+            for row in await cursor.fetchall():
+                d = dict(row)
+                d["imageUrl"] = d["image_url"] or "/images/0.jpg"
+                if d["type"] is not None:
+                    try:
+                        c = int(d["type"])
+                        d["ship_type_text"], d["ship_category"] = get_ship_type_name(c), get_ship_category(c)
+                    except: pass
+                res.append(d)
+            return res
 
 @app.post("/api/ships/{mmsi}/image")
 async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):

@@ -406,6 +406,96 @@ const extraStyles = `
     pointer-events: none !important;
 }
 
+/* Vessel Database Table Styles - Premium Revamp */
+.db-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin-top: 5px;
+}
+.db-table th {
+    text-align: left;
+    padding: 14px 15px;
+    background: linear-gradient(to bottom, rgba(30, 30, 45, 0.8), rgba(20, 20, 30, 0.9));
+    color: rgba(255, 255, 255, 0.8);
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 1.5px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.2s;
+    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+}
+.db-table th:hover {
+    background: linear-gradient(to bottom, rgba(45, 45, 65, 0.9), rgba(30, 30, 45, 1));
+    color: #00f0ff;
+}
+.db-table td {
+    padding: 12px 15px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85rem;
+}
+.db-table tr:nth-child(even) {
+    background: rgba(0, 240, 255, 0.05);
+}
+.db-table tr:hover {
+    background: rgba(0, 240, 255, 0.12);
+    backdrop-filter: blur(4px);
+}
+.light-theme .db-table th {
+    background: linear-gradient(to bottom, #f1f5f9, #e2e8f0);
+    color: #475569;
+    border-bottom-color: #cbd5e1;
+}
+.light-theme .db-table tr:nth-child(even) {
+    background: rgba(0, 102, 204, 0.06);
+}
+.light-theme .db-table td {
+    color: #1e293b;
+    border-bottom-color: #f1f5f9;
+}
+.db-sort-icon {
+    display: inline-flex;
+    margin-left: 6px;
+    vertical-align: middle;
+    transition: transform 0.2s;
+}
+
+/* Premium Badges */
+.ship-badge {
+    padding: 4px 10px;
+    border-radius: 100px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: inline-block;
+}
+.badge-type { background: rgba(68, 170, 255, 0.15); color: #44aaff; border: 1px solid rgba(68, 170, 255, 0.3); }
+.badge-obs { background: rgba(0, 255, 128, 0.15); color: #00ff80; border: 1px solid rgba(0, 255, 128, 0.3); }
+.badge-mmsi { font-family: 'JetBrains Mono', monospace; background: rgba(255, 255, 255, 0.05); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
+
+.light-theme .badge-type { background: rgba(68, 170, 255, 0.1); color: #0066cc; border-color: rgba(68, 170, 255, 0.2); }
+.light-theme .badge-obs { background: rgba(0, 153, 51, 0.1); color: #008822; border-color: rgba(0, 153, 51, 0.2); }
+.light-theme .badge-mmsi { background: rgba(0, 0, 0, 0.05); color: rgba(0, 0, 0, 0.5); border-color: rgba(0, 0, 0, 0.1); }
+.badge-mmsi { font-family: 'JetBrains Mono', monospace; background: rgba(255, 255, 255, 0.05); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
+
+.db-pagination-info {
+    padding: 15px 30px;
+    background: rgba(0,0,0,0.2);
+    border-top: 1px solid rgba(255,255,255,0.05);
+    color: rgba(255,255,255,0.5);
+    font-size: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 /* Detailed Custom Popup Styles */
 .custom-detailed-popup .leaflet-popup-content-wrapper {
     padding: 0;
@@ -1219,6 +1309,222 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
     );
 }
 
+function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearchTerm, setDbSearchTerm, databaseShips, fetchMore, hasMore, loading, dbSort, setDbSort }: any) {
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+
+    const handleScroll = () => {
+        if (!scrollRef.current || loading || !hasMore) return;
+        const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
+        if (scrollTop + clientHeight >= scrollHeight - 50) {
+            fetchMore();
+        }
+    };
+
+    const handleSort = (key: string) => {
+        setDbSort((prev: any) => ({
+            key,
+            direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
+
+    const renderSortIcon = (key: string) => {
+        if (dbSort.key !== key) return <ChevronUp size={12} style={{ opacity: 0.2 }} className="db-sort-icon" />;
+        return dbSort.direction === 'desc' 
+            ? <ChevronDown size={14} className="db-sort-icon" style={{ color: '#44aaff' }} /> 
+            : <ChevronUp size={14} className="db-sort-icon" style={{ color: '#44aaff' }} />;
+    };
+
+    if (!isOpen) return null;
+
+    const getTimeStampFromStr = (dtStr: string) => {
+        if (!dtStr) return Date.now();
+        try {
+            return new Date(dtStr.replace(' ', 'T')).getTime();
+        } catch(e) { return Date.now(); }
+    };
+
+    return (
+        <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1500 }}>
+            <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
+                height: '90vh', 
+                width: '90vw', 
+                maxWidth: 'none',
+                borderRadius: '16px', 
+                overflow: 'hidden', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+                background: colors.bgCard 
+            }}>
+                <div style={{ padding: '25px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgHeader || 'rgba(0,0,0,0.2)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <div style={{ background: 'rgba(68, 170, 255, 0.15)', color: '#44aaff', padding: '10px', borderRadius: '12px' }}>
+                            <Database size={24} />
+                        </div>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Vessel Database</h2>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textMuted }}>Sök och bläddra bland alla historiska fartyg</p>
+                        </div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                        <div style={{ position: 'relative', width: '350px' }}>
+                            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
+                            <input 
+                                type="text"
+                                placeholder="Sök på namn eller MMSI..."
+                                value={dbSearchTerm}
+                                onChange={e => setDbSearchTerm(e.target.value)}
+                                style={{
+                                    width: '100%',
+                                    padding: '12px 15px 12px 40px',
+                                    borderRadius: '12px',
+                                    background: colors.bgApp || 'rgba(0,0,0,0.1)',
+                                    border: `1px solid ${colors.border}`,
+                                    color: colors.textMain,
+                                    outline: 'none',
+                                    fontSize: '0.95rem',
+                                    transition: 'border-color 0.2s'
+                                }}
+                                onFocus={e => e.target.style.borderColor = '#44aaff'}
+                                onBlur={e => e.target.style.borderColor = colors.border}
+                            />
+                        </div>
+                        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '10px', borderRadius: '50%', transition: 'all 0.2s' }}>
+                            <X size={20} />
+                        </button>
+                    </div>
+                </div>
+
+                <div 
+                    ref={scrollRef}
+                    onScroll={handleScroll}
+                    style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}
+                >
+                    <table className="db-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '80px' }}>Bild</th>
+                                <th style={{ width: '130px' }} onClick={() => handleSort('mmsi')}>MMSI {renderSortIcon('mmsi')}</th>
+                                <th onClick={() => handleSort('name')}>Namn {renderSortIcon('name')}</th>
+                                <th style={{ width: '180px' }} onClick={() => handleSort('type')}>Typ {renderSortIcon('type')}</th>
+                                <th style={{ width: '120px' }}>Mått</th>
+                                <th style={{ textAlign: 'center', width: '90px' }} onClick={() => handleSort('registration_count')}>Obs {renderSortIcon('registration_count')}</th>
+                                <th style={{ width: '180px' }} onClick={() => handleSort('last_seen')}>Senast sedd {renderSortIcon('last_seen')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {databaseShips.map((ship: any) => (
+                                <tr key={ship.mmsi} onClick={() => onSelectVessel(ship)}>
+                                    <td>
+                                        <div 
+                                            style={{ width: '60px', height: '40px', borderRadius: '6px', background: '#0a0a0a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)', cursor: ship.imageUrl ? 'zoom-in' : 'default' }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (ship.imageUrl && ship.imageUrl !== "/images/0.jpg") {
+                                                    setSelectedImage(ship.imageUrl);
+                                                }
+                                            }}
+                                        >
+                                            {ship.imageUrl && ship.imageUrl !== "/images/0.jpg" ? (
+                                                <img src={ship.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                            ) : (
+                                                <Ship size={20} color={colors.textMuted} style={{ opacity: 0.3 }} />
+                                            )}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span className="ship-badge badge-mmsi">{ship.mmsi}</span>
+                                    </td>
+                                    <td>
+                                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: colors.textMain, letterSpacing: '-0.3px' }}>{ship.name || 'Unknown Vessel'}</div>
+                                    </td>
+                                    <td>
+                                        <span className="ship-badge badge-type">
+                                            {ship.ship_type_text || (ship.type ? `Type ${ship.type}` : 'Other')}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div style={{ fontSize: '0.85rem', color: colors.textMuted }}>{ship.length && ship.width ? `${ship.length}m × ${ship.width}m` : '--'}</div>
+                                    </td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <span className="ship-badge badge-obs">
+                                            {ship.registration_count || 1}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div style={{ fontWeight: 700, color: '#00f0ff', fontSize: '0.8rem' }}>{getTimeAgo(getTimeStampFromStr(ship.last_seen))} ago</div>
+                                        <div style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.7 }}>{ship.last_seen || '--'}</div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                    {loading && (
+                        <div style={{ textAlign: 'center', padding: '40px', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                            <div className="loading-spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,240,255,0.1)', borderTopColor: '#00f0ff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                            <span style={{ fontSize: '0.85rem', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.8 }}>Hämtar data...</span>
+                        </div>
+                    )}
+                    
+                    {!loading && databaseShips.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: '100px 0', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                            <Database size={48} style={{ opacity: 0.2 }} />
+                            <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>Inga fartyg hittades</div>
+                        </div>
+                    )}
+                    
+                    {!loading && hasMore && databaseShips.length > 0 && (
+                        <div style={{ textAlign: 'center', padding: '20px' }}>
+                            <button 
+                                onClick={() => fetchMore()}
+                                style={{ background: 'rgba(68, 170, 255, 0.1)', color: '#44aaff', border: '1px solid rgba(68, 170, 255, 0.3)', padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                            >
+                                Visa fler
+                            </button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="db-pagination-info">
+                    <div>
+                        Visar <strong>{databaseShips.length}</strong> av totalt tillgängliga objekt i databasen
+                    </div>
+                    <div style={{ opacity: 0.6, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Database size={14} />
+                        <span>Infinite Scroll Active</span>
+                    </div>
+                </div>
+
+                {selectedImage && (
+                    <div 
+                        className="settings-modal-overlay" 
+                        onClick={() => setSelectedImage(null)} 
+                        style={{ zIndex: 2000, background: 'rgba(0,0,0,0.85)' }}
+                    >
+                        <div 
+                            style={{ position: 'relative', maxWidth: '85vw', maxHeight: '85vh' }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <img 
+                                src={selectedImage} 
+                                alt="Vessel Large" 
+                                style={{ width: '100%', height: '100%', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)' }} 
+                            />
+                            <button 
+                                onClick={() => setSelectedImage(null)}
+                                style={{ position: 'absolute', top: '-15px', right: '-15px', background: '#ff4444', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 
 function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any) {
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1988,55 +2294,63 @@ export default function App() {
     const [showFlash, setShowFlash] = useState(() => localStorage.getItem('naviscore_flash') !== 'false');
 
     // Theme and Settings State
-    const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Light is default now!
+    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+        const saved = localStorage.getItem('naviscore_theme');
+        return (saved === 'dark' || saved === 'light') ? saved : 'light';
+    });
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
-    const [mqttSettings, setMqttSettings] = useState({
-        mqtt_enabled: 'false',
-        mqtt_url: '',
-        mqtt_topic: 'ais',
-        mqtt_user: '',
-        mqtt_pass: '',
-        mqtt_pub_enabled: 'false',
-        mqtt_pub_url: '',
-        mqtt_pub_topic: 'naviscore/objects',
-        mqtt_pub_user: '',
-        mqtt_pub_pass: '',
-        mqtt_pub_only_new: 'false',
-        mqtt_pub_forward_sdr: 'true',
-        mqtt_pub_forward_aisstream: 'false',
-        forward_enabled: 'false',
-        ship_timeout: '60',
-        origin_lat: '',
-        origin_lon: '',
-        show_range_rings: 'true',
-        map_style: 'light',
-        range_type: '24h',
-        base_layer: 'standard',
-        history_duration: '60',
-        show_names_on_map: 'true',
-        trail_color: '#ff4444',
-        trail_opacity: '0.6',
-        trail_enabled: 'true',
-        sdr_ppm: '0',
-        sdr_gain: 'auto',
-        units: 'nautical',
-        ship_size: '1.0',
-        circle_size: '1.0',
-        trail_size: '2.0',
-        aisstream_enabled: 'false',
-        aisstream_api_key: '',
-        trail_mode: 'all',
-        show_aisstream_on_map: 'true',
-        sdr_enabled: 'true',
-        udp_enabled: 'true',
-        udp_port: '10110',
-        vessel_detail_view: 'sidebar',
-        cluster_break_zoom: '11',
-        aisstream_sw_lat: '56.5',
-        aisstream_sw_lon: '15.5',
-        aisstream_ne_lat: '60.0',
-        aisstream_ne_lon: '21.0'
+    const [mqttSettings, setMqttSettings] = useState(() => {
+        const savedNames = localStorage.getItem('naviscore_show_names');
+        const savedTrails = localStorage.getItem('naviscore_trail_enabled');
+        
+        return {
+            mqtt_enabled: 'false',
+            mqtt_url: '',
+            mqtt_topic: 'ais',
+            mqtt_user: '',
+            mqtt_pass: '',
+            mqtt_pub_enabled: 'false',
+            mqtt_pub_url: '',
+            mqtt_pub_topic: 'naviscore/objects',
+            mqtt_pub_user: '',
+            mqtt_pub_pass: '',
+            mqtt_pub_only_new: 'false',
+            mqtt_pub_forward_sdr: 'true',
+            mqtt_pub_forward_aisstream: 'false',
+            forward_enabled: 'false',
+            ship_timeout: '60',
+            origin_lat: '',
+            origin_lon: '',
+            show_range_rings: 'true',
+            map_style: 'light',
+            range_type: '24h',
+            base_layer: 'standard',
+            history_duration: '60',
+            show_names_on_map: savedNames !== null ? savedNames : 'true',
+            trail_color: '#ff4444',
+            trail_opacity: '0.6',
+            trail_enabled: savedTrails !== null ? savedTrails : 'true',
+            sdr_ppm: '0',
+            sdr_gain: 'auto',
+            units: 'nautical',
+            ship_size: '1.0',
+            circle_size: '1.0',
+            trail_size: '2.0',
+            aisstream_enabled: 'false',
+            aisstream_api_key: '',
+            trail_mode: 'all',
+            show_aisstream_on_map: 'true',
+            sdr_enabled: 'true',
+            udp_enabled: 'true',
+            udp_port: '10110',
+            vessel_detail_view: 'sidebar',
+            cluster_break_zoom: '11',
+            aisstream_sw_lat: '56.5',
+            aisstream_sw_lon: '15.5',
+            aisstream_ne_lat: '60.0',
+            aisstream_ne_lon: '21.0'
+        };
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
     
@@ -2047,6 +2361,13 @@ export default function App() {
 
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
     const [isNmeaModalOpen, setIsNmeaModalOpen] = useState(false);
+    const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
+    const [databaseShips, setDatabaseShips] = useState<any[]>([]);
+    const [dbSearchTerm, setDbSearchTerm] = useState('');
+    const [dbOffset, setDbOffset] = useState(0);
+    const [dbHasMore, setDbHasMore] = useState(true);
+    const [dbSort, setDbSort] = useState({ key: 'last_seen', direction: 'desc' });
+    const [dbLoading, setDbLoading] = useState(false);
     const [nmeaLogs, setNmeaLogs] = useState<any[]>([]);
     const [settingsTab, setSettingsTab] = useState('general');
 
@@ -2089,6 +2410,20 @@ export default function App() {
     const [filterShipType, setFilterShipType] = useState('all');
     const hoverTimerRef = useRef<number | null>(null);
     const lastFlashRef = useRef<Record<string, number>>({});
+    const mapRef = useRef<L.Map>(null);
+    
+    // Persist UI states to localStorage
+    useEffect(() => {
+        localStorage.setItem('naviscore_theme', theme);
+    }, [theme]);
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_show_names', mqttSettings.show_names_on_map);
+    }, [mqttSettings.show_names_on_map]);
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_trail_enabled', mqttSettings.trail_enabled);
+    }, [mqttSettings.trail_enabled]);
 
     // Performance & Hybrid Visibility
     const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
@@ -2147,55 +2482,27 @@ export default function App() {
         fetch(fetchPath)
             .then(r => r.json())
             .then(data => {
-                setMqttSettings({
-                    mqtt_enabled: data.mqtt_enabled || 'false',
-                    mqtt_url: data.mqtt_url || '',
-                    mqtt_topic: data.mqtt_topic || 'ais',
-                    mqtt_user: data.mqtt_user || '',
-                    mqtt_pass: data.mqtt_pass || '',
-                    mqtt_pub_enabled: data.mqtt_pub_enabled || 'false',
-                    mqtt_pub_url: data.mqtt_pub_url || '',
-                    mqtt_pub_topic: data.mqtt_pub_topic || 'naviscore/objects',
-                    mqtt_pub_user: data.mqtt_pub_user || '',
-                    mqtt_pub_pass: data.mqtt_pub_pass || '',
-                    mqtt_pub_only_new: data.mqtt_pub_only_new || 'false',
-                    mqtt_pub_forward_sdr: data.mqtt_pub_forward_sdr || 'true',
-                    mqtt_pub_forward_aisstream: data.mqtt_pub_forward_aisstream || 'false',
-                    forward_enabled: data.forward_enabled || 'false',
-                    ship_timeout: data.ship_timeout || '60',
-                    origin_lat: data.origin_lat || '',
-                    origin_lon: data.origin_lon || '',
-                    show_range_rings: data.show_range_rings || 'true',
-                    map_style: data.map_style || 'light',
-                    range_type: data.range_type || '24h',
-                    base_layer: data.base_layer || 'standard',
-                    history_duration: data.history_duration || '60',
-                    show_names_on_map: data.show_names_on_map || 'true',
-                    trail_color: data.trail_color || '#ff4444',
-                    trail_opacity: data.trail_opacity || '0.6',
-                    trail_enabled: data.trail_enabled || 'true',
-                    sdr_ppm: data.sdr_ppm || '0',
-                    sdr_gain: data.sdr_gain || 'auto',
-                    units: data.units || 'nautical',
-                    ship_size: data.ship_size || '1.0',
-                    circle_size: data.circle_size || '1.0',
-                    trail_size: data.trail_size || '2.0',
-                    aisstream_enabled: data.aisstream_enabled || 'false',
-                    aisstream_api_key: data.aisstream_api_key || '',
-                    trail_mode: data.trail_mode || 'all',
-                    show_aisstream_on_map: data.show_aisstream_on_map || 'true',
-                    sdr_enabled: data.sdr_enabled || 'true',
-                    udp_enabled: data.udp_enabled || 'true',
-                    udp_port: data.udp_port || '10110',
-                    vessel_detail_view: data.vessel_detail_view || 'sidebar',
-                    cluster_break_zoom: data.cluster_break_zoom || '11',
-                    aisstream_sw_lat: data.aisstream_sw_lat || '56.5',
-                    aisstream_sw_lon: data.aisstream_sw_lon || '15.5',
-                    aisstream_ne_lat: data.aisstream_ne_lat || '60.0',
-                    aisstream_ne_lon: data.aisstream_ne_lon || '21.0'
-                });
+                setMqttSettings(prev => ({
+                    ...data,
+                    // Re-apply local overrides after backend load
+                    ...(() => {
+                        const savedNames = localStorage.getItem('naviscore_show_names');
+                        const savedTrails = localStorage.getItem('naviscore_trail_enabled');
+                        const overrides: any = {};
+                        if (savedNames !== null) overrides.show_names_on_map = savedNames;
+                        if (savedTrails !== null) overrides.trail_enabled = savedTrails;
+                        return overrides;
+                    })()
+                }));
                 setLocalTimeoutStr(data.ship_timeout || '60');
-                setTheme(data.map_style === 'dark' ? 'dark' : 'light');
+                
+                // Only sync theme if not explicitly set in this session? 
+                // Actually, let's honor the backend map_style but allow localStorage override.
+                const savedTheme = localStorage.getItem('naviscore_theme');
+                if (!savedTheme) {
+                    setTheme(data.map_style === 'dark' ? 'dark' : 'light');
+                }
+                
                 setIsSettingsLoaded(true);
             })
             .catch((err) => {
@@ -2245,6 +2552,46 @@ export default function App() {
             // alert('Could not save settings');
         }
     };
+
+    const fetchDatabaseShips = useCallback(async (isNewSearch = false) => {
+        if (dbLoading && !isNewSearch) return;
+        setDbLoading(true);
+        
+        const currentOffset = isNewSearch ? 0 : dbOffset;
+        const limit = 50;
+        const isDev = window.location.port === '5173';
+        const baseUrl = isDev ? 'http://127.0.0.1:8080/api/database' : '/api/database';
+        const sortParam = `&sort=${dbSort.key}&order=${dbSort.direction}`;
+        const url = `${baseUrl}?limit=${limit}&offset=${currentOffset}${dbSearchTerm ? `&q=${encodeURIComponent(dbSearchTerm)}` : ''}${sortParam}`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (isNewSearch) {
+                setDatabaseShips(data);
+                setDbOffset(data.length);
+            } else {
+                setDatabaseShips(prev => [...prev, ...data]);
+                setDbOffset(prev => prev + data.length);
+            }
+            
+            setDbHasMore(data.length === limit);
+        } catch (err) {
+            console.error("Failed to fetch database ships:", err);
+        } finally {
+            setDbLoading(false);
+        }
+    }, [dbSearchTerm, dbOffset, dbLoading]);
+
+    useEffect(() => {
+        if (isDatabaseModalOpen) {
+            const timer = setTimeout(() => {
+                fetchDatabaseShips(true);
+            }, 300);
+            return () => clearTimeout(timer);
+        }
+    }, [dbSearchTerm, isDatabaseModalOpen, dbSort]);
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -2849,6 +3196,15 @@ export default function App() {
                             <Terminal size={22} />
                         </button>
                         <button
+                            onClick={() => setIsDatabaseModalOpen(true)}
+                            style={{ background: isDatabaseModalOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
+                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+                            onMouseLeave={e => { if (!isDatabaseModalOpen) e.currentTarget.style.background = 'transparent' }}
+                            title="Vessel Database"
+                        >
+                            <Database size={22} />
+                        </button>
+                        <button
                             onClick={() => setIsSettingsModalOpen(true)}
                             style={{ background: 'transparent', border: 'none', color: colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s' }}
                             onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
@@ -2899,7 +3255,7 @@ export default function App() {
                             Loading map...
                         </div>
                     ) : (
-                        <MapContainer key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
+                        <MapContainer ref={mapRef} key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
                             <CenterButton originLat={originLat} originLon={originLon} />
                             <ZoomTracker setZoom={setCurrentZoom} />
                             {isSelectionMode && <BoundingBoxSelector />}
@@ -3740,6 +4096,35 @@ export default function App() {
                 activeTab={settingsTab}
                 setActiveTab={setSettingsTab}
                 colors={colors}
+            />
+
+            <VesselDatabaseModal
+                isOpen={isDatabaseModalOpen}
+                onClose={() => setIsDatabaseModalOpen(false)}
+                onSelectVessel={(ship: any) => {
+                    // Stay open per user request
+                    // setIsDatabaseModalOpen(false);
+                    // Check if ship is in current active ships
+                    const active = ships.find((s: any) => String(s.mmsi) === String(ship.mmsi));
+                    if (active && active.lat && active.lon) {
+                        setSelectedShipMmsi(String(active.mmsi));
+                        if (mapRef.current) {
+                            mapRef.current.flyTo([active.lat, active.lon], 14);
+                        }
+                    } else {
+                        // If not active, we just close the modal. 
+                        // Maybe in future we can show historical track.
+                    }
+                }}
+                colors={colors}
+                dbSearchTerm={dbSearchTerm}
+                setDbSearchTerm={setDbSearchTerm}
+                databaseShips={databaseShips}
+                fetchMore={() => fetchDatabaseShips(false)}
+                hasMore={dbHasMore}
+                loading={dbLoading}
+                dbSort={dbSort}
+                setDbSort={setDbSort}
             />
 
             {mqttSettings.vessel_detail_view === 'sidebar' ? (
