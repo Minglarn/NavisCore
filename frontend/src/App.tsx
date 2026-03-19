@@ -428,11 +428,11 @@ const extraStyles = `
     cursor: pointer;
     user-select: none;
     transition: all 0.2s;
-    border-bottom: 1px solid rgba(0, 240, 255, 0.2);
+    border-bottom: 1px solid rgba(68, 170, 255, 0.2);
 }
 .db-table th:hover {
     background: linear-gradient(to bottom, rgba(45, 45, 65, 0.9), rgba(30, 30, 45, 1));
-    color: #00f0ff;
+    color: #44aaff;
 }
 .db-table td {
     padding: 12px 15px;
@@ -441,10 +441,10 @@ const extraStyles = `
     font-size: 0.85rem;
 }
 .db-table tr:nth-child(even) {
-    background: rgba(0, 240, 255, 0.05);
+    background: rgba(68, 170, 255, 0.05);
 }
 .db-table tr:hover {
-    background: rgba(0, 240, 255, 0.12);
+    background: rgba(68, 170, 255, 0.12);
     backdrop-filter: blur(4px);
 }
 .light-theme .db-table th {
@@ -487,7 +487,6 @@ const extraStyles = `
 
 .db-pagination-info {
     padding: 15px 30px;
-    background: rgba(0,0,0,0.2);
     border-top: 1px solid rgba(255,255,255,0.05);
     color: rgba(255,255,255,0.5);
     font-size: 0.75rem;
@@ -1348,8 +1347,8 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1500 }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
                 height: '90vh', 
-                width: '90vw', 
-                maxWidth: 'none',
+                width: '65vw', 
+                maxWidth: '1200px',
                 borderRadius: '16px', 
                 overflow: 'hidden', 
                 display: 'flex', 
@@ -1357,7 +1356,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                 boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                 background: colors.bgCard 
             }}>
-                <div style={{ padding: '25px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgHeader || 'rgba(0,0,0,0.2)' }}>
+                <div style={{ padding: '25px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgApp }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <div style={{ background: 'rgba(68, 170, 255, 0.15)', color: '#44aaff', padding: '10px', borderRadius: '12px' }}>
                             <Database size={24} />
@@ -1368,7 +1367,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <div style={{ position: 'relative', width: '350px' }}>
+                        <div style={{ position: 'relative', width: '250px' }}>
                             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
                             <input 
                                 type="text"
@@ -1453,7 +1452,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                                         </span>
                                     </td>
                                     <td>
-                                        <div style={{ fontWeight: 700, color: '#00f0ff', fontSize: '0.8rem' }}>{getTimeAgo(getTimeStampFromStr(ship.last_seen))} ago</div>
+                                        <div style={{ fontWeight: 700, color: '#44aaff', fontSize: '0.8rem' }}>{getTimeAgo(getTimeStampFromStr(ship.last_seen))} ago</div>
                                         <div style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.7 }}>{ship.last_seen || '--'}</div>
                                     </td>
                                 </tr>
@@ -1486,7 +1485,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                     )}
                 </div>
 
-                <div className="db-pagination-info">
+                <div className="db-pagination-info" style={{ background: colors.bgApp, borderTop: `1px solid ${colors.border}` }}>
                     <div>
                         Visar <strong>{databaseShips.length}</strong> av totalt tillgängliga objekt i databasen
                     </div>
