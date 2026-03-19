@@ -403,6 +403,15 @@ async def enrich_ship_data(mmsi: str):
                         if (datetime.now() - fetch_date).days < 30: active_lookups.remove(mmsi); return
                     else:
                         if (datetime.now() - fetch_date).days < 1: active_lookups.remove(mmsi); return
+        # Check disk first (e.g. if DB was deleted but images were kept)
+        local_path = os.path.join(IMAGES_DIR, f"{mmsi}.jpg")
+        if os.path.exists(local_path):
+            async with db_session() as db:
+                await db.execute('UPDATE ships SET image_url = ?, image_fetched_at = CURRENT_TIMESTAMP WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
+                await db.commit()
+            return
+
+        async with db_session() as db:
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, image_fetched_at, last_seen) VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)', (mmsi,))
             await db.execute('UPDATE ships SET image_fetched_at = CURRENT_TIMESTAMP WHERE mmsi = ?', (mmsi,))
             await db.commit()
