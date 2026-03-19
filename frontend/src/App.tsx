@@ -264,7 +264,7 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     return emoji;
 }
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean) {
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean) {
     const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
     const isAircraft = type === 9;
     const color = getShipColor(mmsi, type, isMeteo, isAton, isEmergency);
@@ -326,6 +326,7 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     return L.divIcon({
         html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%; position: relative;">
                  ${shouldFlash ? `<div class="ship-update-flash"></div>` : ''}
+                 ${isNew ? `<div class="new-vessel-ping"></div>` : ''}
                  <div style="z-index: 1; display:flex;">${svg}</div>
                </div>`,
         className: 'ship-custom-icon-container',
@@ -395,6 +396,30 @@ const extraStyles = `
 
 .ship-custom-icon-container { background: transparent; border: none; }
 .ship-custom-icon svg { filter: drop-shadow(0px 2px 3px rgba(0,0,0,0.4)); }
+
+/* New Vessel Ping - Flash every 10s */
+.new-vessel-ping {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 24px;
+    height: 24px;
+    margin-top: -12px;
+    margin-left: -12px;
+    border-radius: 50%;
+    border: 3px solid #ffea00;
+    box-sizing: border-box;
+    animation: new-vessel-ping-anim 10s infinite;
+    pointer-events: none;
+    z-index: -1;
+}
+
+@keyframes new-vessel-ping-anim {
+    0% { transform: scale(0.5); opacity: 0; boundary-width: 6px; }
+    2% { transform: scale(0.5); opacity: 1; border-width: 6px; }
+    10% { transform: scale(3.5); opacity: 0; border-width: 1px; }
+    100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
+}
 
 .ship-name-label {
     background: rgba(15, 15, 26, 0.8) !important;
@@ -2079,6 +2104,23 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                     onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
                                 />
                             </div>
+                            <div className="form-group">
+                                <div>
+                                    <label>New Vessel Highlight Duration</label>
+                                    <div className="description">How many minutes a vessel is highlighted as "NEW"</div>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        max="60"
+                                        value={settings.new_vessel_threshold || '5'}
+                                        onChange={e => setSettings({ ...settings, new_vessel_threshold: e.target.value })}
+                                        style={{ width: '80px' }}
+                                    />
+                                    <span style={{ fontSize: '0.85rem', color: colors.textMuted }}>min</span>
+                                </div>
+                            </div>
                             <div className="settings-section-title" style={{ marginTop: '10px' }}>Object Sizes</div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
@@ -2348,7 +2390,8 @@ export default function App() {
             aisstream_sw_lat: '56.5',
             aisstream_sw_lon: '15.5',
             aisstream_ne_lat: '60.0',
-            aisstream_ne_lon: '21.0'
+            aisstream_ne_lon: '21.0',
+            new_vessel_threshold: '5'
         };
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -3341,6 +3384,10 @@ export default function App() {
                             >
                             {ships.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
+                                const now = Date.now();
+                                const threshold = parseInt(mqttSettings.new_vessel_threshold || '5');
+                                const isNew = s.session_start && (now - s.session_start < threshold * 60000);
+                                
                                 const nameUpper = (s.name || "").toUpperCase();
                                 if (!s.lat || !s.lon) return null;
 
