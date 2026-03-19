@@ -3368,10 +3368,26 @@ export default function App() {
                                                 />
                                             )}
 
-                                            <Circle center={[originLat, originLon]} radius={10000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }} />
-                                            <Circle center={[originLat, originLon]} radius={20000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }} />
-                                            <Circle center={[originLat, originLon]} radius={50000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }} />
-                                            <Circle center={[originLat, originLon]} radius={100000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }} />
+                                            <Circle center={[originLat, originLon]} radius={10000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                                <Tooltip sticky direction="top" opacity={0.7}>
+                                                    {formatDistance(10, mqttSettings.units)}
+                                                </Tooltip>
+                                            </Circle>
+                                            <Circle center={[originLat, originLon]} radius={20000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                                <Tooltip sticky direction="top" opacity={0.7}>
+                                                    {formatDistance(20, mqttSettings.units)}
+                                                </Tooltip>
+                                            </Circle>
+                                            <Circle center={[originLat, originLon]} radius={50000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                                <Tooltip sticky direction="top" opacity={0.7}>
+                                                    {formatDistance(50, mqttSettings.units)}
+                                                </Tooltip>
+                                            </Circle>
+                                            <Circle center={[originLat, originLon]} radius={100000} pathOptions={{ color: '#0066cc', weight: 1.5, fill: false, opacity: 0.5, dashArray: '5 5' }}>
+                                                <Tooltip sticky direction="top" opacity={0.7}>
+                                                    {formatDistance(100, mqttSettings.units)}
+                                                </Tooltip>
+                                            </Circle>
                                         </>
                                     )}
                                 </>
