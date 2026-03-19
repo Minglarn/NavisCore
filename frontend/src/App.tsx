@@ -2994,15 +2994,16 @@ export default function App() {
                                 if (!showAisStream && (s.source === 'aisstream')) return null;
 
                                 // Smart Label Logic:
-                                // 1. Zoom > 13: Show all names
-                                // 2. Zoom 11-13: Show every 3rd ship
-                                // 3. Zoom < 11: Show every 10th ship 
-                                // This prevents clutter in busy areas while still showing some activity
+                                // 1. Emergency: Always show name
+                                // 2. Zoom >= 10: Show all names (clustering handles density)
+                                // 3. Zoom 8-9: Show every 3rd ship
+                                // 4. Zoom < 8: Show every 10th ship 
                                 let shouldShowName = false;
                                 if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
-                                    if (currentZoom > 13) shouldShowName = true;
-                                    else if (currentZoom > 11 && idx % 3 === 0) shouldShowName = true;
-                                    else if (currentZoom <= 11 && idx % 10 === 0) shouldShowName = true;
+                                    if (s.is_emergency) shouldShowName = true;
+                                    else if (currentZoom >= 10) shouldShowName = true;
+                                    else if (currentZoom >= 8 && idx % 3 === 0) shouldShowName = true;
+                                    else if (currentZoom < 8 && idx % 10 === 0) shouldShowName = true;
                                 }
 
                                 const cog = s.course ?? s.cog;
