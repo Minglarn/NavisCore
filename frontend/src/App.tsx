@@ -1486,7 +1486,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                     </table>
                     {loading && (
                         <div style={{ textAlign: 'center', padding: '40px', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-                            <div className="loading-spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(0,240,255,0.1)', borderTopColor: '#00f0ff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                            <div className="loading-spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(68,170,255,0.1)', borderTopColor: '#44aaff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
                             <span style={{ fontSize: '0.85rem', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.8 }}>Hämtar data...</span>
                         </div>
                     )}
