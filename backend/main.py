@@ -577,7 +577,10 @@ async def process_ais_data(data: dict):
                     ship_data["message_count"], ship_data["eta"], ship_data["rot"], ship_data["imo"], ship_data["callsign"] = r[9], r[10], r[11], r[12], r[13]
                     ship_data["registration_count"] = r[33]
                     if r[34]:
-                        try: ship_data["session_start"] = datetime.strptime(r[34], "%Y-%m-%d %H:%M:%S").timestamp() * 1000
+                        try: 
+                            # SQLite CURRENT_TIMESTAMP is UTC. Convert to UTC timestamp.
+                            dt = datetime.strptime(r[34], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                            ship_data["session_start"] = int(dt.timestamp() * 1000)
                         except Exception: pass
                     if r[14]:
                         try: ship_data["previous_seen"] = datetime.strptime(r[14], "%Y-%m-%d %H:%M:%S").timestamp() * 1000
@@ -960,6 +963,17 @@ async def get_database(q: str = None, limit: int = 50, offset: int = 0, sort: st
         query += f" ORDER BY {sort} {order} LIMIT ? OFFSET ?"
         params.extend([limit, offset])
         
+        # Get total count for the query
+        count_query = "SELECT COUNT(*) FROM ships"
+        count_params = []
+        if q:
+            count_query += " WHERE mmsi LIKE ? OR name LIKE ?"
+            count_params.extend([f"%{q}%", f"%{q}%"])
+            
+        async with db.execute(count_query, tuple(count_params)) as cursor:
+            total_row = await cursor.fetchone()
+            total = total_row[0] if total_row else 0
+
         async with db.execute(query, tuple(params)) as cursor:
             res = []
             for row in await cursor.fetchall():
@@ -970,8 +984,16 @@ async def get_database(q: str = None, limit: int = 50, offset: int = 0, sort: st
                         c = int(d["type"])
                         d["ship_type_text"], d["ship_category"] = get_ship_type_name(c), get_ship_category(c)
                     except: pass
+                
+                # Format session_start for database view if needed, but ensure it's available
+                if d.get("session_start"):
+                    try:
+                        dt = datetime.strptime(d["session_start"], "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+                        d["session_start"] = int(dt.timestamp() * 1000)
+                    except: pass
+
                 res.append(d)
-            return res
+            return {"ships": res, "total": total}
 
 @app.post("/api/ships/{mmsi}/image")
 async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):

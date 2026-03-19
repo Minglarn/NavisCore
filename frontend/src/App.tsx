@@ -415,7 +415,7 @@ const extraStyles = `
 }
 
 @keyframes new-vessel-ping-anim {
-    0% { transform: scale(0.5); opacity: 0; boundary-width: 6px; }
+    0% { transform: scale(0.5); opacity: 0; border-width: 6px; }
     2% { transform: scale(0.5); opacity: 1; border-width: 6px; }
     10% { transform: scale(3.5); opacity: 0; border-width: 1px; }
     100% { transform: scale(3.5); opacity: 0; border-width: 1px; }
@@ -1333,7 +1333,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
     );
 }
 
-function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearchTerm, setDbSearchTerm, databaseShips, fetchMore, hasMore, loading, dbSort, setDbSort }: any) {
+function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearchTerm, setDbSearchTerm, databaseShips, fetchMore, hasMore, loading, dbSort, setDbSort, dbTotal }: any) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
@@ -1510,9 +1510,9 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                     )}
                 </div>
 
-                <div className="db-pagination-info" style={{ background: colors.bgApp, borderTop: `1px solid ${colors.border}` }}>
-                    <div>
-                        Visar <strong>{databaseShips.length}</strong> av totalt tillgängliga objekt i databasen
+                <div className="db-pagination-info" style={{ background: colors.bgApp, borderTop: `1px solid ${colors.border}`, color: colors.textMain }}>
+                    <div style={{ fontWeight: 500 }}>
+                        Visar <strong>{databaseShips.length}</strong> av totalt <strong>{dbTotal || databaseShips.length}</strong> objekt i databasen
                     </div>
                     <div style={{ opacity: 0.6, display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Database size={14} />
@@ -2408,6 +2408,7 @@ export default function App() {
     const [dbSearchTerm, setDbSearchTerm] = useState('');
     const [dbOffset, setDbOffset] = useState(0);
     const [dbHasMore, setDbHasMore] = useState(true);
+    const [dbTotal, setDbTotal] = useState(0);
     const [dbSort, setDbSort] = useState({ key: 'last_seen', direction: 'desc' });
     const [dbLoading, setDbLoading] = useState(false);
     const [nmeaLogs, setNmeaLogs] = useState<any[]>([]);
@@ -2610,15 +2611,19 @@ export default function App() {
             const res = await fetch(url);
             const data = await res.json();
             
+            const newShips = data.ships || [];
+            const total = data.total || 0;
+            setDbTotal(total);
+
             if (isNewSearch) {
-                setDatabaseShips(data);
-                setDbOffset(data.length);
+                setDatabaseShips(newShips);
+                setDbOffset(newShips.length);
             } else {
-                setDatabaseShips(prev => [...prev, ...data]);
-                setDbOffset(prev => prev + data.length);
+                setDatabaseShips(prev => [...prev, ...newShips]);
+                setDbOffset(prev => prev + newShips.length);
             }
             
-            setDbHasMore(data.length === limit);
+            setDbHasMore(newShips.length === limit && (isNewSearch ? newShips.length : dbOffset + newShips.length) < total);
         } catch (err) {
             console.error("Failed to fetch database ships:", err);
         } finally {
@@ -3421,7 +3426,8 @@ export default function App() {
                                     s.is_aton,
                                     s.aton_type,
                                     s.is_emergency,
-                                    s.virtual_aton
+                                    s.virtual_aton,
+                                    isNew
                                 );
 
                                 return (
@@ -4171,6 +4177,7 @@ export default function App() {
                 loading={dbLoading}
                 dbSort={dbSort}
                 setDbSort={setDbSort}
+                dbTotal={dbTotal}
             />
 
             {mqttSettings.vessel_detail_view === 'sidebar' ? (
