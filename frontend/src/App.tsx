@@ -2044,6 +2044,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                    <label>Trail Thickness</label>
+                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
+                                </div>
+                                <input type="range" min="0.5" max="8" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
+                            </div>
+                            <div className="form-group vertical">
+                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
                                     <label>Opacity</label>
                                     <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{Math.round(parseFloat(settings.trail_opacity) * 100)}%</span>
                                 </div>
@@ -2143,10 +2150,10 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             </div>
                             <div className="form-group vertical">
                                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Trail Thickness</label>
-                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
+                                    <label>Stationary / Meteo</label>
+                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
                                 </div>
-                                <input type="range" min="1" max="10" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
+                                <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
                             </div>
                         </div>
                     )}
@@ -2473,6 +2480,18 @@ export default function App() {
         localStorage.setItem('naviscore_trail_enabled', mqttSettings.trail_enabled);
     }, [mqttSettings.trail_enabled]);
 
+    useEffect(() => {
+        localStorage.setItem('naviscore_trail_color', mqttSettings.trail_color);
+    }, [mqttSettings.trail_color]);
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_trail_size', mqttSettings.trail_size);
+    }, [mqttSettings.trail_size]);
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_trail_opacity', mqttSettings.trail_opacity);
+    }, [mqttSettings.trail_opacity]);
+
     // Performance & Hybrid Visibility
     const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, mmsi: string } | null>(null);
@@ -2536,9 +2555,16 @@ export default function App() {
                     ...(() => {
                         const savedNames = localStorage.getItem('naviscore_show_names');
                         const savedTrails = localStorage.getItem('naviscore_trail_enabled');
+                        const savedTrailColor = localStorage.getItem('naviscore_trail_color');
+                        const savedTrailSize = localStorage.getItem('naviscore_trail_size');
+                        const savedTrailOpacity = localStorage.getItem('naviscore_trail_opacity');
+                        
                         const overrides: any = {};
                         if (savedNames !== null) overrides.show_names_on_map = savedNames;
                         if (savedTrails !== null) overrides.trail_enabled = savedTrails;
+                        if (savedTrailColor !== null) overrides.trail_color = savedTrailColor;
+                        if (savedTrailSize !== null) overrides.trail_size = savedTrailSize;
+                        if (savedTrailOpacity !== null) overrides.trail_opacity = savedTrailOpacity;
                         return overrides;
                     })()
                 }));
@@ -3318,26 +3344,18 @@ export default function App() {
                                                 />
                                             )}
 
-                                            <Circle center={[originLat, originLon]} radius={10000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
-                                                <Tooltip sticky direction="top" opacity={0.7}>
-                                                    {formatDistance(10, mqttSettings.units)}
-                                                </Tooltip>
-                                            </Circle>
-                                            <Circle center={[originLat, originLon]} radius={20000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
-                                                <Tooltip sticky direction="top" opacity={0.7}>
-                                                    {formatDistance(20, mqttSettings.units)}
-                                                </Tooltip>
-                                            </Circle>
-                                            <Circle center={[originLat, originLon]} radius={50000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
-                                                <Tooltip sticky direction="top" opacity={0.7}>
-                                                    {formatDistance(50, mqttSettings.units)}
-                                                </Tooltip>
-                                            </Circle>
-                                            <Circle center={[originLat, originLon]} radius={100000} pathOptions={{ color: '#0066cc', weight: 4, fill: false, opacity: 0.5, dashArray: '5 5' }}>
-                                                <Tooltip sticky direction="top" opacity={0.7}>
-                                                    {formatDistance(100, mqttSettings.units)}
-                                                </Tooltip>
-                                            </Circle>
+                                            {[5, 10, 15, 20, 30, 40].map(nm => (
+                                                <Circle 
+                                                    key={`ring-${nm}`}
+                                                    center={[originLat, originLon]} 
+                                                    radius={nm * 1852} 
+                                                    pathOptions={{ color: '#0066cc', weight: 2, fill: false, opacity: 0.5, dashArray: '5 5' }}
+                                                >
+                                                    <Tooltip sticky direction="top" opacity={0.7}>
+                                                        {nm} nm
+                                                    </Tooltip>
+                                                </Circle>
+                                            ))}
                                         </>
                                     )}
                                 </>
@@ -3728,16 +3746,22 @@ export default function App() {
                                 // Logic for selective tracking & Internet vessel filtering
                                 const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
                                 if (!showAisStream && (s.source === 'aisstream')) return null;
+
+                                // If trail_mode is 'selected', only show for hovered/selected/pinned
                                 if (mqttSettings.trail_mode === 'selected' && !isHovered && !isSelected && !isPinned) return null;
+
+                                const trailColor = mqttSettings.trail_color || '#ff4444';
+                                const trailWeight = (isHovered || isSelected || isPinned) ? (parseFloat(mqttSettings.trail_size || '2.0') + 1) : parseFloat(mqttSettings.trail_size || '2.0');
+                                const trailOpacity = (isHovered || isSelected || isPinned) ? 0.9 : parseFloat(mqttSettings.trail_opacity || '0.6');
 
                                 return (
                                     <Polyline
                                         key={`trail-${s.mmsi}`}
                                         positions={s.history}
                                         pathOptions={{
-                                            color: (isHovered || isSelected || isPinned) ? '#00f0ff' : mqttSettings.trail_color,
-                                            weight: (isHovered || isSelected || isPinned) ? Math.max(parseFloat(mqttSettings.trail_size) + 2, 4) : parseFloat(mqttSettings.trail_size),
-                                            opacity: (isHovered || isSelected || isPinned) ? 1 : parseFloat(mqttSettings.trail_opacity),
+                                            color: trailColor,
+                                            weight: trailWeight,
+                                            opacity: trailOpacity,
                                             dashArray: (isHovered || isSelected || isPinned) ? undefined : '5, 5'
                                         }}
                                     />
