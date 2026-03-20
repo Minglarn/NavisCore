@@ -36,14 +36,15 @@ Understanding what happens on the map:
 | **🔴 Red** | Tankers |
 | **🔵 Blue** | Passenger / Ferries |
 | **🟠 Orange** | Fishing Vessels |
+| **🟡 Yellow** | HSC (High Speed Craft) |
 | **🟣 Purple** | Pleasure Craft & Sailing |
-| **💗 Pink** | S.A.R. (Search and Rescue) |
-| **💎 Cyan** | Tugs & Towing |
-| **💠 Light Blue** | Pilot Vessels |
-| **🌑 Indigo** | Military & Law Enforcement |
+| **🔴 Pink-Red** | S.A.R. (Search and Rescue) |
+| **🔵 Cyan** | Tugs & Towing |
+| **🔵 Light Blue** | Pilot Vessels |
+| **⚫ Indigo** | Military & Law Enforcement |
 | **⚪ White** | WIG (Wing in Ground) |
-| **🎨 Magenta** | Aids to Navigation (Buoys, Lighthouses) |
-| **☁️ Light Blue** | Weather / Meteo Stations (Vindstrut icon) |
+| **🟣 Magenta** | Aids to Navigation (Buoys, Lighthouses) |
+| **⚪ Light Blue** | Weather / Meteo Stations (Vindstrut icon) |
 
 ### 📐 Icon Shapes
 - **Triangle/Ship**: Moving vessel (oriented towards its Course Over Ground).
