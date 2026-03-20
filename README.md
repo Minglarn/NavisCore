@@ -132,6 +132,22 @@ action:
         tag: "ais-new-vessel"
 mode: parallel
 max: 10
+
+```yaml
+alias: "AIS: Hourly Statistics Report"
+description: "Sends a summary of the last hour's activity"
+trigger:
+  - platform: mqtt
+    topic: "naviscore/objects_stat_hourly"
+action:
+  - service: notify.mobile_app_your_phone
+    data:
+      title: "📊 NavisCore Hourly Report"
+      message: >
+        Messages: {{ trigger.payload_json.messages_received }}
+        Unique Ships: {{ trigger.payload_json.max_vessels }}
+        New Ships: {{ trigger.payload_json.new_vessels }}
+```
 ```
 
 ## 📄 License & Contributing
