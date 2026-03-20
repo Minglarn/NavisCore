@@ -88,9 +88,25 @@ NavisCore is designed to be a central hub for maritime data:
 - **UDP Ingest**: Accepts NMEA data from external decoders on port `10110/udp`.
 - **MQTT**: 
   - **Broadcast**: Publishes real-time vessel updates to `naviscore/objects`.
+    - **Objects Payload Details**:
+      - `mmsi`: Unique vessel identifier (9 digits).
+      - `name`: Vessel name (if available).
+      - `lat` / `lon`: Current latitude and longitude.
+      - `sog` / `cog` / `heading`: Speed over ground, Course over ground, and Heading.
+      - `ship_type_label`: Human-readable ship category (e.g., "Cargo", "Tanker").
+      - `event_type`: `"new"` for first discovery, `"update"` for positional updates.
+      - `source`: Data origin (`"sdr"`, `"aisstream"`, or `"udp"`).
+      - `image_url`: Filename of the vessel's image from the local cache.
+      - `is_nav_aid`: Boolean for markers, buoys, and virtual aids.
   - **Statistics**:
     - **Hourly**: Publishes `naviscore/objects_stat_hourly` every hour with message counts, new/unique vessels, and shiptype distribution.
     - **Daily**: Publishes `naviscore/objects_stat_daily` at midnight with a summary of the full day's activity.
+    - **Payload Details**:
+      - `messages_received`: Total AIS messages processed during the period.
+      - `new_vessels`: Number of vessels seen for the first time in the database.
+      - `max_vessels`: Total unique MMSIs observed during the period.
+      - `shiptypes`: Dictionary of ship type categories and their counts (e.g., `{"Cargo": 12}`).
+      - `max_range_km` (Daily only): The maximum reception range recorded during the day.
   - **Raw Image Feed**: Publishes the raw binary data (JPEG) of a vessel's image to `naviscore/new_detected` whenever a new vessel is first identified.
 - **AisStream.io (Hybrid)**: This is a powerful feature that allows you to fetch real-time global AIS data.
   - **API Key Required**: To use this, you need a free API key from [AisStream.io](https://aisstream.io).
