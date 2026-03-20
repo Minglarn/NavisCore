@@ -89,8 +89,8 @@ NavisCore is designed to be a central hub for maritime data:
 - **MQTT**: 
   - **Broadcast**: Publishes real-time vessel updates to `naviscore/objects`.
   - **Statistics**:
-    - **Hourly**: Publishes `objects_stat_hourly` every hour with message counts, new/unique vessels, and shiptype distribution.
-    - **Daily**: Publishes `objects_stat_daily` at midnight with a summary of the full day's activity.
+    - **Hourly**: Publishes `naviscore/objects_stat_hourly` every hour with message counts, new/unique vessels, and shiptype distribution.
+    - **Daily**: Publishes `naviscore/objects_stat_daily` at midnight with a summary of the full day's activity.
   - **Raw Image Feed**: Publishes the raw binary data (JPEG) of a vessel's image to `naviscore/new_detected` whenever a new vessel is first identified.
 - **AisStream.io (Hybrid)**: This is a powerful feature that allows you to fetch real-time global AIS data.
   - **API Key Required**: To use this, you need a free API key from [AisStream.io](https://aisstream.io).
