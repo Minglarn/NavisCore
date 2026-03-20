@@ -10,7 +10,7 @@ import aiosqlite
 import aiomqtt
 import socket
 import math
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 import base64
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
@@ -71,6 +71,45 @@ mqtt_pub_queued_mmsis = set()
 # Enrichment Queue for ship images to avoid rate limiting
 enrichment_queue = asyncio.Queue()
 queued_mmsis = set()
+
+class StatsCollector:
+    def __init__(self):
+        self.reset_hourly()
+        self.daily_new_vessels = 0 # Tracked separately for daily report if needed
+        
+    def reset_hourly(self):
+        self.hourly_messages = 0
+        self.hourly_new_vessels = 0
+        self.hourly_mmsis = set()
+        self.hourly_shiptypes = {} # type_id -> count
+        
+    def update(self, mmsi, is_new, shiptype_id):
+        self.hourly_messages += 1
+        if is_new:
+            self.hourly_new_vessels += 1
+            self.daily_new_vessels += 1
+        self.hourly_mmsis.add(mmsi)
+        if shiptype_id:
+            try:
+                sid = int(shiptype_id)
+                self.hourly_shiptypes[sid] = self.hourly_shiptypes.get(sid, 0) + 1
+            except: pass
+
+    def get_hourly_snapshot(self):
+        # Convert shiptype IDs to labels for the payload
+        shiptype_dist = {}
+        for sid, count in self.hourly_shiptypes.items():
+            label = get_ship_type_name(sid)
+            shiptype_dist[label] = shiptype_dist.get(label, 0) + count
+            
+        return {
+            "messages_received": self.hourly_messages,
+            "new_vessels": self.hourly_new_vessels,
+            "max_vessels": len(self.hourly_mmsis),
+            "shiptypes": shiptype_dist
+        }
+
+stats_collector = StatsCollector()
 
 # Database helper
 @asynccontextmanager
@@ -565,6 +604,9 @@ async def process_ais_data(data: dict):
                 if is_new_v: sf.append("new_ships = new_ships + 1")
                 await db.execute(f'UPDATE daily_stats SET {", ".join(sf)} WHERE date = ?', (today,))
             except Exception: pass
+
+            # Update in-memory stats collector
+            stats_collector.update(mmsi_str, is_new_v, ship_data.get("shiptype"))
             
             try:
                 await db.execute('INSERT INTO minute_mmsi (time_min, mmsi) VALUES (?, ?)', (time_min, mmsi_str))
@@ -830,6 +872,92 @@ async def mqtt_publisher_worker():
             mqtt_pub_connected = False
             await asyncio.sleep(10)
 
+async def mqtt_stats_reporter():
+    """Background task to send hourly and daily statistics to MQTT."""
+    logger.info("MQTT Statistics Reporter task started.")
+    
+    last_hour = datetime.utcnow().hour
+    last_day = datetime.utcnow().date()
+    
+    while True:
+        try:
+            now = datetime.utcnow()
+            current_hour = now.hour
+            current_day = now.date()
+            
+            # Diagnostic logs
+            logger.debug(f"[StatsReporter] Current time: {now}. Last hour: {last_hour}")
+
+            # 1. Hourly Report
+            if current_hour != last_hour:
+                logger.info(f"Generating hourly MQTT statistics for hour {last_hour}")
+                snapshot = stats_collector.get_hourly_snapshot()
+                
+                s = await get_all_settings()
+                base_topic = s.get("mqtt_pub_topic", "naviscore/objects")
+                prefix = base_topic.rsplit("/", 1)[0] if "/" in base_topic else ""
+                hourly_topic = f"{prefix}/objects_stat_hourly" if prefix else "objects_stat_hourly"
+                
+                logger.info(f"[StatsReporter] Queuing hourly stats to topic: {hourly_topic}")
+                mqtt_pub_queue.put_nowait({
+                    "_topic": hourly_topic,
+                    **snapshot,
+                    "hour": last_hour,
+                    "date": now.strftime('%Y-%m-%d'),
+                    "timestamp": int(now.timestamp() * 1000)
+                })
+                
+                # Persist shiptype distribution to DB to speed up the stats modal
+                async with db_session() as db:
+                    # Get existing shiptypes for today (if any) to merge or replace
+                    # Actually, we can just aggregate from the ships table once an hour and save it
+                    # OR we can keep a daily shiptype counter in memory too.
+                    # For simplicity and speed, let's aggregate from the ships table for the current day
+                    today_str = now.strftime('%Y-%m-%d')
+                    r = await db.execute("SELECT type, COUNT(*) as count FROM ships WHERE last_seen LIKE ? GROUP BY type", (f"{today_str}%",))
+                    db_dist = []
+                    for row in await r.fetchall():
+                        if row[0]:
+                            db_dist.append({"type": row[0], "label": get_ship_type_name(row[0]), "count": row[1]})
+                    
+                    await db.execute("UPDATE daily_stats SET shiptype_json = ? WHERE date = ?", (json.dumps(db_dist), today_str))
+                    await db.commit()
+                
+                stats_collector.reset_hourly()
+                last_hour = current_hour
+            
+            # 2. Daily Report (Midnight check)
+            if current_day != last_day:
+                logger.info(f"Generating daily MQTT statistics for {last_day}")
+                
+                # Get stats for the day from the DB (since they are persisted every hour)
+                async with db_session() as db:
+                    db.row_factory = aiosqlite.Row
+                    r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (last_day.strftime('%Y-%m-%d'),))
+                    day_row = await r.fetchone()
+                    if day_row:
+                        daily_payload = dict(day_row)
+                        
+                        s = await get_all_settings()
+                        base_topic = s.get("mqtt_pub_topic", "naviscore/objects")
+                        prefix = base_topic.rsplit("/", 1)[0] if "/" in base_topic else ""
+                        daily_topic = f"{prefix}/objects_stat_daily" if prefix else "objects_stat_daily"
+                        
+                        mqtt_pub_queue.put_nowait({
+                            "_topic": daily_topic,
+                            **daily_payload,
+                            "timestamp": int(now.timestamp() * 1000)
+                        })
+                
+                last_day = current_day
+                stats_collector.daily_new_vessels = 0
+                
+        except Exception as e:
+            logger.error(f"Error in mqtt_stats_reporter: {e}")
+            
+        # Sleep for a bit before checking again (e.g. 1 minute)
+        await asyncio.sleep(60)
+
 def restart_mqtt_pub():
     global mqtt_pub_task
     if mqtt_pub_task:
@@ -904,8 +1032,9 @@ async def startup_event():
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
         await db.execute('CREATE TABLE IF NOT EXISTS coverage_sectors (sector_id INTEGER PRIMARY KEY, range_km_24h REAL DEFAULT 0.0, range_km_alltime REAL DEFAULT 0.0, last_updated DATETIME)')
         await db.execute('CREATE TABLE IF NOT EXISTS daily_stats (date TEXT PRIMARY KEY, unique_ships INTEGER DEFAULT 0, new_ships INTEGER DEFAULT 0, total_messages INTEGER DEFAULT 0, max_range_km REAL DEFAULT 0.0)')
-        try: await db.execute("ALTER TABLE daily_stats ADD COLUMN new_ships INTEGER DEFAULT 0")
-        except Exception: pass
+        for c in ["new_ships INTEGER DEFAULT 0", "shiptype_json TEXT"]:
+            try: await db.execute(f"ALTER TABLE daily_stats ADD COLUMN {c}")
+            except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS daily_mmsi (date TEXT, mmsi TEXT, PRIMARY KEY (date, mmsi))')
         await db.execute('CREATE TABLE IF NOT EXISTS hourly_stats (date TEXT, hour INTEGER, message_count INTEGER DEFAULT 0, PRIMARY KEY (date, hour))')
         await db.execute('CREATE TABLE IF NOT EXISTS minute_stats (time_min TEXT PRIMARY KEY, unique_ships INTEGER DEFAULT 0, total_messages INTEGER DEFAULT 0)')
@@ -913,8 +1042,15 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS sector_history (sector_id INTEGER, distance_km REAL, timestamp INTEGER)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_sector_history_ts ON sector_history (timestamp)')
         await db.commit()
-    asyncio.create_task(start_udp_listener()); restart_mqtt(); restart_mqtt_pub(); asyncio.create_task(mock_mode_loop()); asyncio.create_task(purge_job()); asyncio.create_task(coverage_24h_reset_job()); await restart_aisstream(); asyncio.create_task(enrichment_worker())
-
+    asyncio.create_task(start_udp_listener())
+    restart_mqtt()
+    restart_mqtt_pub()
+    asyncio.create_task(mock_mode_loop())
+    asyncio.create_task(purge_job())
+    asyncio.create_task(coverage_24h_reset_job())
+    asyncio.create_task(restart_aisstream())
+    asyncio.create_task(enrichment_worker())
+    asyncio.create_task(mqtt_stats_reporter())
 @app.get("/api/ships")
 async def get_ships():
     s = await get_all_settings(); t = int(s.get("ship_timeout", 60))
@@ -1156,9 +1292,18 @@ async def get_statistics(date: str = None):
             h_raw = {row["hour"]: row["message_count"] for row in await r.fetchall()}
             for h in range(24): h_brk.append({"hour":h, "count":h_raw.get(h,0)})
             t_brk = []
-            r = await db.execute("SELECT type, COUNT(*) as count FROM ships WHERE last_seen LIKE ? GROUP BY type ORDER BY count DESC", (f"{sel}%",))
-            for row in await r.fetchall():
-                if row["type"]: t_brk.append({"type":row["type"], "label":get_ship_type_name(row["type"]), "count":row["count"]})
+            
+            # Use pre-calculated shiptype distribution if available
+            if t_row and t_row.get("shiptype_json"):
+                try:
+                    t_brk = json.loads(t_row["shiptype_json"])
+                except Exception: pass
+            
+            # Fallback to expensive query if no JSON or today
+            if not t_brk:
+                r = await db.execute("SELECT type, COUNT(*) as count FROM ships WHERE last_seen LIKE ? GROUP BY type ORDER BY count DESC", (f"{sel}%",))
+                for row in await r.fetchall():
+                    if row["type"]: t_brk.append({"type":row["type"], "label":get_ship_type_name(row["type"]), "count":row["count"]})
                 
             # New hour stats (last 60 minutes)
             min_brk = []
