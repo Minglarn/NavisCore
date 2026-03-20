@@ -132,6 +132,7 @@ action:
         tag: "ais-new-vessel"
 mode: parallel
 max: 10
+```
 
 ```yaml
 alias: "AIS: Hourly Statistics Report"
@@ -147,7 +148,6 @@ action:
         Messages: {{ trigger.payload_json.messages_received }}
         Unique Ships: {{ trigger.payload_json.max_vessels }}
         New Ships: {{ trigger.payload_json.new_vessels }}
-```
 ```
 
 ## 📄 License & Contributing
