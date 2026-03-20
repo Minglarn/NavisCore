@@ -86,7 +86,7 @@ function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?
 
     if (type >= 20 && type <= 29) return '#ffffff'; // WIG (White)
     if (type === 30) return '#f68b1f'; // Fishing (Orange)
-    if (type >= 31 && type <= 32 || type == 52) return '#00ffff'; // Towing/Tug (Cyan)
+    if (type >= 31 && type <= 32 || type == 52) return '#008080'; // Towing/Tug (Teal)
     if (type === 33) return '#8b4513'; // Dredging (Brown)
     if (type === 34) return '#4682b4'; // Diving (SteelBlue)
     if (type === 35 || type === 55) return '#4b0082'; // Military/Law Enf (Indigo)
@@ -620,82 +620,250 @@ const extraStyles = `
     to { background-color: #880000; }
 }
 
+/* Settings Modal Overhaul - REFINED */
 .settings-modal-overlay {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.4); backdrop-filter: blur(8px);
-    display: flex; align-items: center; justify-content: center; z-index: 9999;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(15px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
     animation: fadeIn 0.3s ease-out;
 }
-@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 
 .settings-modal {
-    background: var(--bg-card); width: 975px; max-width: 95vw; height: 720px;
-    border-radius: 16px; display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
-    border: 1px solid rgba(255,255,255,0.1);
-    animation: slideUp 0.3s ease-out;
+    width: 1400px;
+    height: 900px;
+    max-width: 98vw;
+    max-height: 95vh;
+    background: #0f0f1a;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 24px;
+    display: flex;
+    overflow: hidden;
+    box-shadow: 0 40px 80px -12px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 240, 255, 0.15);
+    animation: modalSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    color: #e0e0e0;
 }
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-.settings-tabs {
-    display: flex; background: rgba(0,0,0,0.2); border-bottom: 1px solid var(--border-color);
-    padding: 0 10px;
+.settings-sidebar {
+    width: 320px;
+    background: #0a0a14;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    flex-direction: column;
+    padding: 40px 0;
 }
-.settings-tab-btn {
-    padding: 16px 20px; border: none; background: transparent; cursor: pointer;
-    color: var(--text-muted); font-weight: 600; border-bottom: 3px solid transparent;
-    transition: all 0.2s; font-size: 0.95rem;
-}
-.settings-tab-btn:hover { color: var(--text-main); background: rgba(255,255,255,0.05); }
-.settings-tab-btn.active {
-    color: #44aaff; border-bottom-color: #44aaff; background: rgba(68,170,255,0.1);
-}
-.settings-content {
-    flex: 1; padding: 30px; overflow-y: auto; color: var(--text-main);
-}
-.settings-section {
-    display: flex; flex-direction: column; gap: 15px;
-    padding-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.settings-section:last-child { border-bottom: none; }
-.settings-section-title {
-    font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
-    color: #44aaff; letter-spacing: 1px; margin-bottom: 5px;
-}
-.form-group { 
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 20px;
-}
-.form-group.vertical { flex-direction: column; align-items: flex-start; gap: 8px; }
 
-.form-group label { font-size: 0.95rem; color: var(--text-main); font-weight: 500; }
-.form-group .description { font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; }
-
-.form-group input[type="text"], 
-.form-group input[type="number"],
-.form-group input[type="password"],
-.form-group select {
-    width: 280px; padding: 10px 14px; border-radius: 8px;
-    border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-main);
-    transition: border-color 0.2s;
+.settings-sidebar-header {
+    padding: 0 40px 30px 40px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    margin-bottom: 25px;
 }
-.form-group input:focus { border-color: #44aaff; outline: none; }
 
-/* Toggle Switch Styles */
-.switch {
-  position: relative; display: inline-block; width: 44px; height: 24px;
+.settings-sidebar-title {
+    font-size: 1.6rem;
+    font-weight: 900;
+    color: #44aaff;
+    letter-spacing: -0.5px;
 }
+
+.settings-tab-sidebar-btn {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 18px 40px;
+    width: 100%;
+    border: none;
+    background: transparent;
+    color: #8892b0;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+}
+
+.settings-tab-sidebar-btn:hover {
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+}
+
+.settings-tab-sidebar-btn.active {
+    background: rgba(0, 240, 255, 0.1);
+    color: #44aaff;
+    border-right: 5px solid #44aaff;
+}
+
+.settings-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    background: #0f0f1a;
+    overflow: hidden;
+}
+
+.settings-header {
+    padding: 40px 60px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.01);
+}
+
+.settings-header-title {
+    font-size: 2.2rem;
+    font-weight: 900;
+    margin: 0;
+    color: #fff;
+    letter-spacing: -1px;
+}
+
+.settings-header-desc {
+    font-size: 1.1rem;
+    color: #8892b0;
+    margin-top: 8px;
+}
+
+.settings-scroll-area {
+    flex: 1;
+    padding: 40px 60px;
+    overflow-y: auto;
+}
+
+.settings-card {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 35px;
+    margin-bottom: 40px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.settings-card-title {
+    font-size: 0.9rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    color: #44aaff;
+    letter-spacing: 2.5px;
+    margin-bottom: 30px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-grid { display: grid; grid-template-columns: 1fr; gap: 30px; }
+.settings-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
+
+.settings-footer {
+    padding: 30px 60px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 25px;
+    background: rgba(0, 0, 0, 0.3);
+}
+
+.btn-cancel-premium {
+    background: transparent;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    color: #fff;
+    padding: 12px 30px;
+    border-radius: 10px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-cancel-premium:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+.form-group-premium {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.form-group-premium:last-child { border-bottom: none; padding-bottom: 0; }
+.form-group-premium.vertical { 
+    flex-direction: column; 
+    align-items: flex-start; 
+    gap: 15px; 
+}
+
+.form-group-grid-item {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 0;
+    border: none;
+}
+
+.label-desc-container {
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    width: 100%;
+}
+
+.form-group-premium label { font-size: 1.1rem; font-weight: 700; color: #fff; }
+.form-group-premium .description { font-size: 0.9rem; color: #8892b0; margin-top: 6px; max-width: 600px; }
+
+.input-premium, .select-premium {
+    width: 300px;
+    padding: 14px 20px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 1.05rem;
+    transition: all 0.2s;
+}
+
+/* Light Theme Overrides */
+.settings-modal.light-theme { background: #fff; color: #1a1a2e; border-color: #e2e8f0; box-shadow: 0 40px 80px -12px rgba(0,0,0,0.1); }
+.settings-modal.light-theme .settings-sidebar { background: #f8fafc; border-right-color: #e2e8f0; }
+.settings-modal.light-theme .settings-tab-sidebar-btn { color: #64748b; }
+.settings-modal.light-theme .settings-tab-sidebar-btn:hover { background: #f1f5f9; color: #0f172a; }
+.settings-modal.light-theme .settings-tab-sidebar-btn.active { background: #e0f2fe; color: #0284c7; border-right-color: #0284c7; }
+.settings-modal.light-theme .settings-main { background: #fff; }
+.settings-modal.light-theme .settings-header { background: #fcfdfe; border-bottom-color: #e2e8f0; }
+.settings-modal.light-theme .settings-header-title { color: #0f172a; }
+.settings-modal.light-theme .settings-card { background: #fdfdfe; border-color: #cbd5e1; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+.settings-modal.light-theme .input-premium, .settings-modal.light-theme .select-premium { background: #ffffff; border-color: #94a3b8; color: #0f172a; }
+.settings-modal.light-theme .form-group-premium label { color: #0f172a; }
+.settings-modal.light-theme .settings-header-desc, .settings-modal.light-theme .description { color: #475569; }
+.settings-modal.light-theme .settings-footer { background: #f1f5f9; border-top-color: #cbd5e1; }
+.settings-modal.light-theme .btn-cancel-premium { color: #334155; border-color: #94a3b8; }
+.settings-modal.light-theme .btn-cancel-premium:hover { background: #e2e8f0; border-color: #64748b; }
+
+/* Toggle Switch */
+.switch { position: relative; display: inline-block; width: 54px; height: 30px; }
 .switch input { opacity: 0; width: 0; height: 0; }
 .slider {
-  position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
-  background-color: #333; transition: .4s; border-radius: 24px;
+    position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+    background-color: #222; transition: .4s; border-radius: 30px;
 }
+.light-theme .slider { background-color: #cbd5e1; }
 .slider:before {
-  position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px;
-  background-color: white; transition: .4s; border-radius: 50%;
+    position: absolute; content: ""; height: 24px; width: 24px; left: 3px; bottom: 3px;
+    background-color: white; transition: .4s; border-radius: 50%;
 }
 input:checked + .slider { background-color: #44aaff; }
-input:checked + .slider:before { transform: translateX(20px); }
+.light-theme input:checked + .slider { background-color: #0284c7; }
+input:checked + .slider:before { transform: translateX(24px); }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalSlideUp { from { transform: translateY(60px) scale(0.97); opacity: 0; } to { transform: translateY(0) scale(1); opacity: 1; } }
 
 @keyframes emergency-flash-alt {
     from { background: #ff0000; box-shadow: 0 0 5px #ff0000; }
@@ -1786,26 +1954,6 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                         </div>
                     </div>
                 </div>
-
-                <div style={{ padding: '20px 30px', borderTop: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'flex-end', background: colors.bgCard }}>
-                    <button 
-                        className="styled-button primary" 
-                        onClick={onClose} 
-                        style={{ 
-                            borderRadius: '12px', 
-                            padding: '10px 40px', 
-                            fontSize: '1rem', 
-                            fontWeight: 700, 
-                            background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)',
-                            boxShadow: '0 4px 15px rgba(0,102,204,0.3)',
-                            border: 'none',
-                            color: 'white',
-                            cursor: 'pointer'
-                        }}
-                    >
-                        Close
-                    </button>
-                </div>
             </div>
         </div>
     );
@@ -1820,520 +1968,607 @@ function Toggle({ checked, onChange }: { checked: boolean, onChange: (val: boole
     );
 }
 
-function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors }: any) {
+function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme }: any) {
+
     if (!isOpen) return null;
 
     const tabs = [
-        { id: 'general', label: 'General', icon: <Info size={18} /> },
-        { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} /> },
-        { id: 'trail', label: 'Tracking', icon: <Navigation size={18} /> },
-        { id: 'map', label: 'Map', icon: <Sun size={18} /> },
-        { id: 'coverage', label: 'Coverage', icon: <Navigation size={18} /> },
-        { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} /> },
-        { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} /> },
+        { id: 'general', label: 'General', icon: <Info size={18} />, title: 'General System Settings', desc: 'Configure basic application behavior and primary station location.' },
+        { id: 'mqtt', label: 'MQTT', icon: <Signal size={18} />, title: 'MQTT Broker Configuration', desc: 'Manage incoming data feeds and outgoing vessel status broadcasts.' },
+        { id: 'trail', label: 'Tracking', icon: <Navigation size={18} />, title: 'Vessel Tracking & Trails', desc: 'Customize how historical movement paths are displayed on the map.' },
+        { id: 'map', label: 'Map', icon: <Sun size={18} />, title: 'Map Visualization', desc: 'Control map layers, vessel icons, labels, and interaction settings.' },
+        { id: 'coverage', label: 'Coverage', icon: <Activity size={18} />, title: 'Coverage & Statistics', desc: 'Monitor system range and reset historical performance data.' },
+        { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} />, title: 'SDR Hardware Tuning', desc: 'Fine-tune your RTL-SDR frequency and gain settings (requires restart).' },
+        { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} />, title: 'Hybrid Data Sources', desc: 'Configure AisStream.io integration and local NMEA UDP ingest.' },
     ];
+
+    const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
 
     return (
         <div className="settings-modal-overlay" onClick={onClose}>
-            <div className="settings-modal" onClick={e => e.stopPropagation()}>
-                <div className="settings-tabs" style={{ flexWrap: 'wrap' }}>
-                    {tabs.map(t => (
-                        <button
-                            key={t.id}
-                            className={`settings-tab-btn ${activeTab === t.id ? 'active' : ''}`}
-                            onClick={() => setActiveTab(t.id)}
-                            style={{ display: 'flex', alignItems: 'center', gap: '8px', whiteSpace: 'nowrap' }}
-                        >
-                            {t.icon} {t.label}
-                        </button>
-                    ))}
-                    <div style={{ flex: 1 }}></div>
-                    <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '10px', color: colors.textMuted }}>
-                        <X size={24} />
-                    </button>
-                </div>
-
-                <div className="settings-content">
-                    {activeTab === 'general' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">General Settings</div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Vessel Timeout</label>
-                                    <div className="description">How long a vessel remains visible after last signal (minutes)</div>
-                                </div>
-                                <input
-                                    type="number"
-                                    value={settings.ship_timeout}
-                                    onChange={e => setSettings({ ...settings, ship_timeout: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Units</label>
-                                    <div className="description">Choose between Nautical (nm/kn) or Metric (km/km/h)</div>
-                                </div>
-                                <select value={settings.units} onChange={e => setSettings({ ...settings, units: e.target.value })}>
-                                    <option value="nautical">Nautical (nm, kn)</option>
-                                    <option value="metric">Metric (km, km/h)</option>
-                                </select>
-                            </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Station Position</div>
-                            <div className="form-group">
-                                <label>Latitude</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 59.3293"
-                                    value={settings.origin_lat}
-                                    onChange={e => setSettings({ ...settings, origin_lat: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Longitude</label>
-                                <input
-                                    type="text"
-                                    placeholder="e.g. 18.0686"
-                                    value={settings.origin_lon}
-                                    onChange={e => setSettings({ ...settings, origin_lon: e.target.value })}
-                                />
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'mqtt' && (
-                        <div className="settings-section" style={{ maxWidth: '1000px', width: '100%' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1px 1fr', gap: '30px' }}>
-                                {/* Left Column: Incoming (Subscriber) */}
-                                <div>
-                                    <div className="settings-section-title" style={{ color: '#44aaff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <ArrowDownLeft size={18} /> INCOMING (AIS Data)
-                                    </div>
-                                    <div className="form-group" style={{ marginTop: '15px' }}>
-                                        <label>MQTT Enabled</label>
-                                        <Toggle
-                                            checked={settings.mqtt_enabled === 'true'}
-                                            onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
-                                        />
-                                    </div>
-                                    <div className="form-group vertical">
-                                        <label>MQTT Broker URL</label>
-                                        <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_url} onChange={e => setSettings({ ...settings, mqtt_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
-                                    </div>
-                                    <div className="form-group vertical">
-                                        <label>MQTT Topic</label>
-                                        <input type="text" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
-                                    </div>
-                                    <div className="settings-section-title" style={{ marginTop: '15px', fontSize: '0.85rem', opacity: 0.7 }}>Authentication</div>
-                                    <div className="form-group">
-                                        <label>Username</label>
-                                        <input type="text" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Password</label>
-                                        <input type="password" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} />
-                                    </div>
-                                </div>
-
-                                {/* Divider */}
-                                <div style={{ background: colors.border, width: '1px', alignSelf: 'stretch' }}></div>
-
-                                {/* Right Column: Outgoing (Publisher) */}
-                                <div>
-                                    <div className="settings-section-title" style={{ color: '#00f0ff', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <ArrowUpRight size={18} /> OUTGOING (Publisher)
-                                    </div>
-                                    <div className="form-group" style={{ marginTop: '15px' }}>
-                                        <label>Publisher Enabled</label>
-                                        <Toggle
-                                            checked={settings.mqtt_pub_enabled === 'true'}
-                                            onChange={val => setSettings({ ...settings, mqtt_pub_enabled: String(val) })}
-                                        />
-                                    </div>
-                                    <div className="form-group vertical">
-                                        <label>Broker URL</label>
-                                        <input type="text" placeholder="mqtt://localhost:1883" value={settings.mqtt_pub_url} onChange={e => setSettings({ ...settings, mqtt_pub_url: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
-                                    </div>
-                                    <div className="form-group vertical">
-                                        <label>Topic</label>
-                                        <input type="text" placeholder="naviscore/objects" value={settings.mqtt_pub_topic} onChange={e => setSettings({ ...settings, mqtt_pub_topic: e.target.value })} style={{ width: '100%', boxSizing: 'border-box' }} />
-                                    </div>
-                                    <div className="form-group" style={{ marginTop: '5px' }}>
-                                        <div>
-                                            <label>Only New Objects</label>
-                                            <div className="description">Reduce traffic by only sending updates for newly discovered vessels</div>
-                                        </div>
-                                        <Toggle
-                                            checked={settings.mqtt_pub_only_new === 'true'}
-                                            onChange={val => setSettings({ ...settings, mqtt_pub_only_new: String(val) })}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginTop: '5px' }}>
-                                        <div>
-                                            <label>Forward Local SDR</label>
-                                            <div className="description">Forward data from local receiver</div>
-                                        </div>
-                                        <Toggle
-                                            checked={settings.mqtt_pub_forward_sdr === 'true'}
-                                            onChange={val => setSettings({ ...settings, mqtt_pub_forward_sdr: String(val) })}
-                                        />
-                                    </div>
-                                    <div className="form-group" style={{ marginTop: '5px' }}>
-                                        <div>
-                                            <label>Forward AisStream</label>
-                                            <div className="description">Forward data from internet sources</div>
-                                        </div>
-                                        <Toggle
-                                            checked={settings.mqtt_pub_forward_aisstream === 'true'}
-                                            onChange={val => setSettings({ ...settings, mqtt_pub_forward_aisstream: String(val) })}
-                                        />
-                                    </div>
-                                    <div className="settings-section-title" style={{ marginTop: '15px', fontSize: '0.85rem', opacity: 0.7 }}>Authentication</div>
-                                    <div className="form-group">
-                                        <label>Username</label>
-                                        <input type="text" value={settings.mqtt_pub_user} onChange={e => setSettings({ ...settings, mqtt_pub_user: e.target.value })} />
-                                    </div>
-                                    <div className="form-group">
-                                        <label>Password</label>
-                                        <input type="password" value={settings.mqtt_pub_pass} onChange={e => setSettings({ ...settings, mqtt_pub_pass: e.target.value })} />
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'trail' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">Visualization</div>
-                            <div className="form-group">
-                                <label>Show Vessel Trails (Breadcrumbs)</label>
-                                <Toggle
-                                    checked={settings.trail_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, trail_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Tracking Mode</label>
-                                <select 
-                                    value={settings.trail_mode || 'all'} 
-                                    onChange={e => setSettings({ ...settings, trail_mode: e.target.value })}
-                                    style={{
-                                        background: settings.map_style === 'dark' ? 'rgba(0,0,0,0.2)' : '#fff',
-                                        color: colors.textMain,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '6px',
-                                        padding: '6px 8px',
-                                        fontSize: '0.85rem'
-                                    }}
-                                >
-                                    <option value="all">Show All Trails</option>
-                                    <option value="selected">Only Selected/Hovered</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>History (Minutes)</label>
-                                    <div className="description">How far back trails are shown (requires reload)</div>
-                                </div>
-                                <input type="number" value={settings.history_duration} onChange={e => setSettings({ ...settings, history_duration: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <label>Trail Color</label>
-                                <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
-                                    <input type="color" value={settings.trail_color} onChange={e => setSettings({ ...settings, trail_color: e.target.value })} style={{ width: '60px', height: '35px', padding: '2px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
-                                    <span style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}>{settings.trail_color.toUpperCase()}</span>
-                                </div>
-                            </div>
-                            <div className="form-group vertical">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Trail Thickness</label>
-                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
-                                </div>
-                                <input type="range" min="0.5" max="8" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
-                            </div>
-                            <div className="form-group vertical">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Opacity</label>
-                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{Math.round(parseFloat(settings.trail_opacity) * 100)}%</span>
-                                </div>
-                                <input type="range" min="0.1" max="1" step="0.1" value={settings.trail_opacity} onChange={e => setSettings({ ...settings, trail_opacity: e.target.value })} style={{ width: '100%' }} />
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'map' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">Map Settings</div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Show Vessel Names</label>
-                                    <div className="description">Displays name directly above the vessel icon on the map</div>
-                                </div>
-                                <Toggle
-                                    checked={settings.show_names_on_map === 'true'}
-                                    onChange={val => setSettings({ ...settings, show_names_on_map: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Vessel Detail View</label>
-                                    <div className="description">How vessel details are shown</div>
-                                </div>
-                                <select value={settings.vessel_detail_view} onChange={e => setSettings({ ...settings, vessel_detail_view: e.target.value })}>
-                                    <option value="sidebar">Sidebar (Right)</option>
-                                    <option value="modal">Popup Modal</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>UI Theme</label>
-                                <select value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
-                                    <option value="light">Light Mode</option>
-                                    <option value="dark">Dark Mode (Night)</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <label>Map Layer (Base)</label>
-                                <select value={settings.base_layer} onChange={e => setSettings({ ...settings, base_layer: e.target.value })}>
-                                    <option value="standard">Standard Vector</option>
-                                    <option value="satellite">Satellite Imagery</option>
-                                </select>
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Cluster Break Zoom</label>
-                                    <div className="description">Zoom level where vessel clusters are split (default: 11)</div>
-                                </div>
-                                <input
-                                    type="number"
-                                    min="1"
-                                    max="20"
-                                    value={settings.cluster_break_zoom || '11'}
-                                    onChange={e => setSettings({ ...settings, cluster_break_zoom: e.target.value })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Show Range Rings</label>
-                                <Toggle
-                                    checked={settings.show_range_rings === 'true'}
-                                    onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>New Vessel Highlight Duration</label>
-                                    <div className="description">How many minutes a vessel is highlighted as "NEW"</div>
-                                </div>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="60"
-                                        value={settings.new_vessel_threshold || '5'}
-                                        onChange={e => setSettings({ ...settings, new_vessel_threshold: e.target.value })}
-                                        style={{ width: '80px' }}
-                                    />
-                                    <span style={{ fontSize: '0.85rem', color: colors.textMuted }}>min</span>
-                                </div>
-                            </div>
-                            <div className="settings-section-title" style={{ marginTop: '10px' }}>Object Sizes</div>
-                            <div className="form-group vertical">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Vessels (Moving)</label>
-                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.ship_size}x</span>
-                                </div>
-                                <input type="range" min="0.5" max="3" step="0.1" value={settings.ship_size} onChange={e => setSettings({ ...settings, ship_size: e.target.value })} style={{ width: '100%' }} />
-                            </div>
-                            <div className="form-group vertical">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Stationary / Meteo</label>
-                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
-                                </div>
-                                <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
-                            </div>
-                            <div className="form-group vertical">
-                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
-                                    <label>Stationary / Meteo</label>
-                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
-                                </div>
-                                <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'coverage' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">Statistics & Coverage</div>
-                            <div className="form-group" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '15px' }}>
-                                <div className="description" style={{ fontSize: '0.9rem' }}>
-                                    Here you can reset all saved coverage data. This removes 24h stats and "All-time high".
-                                </div>
-                                <div className="form-group">
-                                    <label>Include Internet vessels in range</label>
-                                    <Toggle
-                                        checked={settings.include_aisstream_in_range === 'true'}
-                                        onChange={val => setSettings({ ...settings, include_aisstream_in_range: String(val) })}
-                                    />
-                                </div>
+            <div className={`settings-modal ${theme === 'light' ? 'light-theme' : ''}`} onClick={e => e.stopPropagation()}>
+                {/* Sidebar */}
+                <div className="settings-sidebar">
+                    <div className="settings-sidebar-header">
+                        <div className="settings-sidebar-title">Settings</div>
+                        <div style={{ fontSize: '0.75rem', color: '#8892b0', marginTop: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>NavisCore Center</div>
+                    </div>
+                        <div style={{ flex: 1, overflowY: 'auto' }}>
+                            {tabs.map(t => (
                                 <button
-                                    className="styled-button"
-                                    style={{
-                                        color: '#ff4444',
-                                        borderColor: '#ff4444',
-                                        padding: '10px 20px',
-                                        fontWeight: 'bold',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: '8px'
-                                    }}
-                                    onClick={async () => {
-                                        if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
-                                            try {
-                                                const isDev = window.location.port === '5173';
-                                                const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
-                                                await fetch(fetchPath, { method: 'POST' });
-                                                alert('Statistics reset!');
-                                                window.location.reload();
-                                            } catch (e) {
-                                                alert('An error occurred.');
-                                            }
-                                        }
-                                    }}
+                                    key={t.id}
+                                    className={`settings-tab-sidebar-btn ${activeTab === t.id ? 'active' : ''}`}
+                                    onClick={() => setActiveTab(t.id)}
                                 >
-                                    <X size={18} /> Reset All Coverage Data
+                                    {t.icon}
+                                    <span>{t.label}</span>
+                                </button>
+                            ))}
+                        </div>
+                        <div style={{ padding: '20px 25px', opacity: 0.5, fontSize: '0.7rem' }}>
+                            NavisCore v1.0.0
+                        </div>
+                    </div>
+
+                    {/* Main Content */}
+                    <div className="settings-main">
+                        <div className="settings-header">
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                <div>
+                                    <h2 className="settings-header-title">{activeTabData.title}</h2>
+                                    <div className="settings-header-desc">{activeTabData.desc}</div>
+                                </div>
+                                <button onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: '5px', color: colors.textMuted }}>
+                                    <X size={24} />
                                 </button>
                             </div>
                         </div>
-                    )}
 
-                    {activeTab === 'sdr' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">SDR Tuning (Requires Restart)</div>
-                            <div className="form-group">
-                                <div>
-                                    <label>PPM Error (Frequency Correction)</label>
-                                    <div className="description">e.g. 0 or 34</div>
+                        <div className="settings-scroll-area">
+                            {activeTab === 'general' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Settings size={14} /> Basic Configuration</div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Vessel Timeout</label>
+                                                <div className="description">How long a vessel remains visible after last signal (minutes)</div>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                className="input-premium"
+                                                value={settings.ship_timeout}
+                                                onChange={e => setSettings({ ...settings, ship_timeout: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Measurement Units</label>
+                                                <div className="description">Choose between Nautical (nm/kn) or Metric (km/km/h)</div>
+                                            </div>
+                                            <select 
+                                                className="select-premium"
+                                                value={settings.units} 
+                                                onChange={e => setSettings({ ...settings, units: e.target.value })}
+                                            >
+                                                <option value="nautical">Nautical (nm, kn)</option>
+                                                <option value="metric">Metric (km, km/h)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Anchor size={14} /> Station Location</div>
+                                        <div className="settings-grid-2">
+                                            <div className="form-group-grid-item">
+                                                <div className="label-desc-container">
+                                                    <label>Latitude</label>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    className="input-premium"
+                                                    placeholder="59.3293"
+                                                    value={settings.origin_lat}
+                                                    onChange={e => setSettings({ ...settings, origin_lat: e.target.value })}
+                                                    style={{ width: '100%' }}
+                                                />
+                                            </div>
+                                            <div className="form-group-grid-item">
+                                                <div className="label-desc-container">
+                                                    <label>Longitude</label>
+                                                </div>
+                                                <input
+                                                    type="text"
+                                                    className="input-premium"
+                                                    placeholder="18.0686"
+                                                    value={settings.origin_lon}
+                                                    onChange={e => setSettings({ ...settings, origin_lon: e.target.value })}
+                                                    style={{ width: '100%' }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <input type="number" value={settings.sdr_ppm} onChange={e => setSettings({ ...settings, sdr_ppm: e.target.value })} />
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>Tuner Gain</label>
-                                    <div className="description">e.g. auto, 49.6, etc</div>
+                            )}
+
+                            {activeTab === 'mqtt' && (
+                                <div className="settings-grid">
+                                    <div className="settings-grid-2">
+                                        <div className="settings-card">
+                                            <div className="settings-card-title" style={{ color: '#44aaff' }}><ArrowDownLeft size={14} /> Incoming AIS Data</div>
+                                            <div className="form-group-premium">
+                                                <label>MQTT Subscriber Enabled</label>
+                                                <Toggle
+                                                    checked={settings.mqtt_enabled === 'true'}
+                                                    onChange={val => setSettings({ ...settings, mqtt_enabled: String(val) })}
+                                                />
+                                            </div>
+                                            <div className="form-group-premium vertical">
+                                                <label>Broker URL</label>
+                                                <input type="text" className="input-premium" placeholder="mqtt://localhost:1883" value={settings.mqtt_url} onChange={e => setSettings({ ...settings, mqtt_url: e.target.value })} style={{ width: '100%' }} />
+                                            </div>
+                                            <div className="form-group-premium vertical">
+                                                <label>Data Topic</label>
+                                                <input type="text" className="input-premium" placeholder="ais" value={settings.mqtt_topic} onChange={e => setSettings({ ...settings, mqtt_topic: e.target.value })} style={{ width: '100%' }} />
+                                            </div>
+                                            
+                                            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted, marginBottom: '15px', textTransform: 'uppercase' }}>Authentication</div>
+                                                <div className="form-group-premium">
+                                                    <label>Username</label>
+                                                    <input type="text" className="input-premium" value={settings.mqtt_user} onChange={e => setSettings({ ...settings, mqtt_user: e.target.value })} style={{ width: '160px' }} />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <label>Password</label>
+                                                    <input type="password" className="input-premium" value={settings.mqtt_pass} onChange={e => setSettings({ ...settings, mqtt_pass: e.target.value })} style={{ width: '160px' }} />
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="settings-card">
+                                            <div className="settings-card-title" style={{ color: '#44aaff' }}><ArrowUpRight size={14} /> Outgoing Publisher</div>
+                                            <div className="form-group-premium">
+                                                <label>MQTT Publisher Enabled</label>
+                                                <Toggle
+                                                    checked={settings.mqtt_pub_enabled === 'true'}
+                                                    onChange={val => setSettings({ ...settings, mqtt_pub_enabled: String(val) })}
+                                                />
+                                            </div>
+                                            <div className="form-group-premium vertical">
+                                                <label>Broker URL</label>
+                                                <input type="text" className="input-premium" placeholder="mqtt://192.168.1.121:1883" value={settings.mqtt_pub_url} onChange={e => setSettings({ ...settings, mqtt_pub_url: e.target.value })} style={{ width: '100%' }} />
+                                            </div>
+                                            <div className="form-group-premium vertical">
+                                                <label>Outgoing Topic</label>
+                                                <input type="text" className="input-premium" placeholder="naviscore/objects" value={settings.mqtt_pub_topic} onChange={e => setSettings({ ...settings, mqtt_pub_topic: e.target.value })} style={{ width: '100%' }} />
+                                            </div>
+                                            
+                                            <div style={{ marginTop: '15px', display: 'grid', gap: '8px' }}>
+                                                <div className="form-group-premium">
+                                                    <div>
+                                                        <label>Only New Objects</label>
+                                                        <div className="description" style={{ fontSize: '0.75rem' }}>Only broadcast newly discovered vessels</div>
+                                                    </div>
+                                                    <Toggle
+                                                        checked={settings.mqtt_pub_only_new === 'true'}
+                                                        onChange={val => setSettings({ ...settings, mqtt_pub_only_new: String(val) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <label>Forward Local SDR</label>
+                                                    <Toggle
+                                                        checked={settings.mqtt_pub_forward_sdr === 'true'}
+                                                        onChange={val => setSettings({ ...settings, mqtt_pub_forward_sdr: String(val) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <label>Forward AisStream</label>
+                                                    <Toggle
+                                                        checked={settings.mqtt_pub_forward_aisstream === 'true'}
+                                                        onChange={val => setSettings({ ...settings, mqtt_pub_forward_aisstream: String(val) })}
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div style={{ marginTop: '20px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                                <div style={{ fontSize: '0.7rem', fontWeight: 800, color: colors.textMuted, marginBottom: '15px', textTransform: 'uppercase' }}>Authentication</div>
+                                                <div className="form-group-premium">
+                                                    <label>Username</label>
+                                                    <input type="text" className="input-premium" value={settings.mqtt_pub_user} onChange={e => setSettings({ ...settings, mqtt_pub_user: e.target.value })} style={{ width: '160px' }} />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <label>Password</label>
+                                                    <input type="password" className="input-premium" value={settings.mqtt_pub_pass} onChange={e => setSettings({ ...settings, mqtt_pub_pass: e.target.value })} style={{ width: '160px' }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                                <input type="text" value={settings.sdr_gain} onChange={e => setSettings({ ...settings, sdr_gain: e.target.value })} />
-                            </div>
+                            )}
+
+                            {activeTab === 'trail' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Activity size={14} /> Trails & Tracks</div>
+                                        <div className="form-group-premium">
+                                            <label>Enable Vessel Trails (Breadcrumbs)</label>
+                                            <Toggle
+                                                checked={settings.trail_enabled === 'true'}
+                                                onChange={val => setSettings({ ...settings, trail_enabled: String(val) })}
+                                            />
+                                        </div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Tracking Mode</label>
+                                                <div className="description">Manage how many trails are visible simultaneously</div>
+                                            </div>
+                                            <select 
+                                                className="select-premium"
+                                                value={settings.trail_mode || 'all'} 
+                                                onChange={e => setSettings({ ...settings, trail_mode: e.target.value })}
+                                            >
+                                                <option value="all">Show All Trails</option>
+                                                <option value="selected">Only Selected/Hovered</option>
+                                            </select>
+                                        </div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>History Duration (Minutes)</label>
+                                                <div className="description">How far back trails are shown (requires reload)</div>
+                                            </div>
+                                            <input type="number" className="input-premium" value={settings.history_duration} onChange={e => setSettings({ ...settings, history_duration: e.target.value })} />
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><LayoutGrid size={14} /> Trail Styling</div>
+                                        <div className="form-group-premium">
+                                            <label>Trail Base Color</label>
+                                            <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                                                <input type="color" value={settings.trail_color} onChange={e => setSettings({ ...settings, trail_color: e.target.value })} style={{ width: '60px', height: '35px', padding: '2px', border: 'none', background: 'transparent', cursor: 'pointer' }} />
+                                                <span style={{ fontFamily: 'monospace', fontSize: '0.9rem', color: colors.textMuted }}>{settings.trail_color.toUpperCase()}</span>
+                                            </div>
+                                        </div>
+                                        <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                <label>Trail Thickness</label>
+                                                <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.trail_size}px</span>
+                                            </div>
+                                            <input type="range" min="0.5" max="8" step="0.5" value={settings.trail_size} onChange={e => setSettings({ ...settings, trail_size: e.target.value })} style={{ width: '100%' }} />
+                                        </div>
+                                        <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                <label>Opacity</label>
+                                                <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{Math.round(parseFloat(settings.trail_opacity) * 100)}%</span>
+                                            </div>
+                                            <input type="range" min="0.1" max="1" step="0.1" value={settings.trail_opacity} onChange={e => setSettings({ ...settings, trail_opacity: e.target.value })} style={{ width: '100%' }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'map' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><LayoutGrid size={14} /> Interface & Behavior</div>
+                                        <div className="settings-grid-2">
+                                            <div style={{ display: 'grid', gap: '15px' }}>
+                                                <div className="form-group-premium">
+                                                    <label>Show Vessel Names on Map</label>
+                                                    <Toggle
+                                                        checked={settings.show_names_on_map === 'true'}
+                                                        onChange={val => setSettings({ ...settings, show_names_on_map: String(val) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium vertical">
+                                                    <label>UI Theme</label>
+                                                    <select className="select-premium" style={{ width: '100%' }} value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
+                                                        <option value="light">Light Mode</option>
+                                                        <option value="dark">Dark Mode (Night)</option>
+                                                    </select>
+                                                </div>
+                                                <div className="form-group-premium vertical">
+                                                    <label>Map Base Layer</label>
+                                                    <select className="select-premium" style={{ width: '100%' }} value={settings.base_layer} onChange={e => setSettings({ ...settings, base_layer: e.target.value })}>
+                                                        <option value="standard">Standard Vector</option>
+                                                        <option value="satellite">Satellite Imagery</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'grid', gap: '15px' }}>
+                                                <div className="form-group-premium vertical">
+                                                    <label>Vessel Detail View</label>
+                                                    <select className="select-premium" style={{ width: '100%' }} value={settings.vessel_detail_view} onChange={e => setSettings({ ...settings, vessel_detail_view: e.target.value })}>
+                                                        <option value="sidebar">Sidebar (Right)</option>
+                                                        <option value="modal">Popup Modal</option>
+                                                    </select>
+                                                </div>
+                                                <div className="form-group-premium vertical">
+                                                    <div>
+                                                        <label>Cluster Break Zoom</label>
+                                                        <div className="description" style={{ fontSize: '0.75rem' }}>Where clusters split into ships</div>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        className="input-premium"
+                                                        style={{ width: '100%' }}
+                                                        min="1"
+                                                        max="20"
+                                                        value={settings.cluster_break_zoom || '11'}
+                                                        onChange={e => setSettings({ ...settings, cluster_break_zoom: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <label>Show Range Rings</label>
+                                                    <Toggle
+                                                        checked={settings.show_range_rings === 'true'}
+                                                        onChange={val => setSettings({ ...settings, show_range_rings: String(val) })}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-grid-2">
+                                        <div className="settings-card">
+                                            <div className="settings-card-title"><TrendingUp size={14} /> Highlight & Detection</div>
+                                            <div className="form-group-premium vertical">
+                                                <div>
+                                                    <label>New Vessel Duration</label>
+                                                    <div className="description">Minutes a vessel is highlighted as "NEW"</div>
+                                                </div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', width: '100%' }}>
+                                                    <input
+                                                        type="number"
+                                                        className="input-premium"
+                                                        min="1"
+                                                        max="60"
+                                                        value={settings.new_vessel_threshold || '5'}
+                                                        onChange={e => setSettings({ ...settings, new_vessel_threshold: e.target.value })}
+                                                        style={{ flex: 1 }}
+                                                    />
+                                                    <span style={{ fontSize: '0.85rem', color: colors.textMuted }}>min</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="settings-card">
+                                            <div className="settings-card-title"><Rows size={14} /> Global Object Scaling</div>
+                                            <div className="form-group-premium vertical">
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                    <label>Vessel Icons</label>
+                                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.ship_size}x</span>
+                                                </div>
+                                                <input type="range" min="0.5" max="3" step="0.1" value={settings.ship_size} onChange={e => setSettings({ ...settings, ship_size: e.target.value })} style={{ width: '100%' }} />
+                                            </div>
+                                            <div className="form-group-premium vertical">
+                                                <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                    <label>Stationary / Aton Icons</label>
+                                                    <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>{settings.circle_size}x</span>
+                                                </div>
+                                                <input type="range" min="0.5" max="3" step="0.1" value={settings.circle_size} onChange={e => setSettings({ ...settings, circle_size: e.target.value })} style={{ width: '100%' }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'coverage' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Radio size={14} /> Reception Analytics</div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Include Internet Data in Range Statistics</label>
+                                                <div className="description">If enabled, range heatmap will include vessels from AisStream.io</div>
+                                            </div>
+                                            <Toggle
+                                                checked={settings.include_aisstream_in_range === 'true'}
+                                                onChange={val => setSettings({ ...settings, include_aisstream_in_range: String(val) })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card" style={{ border: '1px solid rgba(255, 68, 68, 0.2)' }}>
+                                        <div className="settings-card-title" style={{ color: '#ff4444' }}><AlertTriangle size={14} /> Danger Zone</div>
+                                        <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '20px' }}>
+                                            Resetting coverage data will permanently remove all historical range sectors and statistics. This action cannot be undone.
+                                        </p>
+                                        <button
+                                            className="styled-button"
+                                            style={{
+                                                width: '100%',
+                                                color: '#ff4444',
+                                                borderColor: '#ff4444',
+                                                padding: '12px',
+                                                fontWeight: 'bold',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                gap: '8px',
+                                                background: 'rgba(255, 68, 68, 0.05)'
+                                            }}
+                                            onClick={async () => {
+                                                if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
+                                                    try {
+                                                        const isDev = window.location.port === '5173';
+                                                        const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
+                                                        await fetch(fetchPath, { method: 'POST' });
+                                                        alert('Statistics reset!');
+                                                        window.location.reload();
+                                                    } catch (e) {
+                                                        alert('An error occurred.');
+                                                    }
+                                                }
+                                            }}
+                                        >
+                                            <X size={18} /> Reset All Coverage Data
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'sdr' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Terminal size={14} /> Hardware Parameters</div>
+                                        <div className="settings-grid-2">
+                                            <div className="form-group-grid-item">
+                                                <div className="label-desc-container">
+                                                    <label>PPM Error (Frequency Correction)</label>
+                                                    <div className="description">Standard RTL-SDR usually needs 0, 1 or 34.</div>
+                                                </div>
+                                                <input type="number" className="input-premium" style={{ width: '100%' }} value={settings.sdr_ppm} onChange={e => setSettings({ ...settings, sdr_ppm: e.target.value })} />
+                                            </div>
+                                            <div className="form-group-grid-item">
+                                                <div className="label-desc-container">
+                                                    <label>Tuner Gain (dB)</label>
+                                                    <div className="description">Set to "auto" for most cases, or e.g. "49.6" for max.</div>
+                                                </div>
+                                                <input type="text" className="input-premium" style={{ width: '100%' }} value={settings.sdr_gain} onChange={e => setSettings({ ...settings, sdr_gain: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(68,170,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <Info size={16} color="#44aaff" />
+                                            <span style={{ fontSize: '0.8rem', color: colors.textMuted }}>Changes to hardware parameters require a full container restart to take effect.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'hybrid' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Globe size={14} /> AisStream.io Integration</div>
+                                        <div className="form-group-premium">
+                                            <label>Enable Hybrid Data Feed</label>
+                                            <Toggle
+                                                checked={settings.aisstream_enabled === 'true'}
+                                                onChange={val => setSettings({ ...settings, aisstream_enabled: String(val) })}
+                                            />
+                                        </div>
+                                        <div className="form-group-premium vertical">
+                                            <label>AisStream.io API Key</label>
+                                            <input 
+                                                type="password" 
+                                                className="input-premium"
+                                                placeholder="PASTE_YOUR_API_KEY_HERE" 
+                                                value={settings.aisstream_api_key} 
+                                                onChange={e => setSettings({ ...settings, aisstream_api_key: e.target.value })} 
+                                                style={{ width: '100%' }} 
+                                            />
+                                            <div className="description" style={{ marginTop: '5px' }}>
+                                                Obtain a free API key at <a href="https://aisstream.io" target="_blank" rel="noreferrer" style={{color: '#44aaff', fontWeight: 600}}>aisstream.io</a>.
+                                            </div>
+                                        </div>
+                                        
+                                        <div style={{ marginTop: '25px', paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className="settings-card-title" style={{ color: colors.textMain }}><Radar size={14} /> Geographical Filter Area</div>
+                                            <div className="settings-grid-2">
+                                                <div className="form-group-grid-item">
+                                                    <div className="label-desc-container">
+                                                        <label>South West Lat</label>
+                                                    </div>
+                                                    <input type="number" step="0.001" className="input-premium" style={{ width: '100%' }} value={settings.aisstream_sw_lat} onChange={e => setSettings({...settings, aisstream_sw_lat: e.target.value})} />
+                                                </div>
+                                                <div className="form-group-grid-item">
+                                                    <div className="label-desc-container">
+                                                        <label>South West Lon</label>
+                                                    </div>
+                                                    <input type="number" step="0.001" className="input-premium" style={{ width: '100%' }} value={settings.aisstream_sw_lon} onChange={e => setSettings({...settings, aisstream_sw_lon: e.target.value})} />
+                                                </div>
+                                                <div className="form-group-grid-item">
+                                                    <div className="label-desc-container">
+                                                        <label>North East Lat</label>
+                                                    </div>
+                                                    <input type="number" step="0.001" className="input-premium" style={{ width: '100%' }} value={settings.aisstream_ne_lat} onChange={e => setSettings({...settings, aisstream_ne_lat: e.target.value})} />
+                                                </div>
+                                                <div className="form-group-grid-item">
+                                                    <div className="label-desc-container">
+                                                        <label>North East Lon</label>
+                                                    </div>
+                                                    <input type="number" step="0.001" className="input-premium" style={{ width: '100%' }} value={settings.aisstream_ne_lon} onChange={e => setSettings({...settings, aisstream_ne_lon: e.target.value})} />
+                                                </div>
+                                            </div>
+                                            <button 
+                                                className="styled-button" 
+                                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', marginTop: '20px', background: 'rgba(68,170,255,0.1)', borderColor: '#44aaff33' }}
+                                                onClick={() => {
+                                                    onClose();
+                                                    setTimeout(() => {
+                                                        window.dispatchEvent(new CustomEvent('naviscore_enter_selection'));
+                                                    }, 300);
+                                                }}
+                                            >
+                                                <Radar size={18} /> Select Filter Area on Map
+                                            </button>
+                                        </div>
+                                        <div className="form-group-premium" style={{ marginTop: '20px' }}>
+                                            <label>Show Hybrid Objects on Main Map</label>
+                                            <Toggle
+                                                checked={settings.show_aisstream_on_map !== 'false'}
+                                                onChange={val => setSettings({ ...settings, show_aisstream_on_map: String(val) })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Wifi size={14} /> Local Data Ingest</div>
+                                        <div className="settings-grid-2">
+                                            <div className="form-group-premium">
+                                                <label>Local SDR Receiver</label>
+                                                <Toggle
+                                                    checked={settings.sdr_enabled === 'true'}
+                                                    onChange={val => setSettings({ ...settings, sdr_enabled: String(val) })}
+                                                />
+                                            </div>
+                                            <div className="form-group-premium">
+                                                <label>UDP NMEA Listener</label>
+                                                <Toggle
+                                                    checked={settings.udp_enabled === 'true'}
+                                                    onChange={val => setSettings({ ...settings, udp_enabled: String(val) })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="form-group-premium" style={{ marginTop: '10px' }}>
+                                            <div>
+                                                <label>UDP Ingest Port</label>
+                                                <div className="description">Standard AIS NMEA port is 10110</div>
+                                            </div>
+                                            <input 
+                                                type="number" 
+                                                className="input-premium"
+                                                value={settings.udp_port} 
+                                                onChange={e => setSettings({ ...settings, udp_port: e.target.value })} 
+                                                style={{ width: '100px' }}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
                         </div>
-                    )}
 
-                    {activeTab === 'hybrid' && (
-                        <div className="settings-section">
-                            <div className="settings-section-title">AisStream.io Integration</div>
-                            <div className="form-group">
-                                <label>Enable Hybrid Data</label>
-                                <Toggle
-                                    checked={settings.aisstream_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, aisstream_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group vertical">
-                                <label>AisStream.io API Key</label>
-                                <input 
-                                    type="password" 
-                                    placeholder="Your API Key" 
-                                    value={settings.aisstream_api_key} 
-                                    onChange={e => setSettings({ ...settings, aisstream_api_key: e.target.value })} 
-                                    style={{ width: '100%', boxSizing: 'border-box' }} 
-                                />
-                                <div className="description" style={{ marginTop: '8px' }}>
-                                    Required to fetch live AIS data from AisStream.io. 
-                                    Get your free key at <a href="https://aisstream.io" target="_blank" rel="noreferrer" style={{color: '#44aaff'}}>aisstream.io</a>.
-                                </div>
-                            </div>
-
-                            <div className="settings-section-title" style={{ marginTop: '20px' }}>Geographical Area (Bounding Box)</div>
-                            <div className="description" style={{ marginBottom: '15px' }}>
-                                Define the area the stream will fetch data for. You can draw a box on the map to select the area.
-                            </div>
-                            
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                                <div className="form-group vertical">
-                                    <label>South West Lat</label>
-                                    <input type="number" step="0.001" value={settings.aisstream_sw_lat} onChange={e => setSettings({...settings, aisstream_sw_lat: e.target.value})} />
-                                </div>
-                                <div className="form-group vertical">
-                                    <label>South West Lon</label>
-                                    <input type="number" step="0.001" value={settings.aisstream_sw_lon} onChange={e => setSettings({...settings, aisstream_sw_lon: e.target.value})} />
-                                </div>
-                                <div className="form-group vertical">
-                                    <label>North East Lat</label>
-                                    <input type="number" step="0.001" value={settings.aisstream_ne_lat} onChange={e => setSettings({...settings, aisstream_ne_lat: e.target.value})} />
-                                </div>
-                                <div className="form-group vertical">
-                                    <label>North East Lon</label>
-                                    <input type="number" step="0.001" value={settings.aisstream_ne_lon} onChange={e => setSettings({...settings, aisstream_ne_lon: e.target.value})} />
-                                </div>
-                            </div>
-
+                        <div className="settings-footer">
+                            <button className="btn-cancel-premium" onClick={onClose}>Cancel</button>
                             <button 
-                                className="styled-button" 
-                                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '10px' }}
-                                onClick={() => {
-                                    // Start selection mode
-                                    onClose(); // Hide settings
-                                    // Wait for modal to close then enter mode
-                                    setTimeout(() => {
-                                        window.dispatchEvent(new CustomEvent('naviscore_enter_selection'));
-                                    }, 300);
+                                className="styled-button primary" 
+                                onClick={() => { onSave(); onClose(); }}
+                                style={{ 
+                                    padding: '10px 35px', 
+                                    borderRadius: '8px', 
+                                    background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', 
+                                    boxShadow: '0 4px 15px rgba(0,102,204,0.3)' 
                                 }}
                             >
-                                <Radar size={18} /> Select area on map
+                                Save Changes
                             </button>
-                            <div className="form-group" style={{ marginTop: '10px' }}>
-                                <label>Show internet vessels on main map</label>
-                                <Toggle
-                                    checked={settings.show_aisstream_on_map !== 'false'}
-                                    onChange={val => setSettings({ ...settings, show_aisstream_on_map: String(val) })}
-                                />
-                            </div>
-
-                            <div className="settings-section-title" style={{ marginTop: '20px' }}>Local Data Sources</div>
-                            <div className="form-group">
-                                <label>Enable Local SDR Dongle</label>
-                                <Toggle
-                                    checked={settings.sdr_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, sdr_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <label>Enable UDP NMEA Listener</label>
-                                <Toggle
-                                    checked={settings.udp_enabled === 'true'}
-                                    onChange={val => setSettings({ ...settings, udp_enabled: String(val) })}
-                                />
-                            </div>
-                            <div className="form-group">
-                                <div>
-                                    <label>UDP Listen Port</label>
-                                    <div className="description">Default: 10110</div>
-                                </div>
-                                <input 
-                                    type="number" 
-                                    value={settings.udp_port} 
-                                    onChange={e => setSettings({ ...settings, udp_port: e.target.value })} 
-                                    style={{ width: '100px' }}
-                                />
-                            </div>
                         </div>
-                    )}
+                    </div>
                 </div>
-
-                <div style={{ padding: '25px 30px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'flex-end', gap: '15px', background: 'rgba(0,0,0,0.1)' }}>
-                    <button className="styled-button" style={{ padding: '10px 20px', borderRadius: '8px' }} onClick={onClose}>Cancel</button>
-                    <button className="styled-button primary" style={{ padding: '10px 25px', borderRadius: '8px', background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)', boxShadow: '0 4px 15px rgba(0,102,204,0.3)' }} onClick={() => { onSave(); onClose(); }}>Save Changes</button>
-                </div>
-            </div>
         </div>
     );
 }
+
 
 export default function App() {
     const [ships, setShips] = useState<any[]>([]);
@@ -2604,6 +2839,19 @@ export default function App() {
     }, [localTimeoutStr]);
 
     const saveSettings = async (newSettings?: any) => {
+        const settingsToSave = newSettings || mqttSettings;
+        
+        // Save UI settings to localStorage
+        if (settingsToSave.show_names_on_map !== undefined) localStorage.setItem('naviscore_show_names', settingsToSave.show_names_on_map);
+        if (settingsToSave.trail_enabled !== undefined) localStorage.setItem('naviscore_trail_enabled', settingsToSave.trail_enabled);
+        if (settingsToSave.map_style !== undefined) {
+            localStorage.setItem('naviscore_theme', settingsToSave.map_style);
+            setTheme(settingsToSave.map_style as 'light' | 'dark');
+        }
+        if (settingsToSave.trail_color !== undefined) localStorage.setItem('naviscore_trail_color', settingsToSave.trail_color);
+        if (settingsToSave.trail_size !== undefined) localStorage.setItem('naviscore_trail_size', settingsToSave.trail_size);
+        if (settingsToSave.trail_opacity !== undefined) localStorage.setItem('naviscore_trail_opacity', settingsToSave.trail_opacity);
+
         const isDev = window.location.port === '5173';
         const fetchPath = isDev ? 'http://127.0.0.1:8080/api/settings' : '/api/settings';
 
@@ -2611,7 +2859,7 @@ export default function App() {
             await fetch(fetchPath, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newSettings || mqttSettings)
+                body: JSON.stringify(settingsToSave)
             });
 
             // Refetch coverage sectors manually
@@ -2620,11 +2868,8 @@ export default function App() {
                 .then(r => r.json())
                 .then(data => setCoverageSectors(data))
                 .catch(console.error);
-
-            // alert('Settings saved!');
         } catch (err) {
             console.error(err);
-            // alert('Could not save settings');
         }
     };
 
@@ -2902,7 +3147,7 @@ export default function App() {
         textMain: isDark ? '#e0e0e0' : '#1a1a2e',
         textMuted: isDark ? '#8892b0' : '#64748b',
         border: isDark ? '#2a2a40' : '#e2e8f0',
-        accent: '#00f0ff',
+        accent: '#44aaff',
         accentDark: '#00acc1'
     };
 
@@ -3069,7 +3314,7 @@ export default function App() {
                     [currentSelection[0].lat, currentSelection[0].lng],
                     [currentSelection[1].lat, currentSelection[1].lng]
                 ]} 
-                pathOptions={{ color: '#00f0ff', weight: 2, fillOpacity: 0.1, dashArray: '5,10' }} 
+                pathOptions={{ color: '#44aaff', weight: 2, fillOpacity: 0.1, dashArray: '5,10' }} 
             />
         ) : null;
     }
@@ -3083,7 +3328,7 @@ export default function App() {
                 position: 'relative',
                 padding: '15px 25px',
                 background: isDark ? '#0f0f1a' : '#ffffff',
-                color: isDark ? '#00f0ff' : '#00838f',
+                color: isDark ? '#44aaff' : '#00838f',
                 display: 'flex',
                 justifyContent: 'space-between',
                 alignItems: 'center',
@@ -3249,7 +3494,7 @@ export default function App() {
                     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.5)', backdropFilter: 'blur(10px)'
                 }}>
-                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#00f0ff' }}>Interactive Selection</div>
+                    <div style={{ fontWeight: 800, fontSize: '1.1rem', color: '#44aaff' }}>Interactive Selection</div>
                     <div style={{ fontSize: '0.9rem', opacity: 0.9 }}>Draw a box on the map to select the coverage area.</div>
                     <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
                         <button 
@@ -3261,7 +3506,7 @@ export default function App() {
                         </button>
                         <button 
                             className="styled-button primary" 
-                            style={{ flex: 1, background: 'linear-gradient(135deg, #00f0ff 0%, #0072ff 100%)', border: 'none' }}
+                            style={{ flex: 1, background: 'linear-gradient(135deg, #44aaff 0%, #0072ff 100%)', border: 'none' }}
                             onClick={confirmSelection}
                             disabled={!currentSelection}
                         >
@@ -3487,7 +3732,7 @@ export default function App() {
                                                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                                                                 <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
                                                                     <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Wind</div>
-                                                                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#00f0ff' }}>{s.wind_speed ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>m/s</span></div>
+                                                                    <div style={{ fontWeight: 800, fontSize: '1.2rem', color: '#44aaff' }}>{s.wind_speed ?? '--'}<span style={{ fontSize: '0.7rem', fontWeight: 400, marginLeft: '2px' }}>m/s</span></div>
                                                                     <div style={{ fontSize: '0.7rem', marginTop: '2px' }}>{s.wind_direction ?? '--'}°</div>
                                                                 </div>
                                                                 <div style={{ background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)', padding: '10px', borderRadius: '8px', textAlign: 'center' }}>
@@ -4139,6 +4384,7 @@ export default function App() {
                 activeTab={settingsTab}
                 setActiveTab={setSettingsTab}
                 colors={colors}
+                theme={theme}
             />
 
             <VesselDatabaseModal
@@ -4264,7 +4510,7 @@ export default function App() {
                 }}>
                     <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff80', animation: 'pulse 2s infinite' }}></div>
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px' }}>LATEST EVENT:</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isDark ? '#00f0ff' : '#007080' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isDark ? '#44aaff' : '#007080' }}>
                         {lastUpdatedShip.name} <span style={{ opacity: 0.6, fontWeight: 400, marginLeft: '5px' }}>(MMSI {lastUpdatedShip.mmsi})</span>
                     </span>
                     <span style={{ fontSize: '0.75rem', color: colors.textMuted, opacity: 0.8, marginLeft: '10px' }}>
@@ -4360,7 +4606,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <div style={{ 
-                            background: 'linear-gradient(135deg, #00f0ff, #0072ff)', 
+                            background: 'linear-gradient(135deg, #44aaff, #0072ff)', 
                             padding: '8px', 
                             borderRadius: '10px',
                             display: 'flex',
@@ -4418,7 +4664,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                 fontSize: '0.85rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
-                                background: viewMode === 'live' ? '#00f0ff' : 'transparent',
+                                background: viewMode === 'live' ? '#44aaff' : 'transparent',
                                 color: viewMode === 'live' ? '#000' : colors.textMuted,
                                 transition: 'all 0.2s'
                             }}
@@ -4434,7 +4680,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                 fontSize: '0.85rem',
                                 fontWeight: 700,
                                 cursor: 'pointer',
-                                background: viewMode === 'grouped' ? '#00f0ff' : 'transparent',
+                                background: viewMode === 'grouped' ? '#44aaff' : 'transparent',
                                 color: viewMode === 'grouped' ? '#000' : colors.textMuted,
                                 transition: 'all 0.2s'
                             }}
@@ -4493,7 +4739,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                     {log.decoded ? (
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                             <span style={{ 
-                                                background: '#00f0ff', 
+                                                background: '#44aaff', 
                                                 color: '#000', 
                                                 padding: '1px 8px', 
                                                 borderRadius: '4px', 
@@ -4577,7 +4823,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                                 background: colors.isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.05)',
                                                 borderRadius: '4px',
                                                 overflow: 'hidden',
-                                                borderLeft: `3px solid ${log.decoded ? '#00f0ff' : colors.border}`,
+                                                borderLeft: `3px solid ${log.decoded ? '#44aaff' : colors.border}`,
                                                 marginLeft: '10px',
                                                 flexShrink: 0
                                             }}>
@@ -4599,7 +4845,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                                     {log.decoded ? (
                                                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                                             <span style={{ 
-                                                                background: '#00f0ff', 
+                                                                background: '#44aaff', 
                                                                 color: '#000', 
                                                                 padding: '1px 8px', 
                                                                 borderRadius: '4px', 
@@ -4655,7 +4901,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                         onClick={onClose} 
                         style={{ 
                             padding: '10px 25px', 
-                            background: '#00f0ff', 
+                            background: '#44aaff', 
                             color: '#000', 
                             border: 'none', 
                             borderRadius: '8px', 
