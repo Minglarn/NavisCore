@@ -819,7 +819,8 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
     useEffect(() => {
         if (isOpen) {
             setLoading(true);
-            const fetchPath = `/api/statistics?date=${selectedDate}`;
+            const isDev = window.location.port === '5173';
+            const fetchPath = isDev ? `http://127.0.0.1:8080/api/statistics?date=${selectedDate}` : `/api/statistics?date=${selectedDate}`;
             fetch(fetchPath)
                 .then(r => r.json())
                 .then(data => {

@@ -1283,10 +1283,16 @@ async def get_statistics(date: str = None):
         yest = (datetime.strptime(sel, '%Y-%m-%d') - timedelta(days=1)).strftime('%Y-%m-%d')
         async with db_session() as db:
             db.row_factory = aiosqlite.Row
-            r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (sel,)); t_row = await r.fetchone() or {"unique_ships":0,"new_ships":0,"total_messages":0,"max_range_km":0.0}
-            r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (yest,)); y_row = await r.fetchone() or {"unique_ships":0,"new_ships":0,"total_messages":0}
-            r = await db.execute("SELECT MAX(unique_ships), MAX(total_messages), MAX(max_range_km) FROM daily_stats"); a_row = await r.fetchone()
-            r = await db.execute("SELECT date, unique_ships, total_messages FROM daily_stats ORDER BY date DESC LIMIT 30"); h30 = [dict(row) for row in await r.fetchall()]; h30.reverse()
+            r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (sel,))
+            row = await r.fetchone()
+            t_row = dict(row) if row else {"unique_ships":0,"new_ships":0,"total_messages":0,"max_range_km":0.0, "shiptype_json": None}
+            r = await db.execute("SELECT * FROM daily_stats WHERE date = ?", (yest,))
+            row = await r.fetchone()
+            y_row = dict(row) if row else {"unique_ships":0,"new_ships":0,"total_messages":0}
+            r = await db.execute("SELECT MAX(unique_ships), MAX(total_messages), MAX(max_range_km) FROM daily_stats")
+            a_row = await r.fetchone() or (0, 0, 0)
+            r = await db.execute("SELECT date, unique_ships, total_messages FROM daily_stats ORDER BY date DESC LIMIT 30")
+            h30 = [dict(row) for row in await r.fetchall()]; h30.reverse()
             h_brk = []
             r = await db.execute("SELECT hour, message_count FROM hourly_stats WHERE date = ? ORDER BY hour ASC", (sel,))
             h_raw = {row["hour"]: row["message_count"] for row in await r.fetchall()}
@@ -1333,7 +1339,7 @@ async def get_statistics(date: str = None):
                     sector_24h_max[row["sector_id"]] = row["max_dist"]
 
             return {
-                "selected_date":sel, "today":dict(t_row), "yesterday":dict(y_row), 
+                "selected_date":sel, "today":t_row, "yesterday":y_row, 
                 "all_time":{"unique_ships":a_row[0] or 0,"total_messages":a_row[1] or 0,"max_range_km":a_row[2] or 0}, 
                 "history_30d":h30, "hourly_breakdown":h_brk, "type_breakdown":t_brk,
                 "minute_breakdown": min_brk, "sector_max_last_hour": sector_max, "sector_max_last_24h": sector_24h_max
