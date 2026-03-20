@@ -18,7 +18,39 @@
 - **Smart Data Hybridization**: Seamless integration of local SDR data (via [AIS-catcher](https://github.com/jvde-github/AIS-catcher)) and global feeds from [AisStream.io](https://aisstream.io) with intelligent deduplication.
 - **Vessel Enrichment**: Automatic vessel image fetching with intelligent caching (30-day persistence) and fallback logic.
 - **Advanced Visualization**: Sleek, high-performance map featuring real-time tracking, COG lines, and persistent user settings (zoom, center, layer preferences).
-- **Proactive Monitoring**: Built-in support for safety alerts, emergency signals, and advanced binary message decoding.
+- **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, with a comprehensive color-coding system for maritime situational awareness.
+
+## 🧭 UI Visual Indicators
+
+Understanding what happens on the map:
+
+### 💡 Animations & Effects
+- **🟡 Yellow Pulsing Ring**: Indicates a **New Vessel**. This appears when a ship is detected for the first time in your database or after a long absence.
+- **🔵 Cyan Radar Ping**: Indicates a **Data Update**. This quick flash happens every time a new AIS message is received for that specific vessel.
+- **🚨 Red Pulsing Glow**: Indicates an **Emergency Status**. This vessel is broadcasting an active distress signal or emergency message.
+
+### 🎨 Vessel Color Coding
+| Color | Vessel Type |
+| :--- | :--- |
+| **🟢 Green** | Cargo Ships |
+| **🔴 Red** | Tankers |
+| **🔵 Blue** | Passenger / Ferries |
+| **🟠 Orange** | Fishing Vessels |
+| **🟣 Purple** | Pleasure Craft & Sailing |
+| **💗 Pink** | S.A.R. (Search and Rescue) |
+| **💎 Cyan** | Tugs & Towing |
+| **💠 Light Blue** | Pilot Vessels |
+| **🌑 Indigo** | Military & Law Enforcement |
+| **⚪ White** | WIG (Wing in Ground) |
+| **🎨 Magenta** | Aids to Navigation (Buoys, Lighthouses) |
+| **☁️ Light Blue** | Weather / Meteo Stations (Vindstrut icon) |
+
+### 📐 Icon Shapes
+- **Triangle/Ship**: Moving vessel (oriented towards its Course Over Ground).
+- **Circle**: Stationary vessel.
+- **Lighthouse/Buoy**: Aid to Navigation (AtoN).
+- **Wind Sock**: Weather or Meteorological station.
+- **Aircraft**: Search & Rescue aircraft or helicopters.
 
 ## 🛠 Architecture
 
