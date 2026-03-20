@@ -85,7 +85,12 @@ No SDR? No problem. Set `MOCK_MODE=true` in the `app` environment to see simulat
 NavisCore is designed to be a central hub for maritime data:
 
 - **Local SDR Layer**: Interfaces with RTL-SDR hardware to decode local traffic.
-- **UDP Ingest**: Accepts NMEA data from external decoders on port `10110/udp`.
+- **UDP Ingest (Remote SDR)**: NavisCore listens on port `10110/udp` for raw NMEA 0183 sentences. This allows you to use an external decoder running on a different machine (e.g., a Raspberry Pi closer to the antenna).
+  - **AIS-catcher Example**: If you run `AIS-catcher` on a remote host, you can forward the data to NavisCore using:
+    ```bash
+    AIS-catcher -u <naviscore_ip> 10110
+    ```
+  - **Deployment**: In this scenario, you can simply remove or disable the `sdr` service in your `docker-compose.yml` and only run the `app` container.
 - **MQTT**: 
   - **Broadcast**: Publishes real-time vessel updates to `naviscore/objects`.
     - **Objects Payload Details**:
