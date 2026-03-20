@@ -1,8 +1,10 @@
-name: Docker Build and Publish
+name: Docker SDR Build
 
 on:
   push:
     branches: [ "main" ]
+    paths:
+      - 'sdr/**'
   workflow_dispatch:
 
 concurrency:
@@ -11,51 +13,34 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build-and-push:
+  build-sdr:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-
-    strategy:
-      matrix:
-        include:
-          - context: .
-            image_name: naviscore-app
-          - context: ./sdr
-            image_name: naviscore-sdr
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-
       - name: Log in to the Container registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels) for Docker
+      - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/minglarn/${{ matrix.image_name }}
-          tags: |
-            type=raw,value=latest
-            type=sha
-
-      - name: Build and push Docker image
+          images: ${{ env.REGISTRY }}/minglarn/naviscore-sdr
+          tags: type=raw,value=latest
+      - name: Build and push SDR
         uses: docker/build-push-action@v5
         with:
-          context: ${{ matrix.context }}
+          context: ./sdr
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
