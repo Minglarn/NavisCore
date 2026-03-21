@@ -3158,17 +3158,22 @@ export default function App() {
     }, []);
 
 
-    const filteredShips = useMemo(() => {
+    const mapShips = useMemo(() => {
         const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
+        return ships.filter(s => {
+            if (!showAisStream && s.source === 'aisstream') return false;
+            return true;
+        });
+    }, [ships, mqttSettings.show_aisstream_on_map]);
+
+    const sidebarShips = useMemo(() => {
         return ships.filter(s => {
             const nameUpper = (s.name || "").toUpperCase();
             const mmsiStr = String(s.mmsi || "");
-            const type = s.shiptype || s.ship_type;
+            const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
             
-            // Basic exclusions shouldn't filter them out entirely, we let ship filters handle them
-            // if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
-            
-            // Internet vessel filtering
+            // Internet vessel filtering (Always obey map setting for consistency or let sidebar show it?)
+            // Usually if it's not on map, maybe it shouldn't be in sidebar? Let's keep consistent with map for now.
             if (!showAisStream && (s.source === 'aisstream')) return false;
 
             // Search Filter
@@ -3195,15 +3200,15 @@ export default function App() {
         });
     }, [ships, mqttSettings.show_aisstream_on_map, searchTerm, filterSource, filterShipType]);
 
-    const filteredShipsCount = useMemo(() => filteredShips.length, [filteredShips]);
+    const sidebarShipsCount = useMemo(() => sidebarShips.length, [sidebarShips]);
     
     const vesselCount = useMemo(() => {
-        return filteredShips.filter(s => {
+        return mapShips.filter(s => {
             const cat = getShipFilterCategory(s);
             // Non-vessels are AtoNs, Base Stations, and Meteo
             return cat !== 'aton' && cat !== 'base_station' && cat !== 'meteo';
         }).length;
-    }, [filteredShips]);
+    }, [mapShips]);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -4050,7 +4055,7 @@ export default function App() {
                                 zoomToBoundsOnClick={true}
                                 iconCreateFunction={createClusterCustomIcon}
                             >
-                            {filteredShips.map((s: any, idx: number) => {
+                            {mapShips.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
                                 const now = Date.now();
                                 const threshold = parseInt(mqttSettings.new_vessel_threshold || '5');
@@ -4189,18 +4194,18 @@ export default function App() {
                                                         display: 'flex', 
                                                         flexDirection: 'row', 
                                                         alignItems: 'center', 
-                                                        gap: '12px', 
+                                                        gap: '10px', 
                                                         background: colors.bgCard, 
-                                                        padding: '10px 14px', 
+                                                        padding: '8px 12px', 
                                                         borderRadius: '12px', 
                                                         color: colors.textMain,
                                                         boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                                                         border: `1px solid ${colors.border}`,
-                                                        minWidth: '320px',
+                                                        minWidth: '300px',
                                                         fontFamily: 'system-ui, -apple-system, sans-serif'
                                                     }}>
                                                         {/* Left: Vessel Image */}
-                                                        <div style={{ position: 'relative', width: '64px', height: '64px', minWidth: '64px', borderRadius: '8px', overflow: 'hidden', background: '#0a0a0a' }}>
+                                                        <div style={{ position: 'relative', width: '54px', height: '54px', minWidth: '54px', borderRadius: '6px', overflow: 'hidden', background: '#0a0a0a' }}>
                                                             {s.imageUrl ? (
                                                                 <img
                                                                     src={s.imageUrl}
@@ -4216,23 +4221,23 @@ export default function App() {
                                                         </div>
 
                                                         {/* Right: Info Area */}
-                                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px' }}>
+                                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
                                                             {/* Top Row: Flag, Name, Speed */}
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
                                                                     <span style={{ fontSize: '1.4rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
-                                                                    <strong style={{ fontSize: '1rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                                    <strong style={{ fontSize: '0.95rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                                                         {s.name || mmsiStr}
                                                                     </strong>
                                                                 </div>
-                                                                <span style={{ color: '#00ff40', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap', marginLeft: '8px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                                <span style={{ color: '#22c55e', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap', marginLeft: '8px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
                                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                                                                         <span style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>
                                                                             {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
                                                                         </span>
                                                                         {formatSpeed(s.sog, mqttSettings.units)}
                                                                     </div>
-                                                                    {(s.shiptype === 9 || s.is_sar) && s.altitude !== undefined && (
+                                                                    {Boolean(s.shiptype === 9 || s.is_sar) && s.altitude !== undefined && (
                                                                         <div style={{ fontSize: '0.75rem', color: '#44aaff', fontWeight: 800 }}>
                                                                             {s.altitude * 10} ft
                                                                         </div>
@@ -4511,7 +4516,7 @@ export default function App() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: `1px solid ${colors.border}` }}>
                                 <h1 style={{ margin: 0, fontSize: '1.1rem', color: colors.textMain, fontWeight: 700 }}>
-                                    Seen Objects ({filteredShipsCount})
+                                    Seen Objects ({sidebarShipsCount})
                                 </h1>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <button 
@@ -4628,7 +4633,7 @@ export default function App() {
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                                             No objects on the radar yet...
                                         </div>
-                                    ) : filteredShips
+                                    ) : sidebarShips
                                         .map(s => {
                                             const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
                                                 ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
