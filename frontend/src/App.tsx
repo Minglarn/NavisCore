@@ -259,7 +259,7 @@ function getCountryName(countryCode?: string) {
 
 function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     const mid = mmsiStr ? mmsiStr.substring(0, 3) : '';
-    let emoji = '📌';
+    let emoji = '🏳️';
     
     const midToEmoji: { [key: string]: string } = {
         // Europe
@@ -289,16 +289,20 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
         "461": "🇸🇦", "463": "🇸🇬", "466": "🇱🇰", "468": "🇸🇾", "470": "🇹🇼", "471": "🇹🇭", "473": "🇹🇱", "475": "🇦🇪",
         "477": "🇻🇳", "478": "🇧🇦",
         // Oceania / SE Asia
-        "501": "🇹🇫", "503": "🇦🇺", "508": "🇧🇳", "514": "🇰🇭", "515": "🇰🇭", "536": "🇲🇵", "559": "🇦🇸",
+        "501": "🇹🇫", "503": "🇦🇺", "506": "🇲🇲", "510": "🇫🇲", "511": "🇵🇼", "512": "🇳🇿", "514": "🇰🇭", 
+        "515": "🇰🇭", "518": "🇹🇭", "520": "🇭🇰", "523": "🇱🇦", "525": "🇮🇩", "529": "🇰🇮", "533": "🇲🇾", "536": "🇲🇵", 
+        "538": "🇲🇭", "548": "🇵🇭", "553": "🇵🇬", "555": "🇵🇳", "557": "🇸🇧", "559": "🇦🇸", "561": "🇼🇸", "563": "🇸🇬", 
+        "564": "🇸🇬", "565": "🇸🇬", "566": "🇸🇬", "567": "🇻🇺", "570": "🇸🇬", "572": "🇹🇺", "574": "🇻🇺", "576": "🇻🇺", 
+        "577": "🇻🇺", "578": "🇼🇫",
         // Africa / Atlantic
-        "601": "🇿🇦", "603": "🇦🇴", "605": "🇩🇿", "608": "🇸🇭", "609": "🇧🇮", "610": "🇧🇯", "611": "🇧🇼", "613": "🇨🇲",
-        "616": "🇰🇲", "617": "🇨🇻", "618": "🇨🇫", "619": "🇹🇩", "620": "🇨🇬", "621": "🇩🇯", "622": "🇪🇬", "624": "🇪🇹",
-        "625": "🇪🇷", "626": "🇬🇶", "627": "🇬🇦", "629": "🇬🇲", "630": "🇬🇭", "631": "🇬🇳", "632": "🇬🇼", "633": "🇧🇫",
-        "634": "🇰🇪", "635": "🇱🇸", "636": "🇱🇷", "637": "🇱🇾", "642": "🇲🇬", "644": "🇲🇼", "645": "🇲🇱", "647": "🇲🇷",
-        "649": "🇲🇺", "650": "🇲🇿", "654": "🇳🇦", "655": "🇳🇪", "656": "🇳🇬", "657": "🇷🇼", "659": "🇸🇳", "660": "🇸🇨",
-        "661": "🇸🇱", "662": "🇸🇴", "663": "🇸🇩", "664": "🇸🇿", "665": "🇹🇿", "666": "🇹🇬", "667": "🇹🇳", "668": "🇺🇬",
-        "669": "🇨🇩", "670": "🇿🇲", "671": "🇿🇼", "672": "🇳🇦", "674": "🇹🇿", "675": "🇪🇹", "676": "🇸🇴", "677": "🇹🇿",
-        "678": "🇸🇹", "679": "🇨🇮",
+        "601": "🇿🇦", "603": "🇦🇴", "605": "🇩🇿", "607": "🇹🇫", "608": "🇦🇨", "609": "🇧🇮", "610": "🇧🇯", "611": "🇧🇼", 
+        "612": "🇨🇫", "613": "🇨🇲", "615": "🇨🇬", "616": "🇰🇲", "617": "🇨🇻", "618": "🇹🇫", "619": "🇨🇮", "620": "🇨🇬", 
+        "621": "🇩🇯", "622": "🇪🇬", "624": "🇪🇹", "625": "🇪🇷", "626": "🇬🇶", "627": "🇬🇦", "629": "🇬🇲", "630": "🇬🇭", 
+        "631": "🇬🇳", "632": "🇬🇼", "633": "🇧🇫", "634": "🇰🇪", "635": "🇹🇫", "636": "🇱🇷", "637": "🇱🇷", "642": "🇱🇾", 
+        "644": "🇱🇸", "645": "🇲🇺", "647": "🇲🇬", "649": "🇲🇱", "650": "🇲🇿", "654": "🇲🇷", "655": "🇳🇪", "656": "🇳🇬", 
+        "657": "🇷🇼", "659": "🇸🇳", "660": "🇸🇨", "661": "🇸🇱", "662": "🇸🇴", "663": "🇸🇩", "664": "🇸🇿", "665": "🇹🇿", 
+        "666": "🇹🇬", "667": "🇹🇳", "668": "🇺🇬", "669": "🇨🇩", "670": "🇿🇲", "671": "🇿🇼", "672": "🇳🇦", "674": "🇹🇿", 
+        "675": "🇪🇹", "676": "🇸🇴", "677": "🇹🇿", "678": "🇸🇹", "679": "🇨🇮",
         // South America
         "701": "🇦🇷", "710": "🇧🇷", "720": "🇧🇴", "725": "🇨🇱", "730": "🇨🇴", "735": "🇪🇨", "740": "🇫🇰", "745": "🇬🇾",
         "750": "🇵🇾", "755": "🇵🇪", "760": "🇸🇷", "765": "🇺🇾", "770": "🇻🇪"
@@ -1620,7 +1624,11 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             ) : getShipTypeName(mmsiStr, ship.shiptype, ship.ship_type_text)} 
                             colors={colors} 
                         />
-                        <AccordionRow label="Messages" value={ship.message_count || '1'} colors={colors} />
+                        <AccordionRow 
+                            label="Draught" 
+                            value={isEditing ? <input type="number" step="0.1" value={editData.draught || ''} onChange={e => setEditData({...editData, draught: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.draught ? `${ship.draught}m` : 'N/A')} 
+                            colors={colors} 
+                        />
                     </div>
                 </Accordion>
 
@@ -1647,11 +1655,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                     setIsOpen={() => toggleSection("Navigation & Signal")}
                 >
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                        <AccordionRow 
-                            label="Draught" 
-                            value={isEditing ? <input type="number" step="0.1" value={editData.draught || ''} onChange={e => setEditData({...editData, draught: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.draught ? `${ship.draught}m` : 'N/A')} 
-                            colors={colors} 
-                        />
+                        <AccordionRow label="Messages" value={ship.message_count || '1'} colors={colors} />
                         <AccordionRow label="Source" value={ship.source || 'Local'} colors={colors} />
                         <AccordionRow 
                             label="Distance to Station" 
@@ -3755,7 +3759,7 @@ export default function App() {
             {/* Header */}
             <header style={{
                 position: 'relative',
-                padding: '11px 25px',
+                padding: '8px 25px',
                 background: isDark ? '#0f0f1a' : '#ffffff',
                 color: isDark ? '#44aaff' : '#00838f',
                 display: 'flex',
@@ -4241,7 +4245,7 @@ export default function App() {
                                                                 <span style={{ whiteSpace: 'nowrap' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}</span>
                                                                 <span>•</span>
                                                                 <span style={{ color: '#44aaff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                                    <span style={{ fontSize: '0.65rem', color: colors.textMuted }}>Distans:</span>
+                                                                    <span style={{ fontSize: '0.65rem', color: colors.textMuted }}>Distance:</span>
                                                                     {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
                                                                 </span>
                                                                 
@@ -4635,9 +4639,14 @@ export default function App() {
                                             let valA = a[sortConfig.key];
                                             let valB = b[sortConfig.key];
 
-                                            // Specific handling for strings
-                                            if (typeof valA === 'string') valA = valA.toLowerCase();
-                                            if (typeof valB === 'string') valB = valB.toLowerCase();
+                                            if (sortConfig.key === 'name') {
+                                                valA = (a.name || a.mmsi || '').toString().toLowerCase();
+                                                valB = (b.name || b.mmsi || '').toString().toLowerCase();
+                                            } else {
+                                                // Specific handling for strings
+                                                if (typeof valA === 'string') valA = valA.toLowerCase();
+                                                if (typeof valB === 'string') valB = valB.toLowerCase();
+                                            }
 
                                             // Fallbacks for undefined
                                             if (valA === undefined) valA = sortConfig.direction === 'asc' ? Infinity : -Infinity;
