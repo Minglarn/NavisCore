@@ -212,6 +212,7 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_forward_sdr": "true",
         "mqtt_pub_forward_aisstream": "false",
         "new_vessel_threshold": "5",
+        "new_vessel_timeout_h": "24"
     }
     for k, v in defaults.items():
         if k not in settings:
@@ -554,9 +555,11 @@ async def process_ais_data(data: dict):
                 db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = bool(row[3]), bool(row[4]), bool(row[5]), bool(row[6])
                 try:
                     last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                    if (datetime.utcnow() - last_seen_dt).total_seconds() > (int(settings.get("ship_timeout", 60)) * 60):
+                    # Use explicit New Vessel Timeout (hours) instead of just ship_timeout
+                    nv_timeout_h = int(settings.get("new_vessel_timeout_h", 24))
+                    if (datetime.utcnow() - last_seen_dt).total_seconds() > (nv_timeout_h * 3600):
                         reset_count = True
-                        logger.info(f"Vessel {mmsi_str} re-acquired. Resetting count.")
+                        logger.info(f"Vessel {mmsi_str} re-acquired after {nv_timeout_h}h silence. Resetting count.")
                 except Exception: pass
 
             # 2. Prepare ship data dictionary

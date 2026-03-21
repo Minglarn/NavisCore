@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -97,7 +97,7 @@ function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?
     if (type >= 53 && type <= 54) return '#2e8b57'; // Port/Anti-pollution (SeaGreen)
     if (type === 58) return '#ff69b4'; // Medical (HotPink)
     if (type >= 60 && type <= 69) return '#0000ff'; // Passenger (Blue)
-    if (type === 70 || type === 79 || (type >= 71 && type <= 78)) return '#00ff00'; // Cargo (Green)
+    if (type === 70 || type === 79 || (type >= 71 && type <= 78)) return '#10b981'; // Cargo (Green)
     if (type >= 80 && type <= 89) return '#ff0000'; // Tanker (Red)
 
     return '#a0a0a0'; // Other Type
@@ -562,7 +562,7 @@ const extraStyles = `
     display: inline-block;
 }
 .badge-type { background: rgba(68, 170, 255, 0.15); color: #44aaff; border: 1px solid rgba(68, 170, 255, 0.3); }
-.badge-obs { background: rgba(0, 255, 128, 0.15); color: #00ff80; border: 1px solid rgba(0, 255, 128, 0.3); }
+.badge-obs { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
 .badge-mmsi { font-family: 'JetBrains Mono', monospace; background: rgba(255, 255, 255, 0.05); color: rgba(255,255,255,0.6); border: 1px solid rgba(255,255,255,0.1); }
 
 .light-theme .badge-type { background: rgba(68, 170, 255, 0.1); color: #0066cc; border-color: rgba(68, 170, 255, 0.2); }
@@ -637,9 +637,9 @@ const extraStyles = `
 }
 
 @keyframes blink-anim {
-    0% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px #00ff80); }
-    50% { transform: scale(1.3); filter: brightness(2) drop-shadow(0 0 8px #00ff80); }
-    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px #00ff80); }
+    0% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px #10b981); }
+    50% { transform: scale(1.3); filter: brightness(2) drop-shadow(0 0 8px #10b981); }
+    100% { transform: scale(1); filter: brightness(1) drop-shadow(0 0 0px #10b981); }
 }
 
 @keyframes slideUpFade {
@@ -1354,9 +1354,12 @@ function Accordion({ title, children, isOpen, setIsOpen, colors }: any) {
     );
 }
 
-function AccordionRow({ label, value, labelIcon, colors }: any) {
+function AccordionRow({ label, value, labelIcon, colors, onDoubleClick }: any) {
     return (
-        <div style={{ display: 'flex', flexDirection: 'column', padding: '10px 16px', borderBottom: `1px solid ${colors.border}88` }}>
+        <div 
+            onDoubleClick={onDoubleClick}
+            style={{ display: 'flex', flexDirection: 'column', padding: '10px 16px', borderBottom: `1px solid ${colors.border}88`, cursor: onDoubleClick ? 'cell' : 'default' }}
+        >
             <span style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                 {labelIcon} {label}
             </span>
@@ -1366,9 +1369,11 @@ function AccordionRow({ label, value, labelIcon, colors }: any) {
 }
 
 function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: any) {
+    const sidebarRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
     const [localImage, setLocalImage] = useState<string | null>(null);
+    const [showSavePrompt, setShowSavePrompt] = useState(false);
 
     const mmsiStr = ship ? String(ship.mmsi) : '';
 
@@ -1414,10 +1419,47 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
         }
     };
 
+    // Click outside logic
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (isEditing && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+                // Determine if data is dirty
+                const isDirty = JSON.stringify(editData) !== JSON.stringify(ship);
+                if (isDirty) {
+                    setShowSavePrompt(true);
+                } else {
+                    setIsEditing(false);
+                }
+            }
+        };
+
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [isEditing, editData, ship]);
+
     if (!isOpen || !ship) return null;
 
     return (
-        <div style={{ 
+        <>
+        {isEditing && (
+            <div 
+                style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    zIndex: 1100, background: 'transparent'
+                }}
+                onClick={(e) => {
+                    e.stopPropagation();
+                    const isDirty = JSON.stringify(editData) !== JSON.stringify(ship);
+                    if (isDirty) {
+                        setShowSavePrompt(true);
+                    } else {
+                        setIsEditing(false);
+                    }
+                }}
+            />
+        )}
+        <div 
+            ref={sidebarRef}
+            style={{ 
             position: 'fixed', right: 0, top: 0, bottom: 0, width: '420px', 
             background: colors.bgMain, zIndex: 1101, display: 'flex', flexDirection: 'column', 
             boxShadow: '-10px 0 30px rgba(0,0,0,0.15)', overflowY: 'auto',
@@ -1425,6 +1467,41 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
             transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
             borderLeft: `1px solid ${colors.border}`
         }}>
+            {/* Save Confirmation Overlay */}
+            {showSavePrompt && (
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+                    zIndex: 2000, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    padding: '20px', textAlign: 'center'
+                }}>
+                    <div style={{ background: colors.bgCard, padding: '25px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column', gap: '20px', maxWidth: '300px' }}>
+                        <div style={{ color: colors.textMain, fontWeight: 800, fontSize: '1.1rem' }}>Spara ändringar?</div>
+                        <div style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Du har gjort ändringar i fartygets uppgifter. Vill du spara dem?</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            <button 
+                                onClick={async () => {
+                                    await handleSave();
+                                    setShowSavePrompt(false);
+                                }}
+                                style={{ background: '#10b981', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 800, cursor: 'pointer' }}
+                            >
+                                Spara och stäng
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    setIsEditing(false);
+                                    setEditData({ ...ship });
+                                    setShowSavePrompt(false);
+                                }}
+                                style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.textMuted, padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
+                            >
+                                Ignorera ändringar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
             {/* Header Row */}
             <div style={{ 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
@@ -1482,40 +1559,47 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         }
                         return null;
                     })()}
-                    <button 
-                        onClick={() => isEditing ? handleSave() : setIsEditing(true)}
-                        style={{ 
-                            background: isEditing ? 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)' : 'transparent', 
-                            border: isEditing ? 'none' : `1px solid ${colors.border}`, 
-                            cursor: 'pointer', color: isEditing ? '#fff' : colors.textMuted, 
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: 'bold'
-                        }}
-                    >
-                        {isEditing ? 'SAVE' : 'EDIT'}
-                    </button>
-                    {isEditing && (
-                        <button 
-                            onClick={() => { setIsEditing(false); setEditData({ ...ship }); }}
-                            style={{ background: 'transparent', border: `1px solid ${colors.border}`, cursor: 'pointer', color: colors.textMuted, padding: '4px 12px', borderRadius: '8px', fontSize: '0.75rem' }}
-                        >
-                            CANCEL
-                        </button>
-                    )}
                 </div>
-                <span style={{ fontSize: '1.8rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                    </div>
+                    <span style={{ fontSize: '1.8rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, ship.country_code) }} />
+                </div>
             </div>
 
             {/* Destination Row */}
             <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 20px', borderBottom: `1px solid ${colors.border}`, background: colors.bgSidebar }}>
-                <div>
+                <div 
+                    onDoubleClick={() => !isEditing && setIsEditing(true)}
+                    style={{ cursor: isEditing ? 'default' : 'cell' }}
+                >
                     <div style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '4px' }}>Destination</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 800, color: colors.textMain, fontSize: '0.95rem' }}>
-                        {ship.destination || '--'}
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                value={editData.destination || ''} 
+                                onChange={e => setEditData({...editData, destination: e.target.value})} 
+                                style={{ width: '100%', background: 'transparent', border: 'none', color: '#44aaff', fontWeight: 800, fontSize: '0.95rem', outline: 'none' }} 
+                            />
+                        ) : (ship.destination || '--')}
                     </div>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: colors.textMain }}>{ship.eta || 'N/A'}</div>
+                <div 
+                    onDoubleClick={() => !isEditing && setIsEditing(true)}
+                    style={{ textAlign: 'right', cursor: isEditing ? 'default' : 'cell' }}
+                >
+                    <div style={{ fontSize: '0.85rem', fontWeight: 800, color: colors.textMain }}>
+                        {isEditing ? (
+                            <input 
+                                type="text" 
+                                value={editData.eta || ''} 
+                                onChange={e => setEditData({...editData, eta: e.target.value})} 
+                                style={{ width: '80px', background: 'transparent', border: 'none', color: '#44aaff', fontWeight: 800, textAlign: 'right', outline: 'none' }} 
+                            />
+                        ) : (ship.eta || 'N/A')}
+                    </div>
                     <div style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700 }}>{getTimeAgo(ship.timestamp)}</div>
                 </div>
             </div>
@@ -1586,26 +1670,31 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             label="IMO" 
                             value={isEditing ? <input type="text" value={editData.imo || ''} onChange={e => setEditData({...editData, imo: e.target.value})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.imo || 'N/A')} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                         <AccordionRow 
                             label="Callsign" 
                             value={isEditing ? <input type="text" value={editData.callsign || ''} onChange={e => setEditData({...editData, callsign: e.target.value})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.callsign || 'N/A')} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                         <AccordionRow 
                             label="Name" 
                             value={isEditing ? <input type="text" value={editData.name || ''} onChange={e => setEditData({...editData, name: e.target.value})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.name || 'N/A')} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                         <AccordionRow 
                             label="Length" 
                             value={isEditing ? <input type="number" value={editData.length || ''} onChange={e => setEditData({...editData, length: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.length ? `${ship.length}m` : 'N/A')} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                         <AccordionRow 
                             label="Width" 
                             value={isEditing ? <input type="number" value={editData.width || ''} onChange={e => setEditData({...editData, width: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.width ? `${ship.width}m` : 'N/A')} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                         <AccordionRow 
                             label="Type" 
@@ -1623,11 +1712,13 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                                 </select>
                             ) : getShipTypeName(mmsiStr, ship.shiptype, ship.ship_type_text)} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                         <AccordionRow 
                             label="Draught" 
                             value={isEditing ? <input type="number" step="0.1" value={editData.draught || ''} onChange={e => setEditData({...editData, draught: parseFloat(e.target.value)})} style={{ width: '100%', background: 'transparent', border: 'none', color: colors.textMain, fontWeight: 800 }} /> : (ship.draught ? `${ship.draught}m` : 'N/A')} 
                             colors={colors} 
+                            onDoubleClick={() => !isEditing && setIsEditing(true)}
                         />
                     </div>
                 </Accordion>
@@ -1662,10 +1753,16 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             value={formatDistance(haversineDistance(parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon), ship.lat, ship.lon), mqttSettings.units)} 
                             colors={colors} 
                         />
+                        <AccordionRow 
+                            label="Seen Count" 
+                            value={ship.registration_count || '1'} 
+                            colors={colors} 
+                        />
                     </div>
                 </Accordion>
             </div>
         </div>
+        </>
     );
 }
 
@@ -2015,15 +2112,15 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '4px' }}>
                                     <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 800, textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{ship.name || 'Unknown Vessel'}</h1>
                                     <div style={{
-                                        background: ship.source === 'aisstream' ? '#44aaff33' : '#00ff8033',
-                                        color: ship.source === 'aisstream' ? '#44aaff' : '#00ff80',
+                                        background: ship.source === 'aisstream' ? '#44aaff33' : '#10b98133',
+                                        color: ship.source === 'aisstream' ? '#44aaff' : '#10b981',
                                         padding: '2px 10px',
                                         borderRadius: '20px',
                                         fontSize: '0.7rem',
                                         fontWeight: 800,
                                         letterSpacing: '0.5px',
                                         textTransform: 'uppercase',
-                                        border: `1px solid ${ship.source === 'aisstream' ? '#44aaff66' : '#00ff8066'}`,
+                                        border: `1px solid ${ship.source === 'aisstream' ? '#44aaff66' : '#10b98166'}`,
                                         backdropFilter: 'blur(4px)'
                                     }}>
                                         {ship.source === 'aisstream' ? 'STREAM' : 'LIVE'}
@@ -2355,6 +2452,19 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                                     <Toggle
                                                         checked={settings.mqtt_pub_only_new === 'true'}
                                                         onChange={val => setSettings({ ...settings, mqtt_pub_only_new: String(val) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <div>
+                                                        <label>New Vessel Timeout (Hours)</label>
+                                                        <div className="description" style={{ fontSize: '0.75rem' }}>Hours of silence before a returning vessel triggers a new notification</div>
+                                                    </div>
+                                                    <input
+                                                        type="number"
+                                                        className="input-premium"
+                                                        style={{ width: '80px' }}
+                                                        value={settings.new_vessel_timeout_h}
+                                                        onChange={e => setSettings({ ...settings, new_vessel_timeout_h: e.target.value })}
                                                     />
                                                 </div>
                                                 <div className="form-group-premium">
@@ -4231,7 +4341,7 @@ export default function App() {
                                                                 <span style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold', lineHeight: 1 }}>
                                                                     {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
                                                                 </span>
-                                                                <span style={{ color: '#22c55e', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap' }}>
+                                                                <span style={{ color: '#10b981', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap' }}>
                                                                     {formatSpeed(s.sog, mqttSettings.units)}
                                                                 </span>
                                                             </div>
@@ -4764,7 +4874,7 @@ export default function App() {
                                                             <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distance:</span>
                                                             {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}
                                                         </span>
-                                                        <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(0,255,128,0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#00ff80', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}` }}>
+                                                        <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(16, 185, 129, 0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#10b981', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(16, 185, 129, 0.2)'}` }}>
                                                             {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
                                                         </span>
                                                     </div>
@@ -4772,7 +4882,7 @@ export default function App() {
 
                                                 {/* Speed/Direction */}
                                                 <div style={{ textAlign: 'right', minWidth: '65px' }}>
-                                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: (ship.sog && ship.sog > 1) ? '#00ee00' : colors.textMain }}>
+                                                    <div style={{ fontWeight: 700, fontSize: '0.85rem', color: (ship.sog && ship.sog > 1) ? '#10b981' : colors.textMain }}>
                                                         {formatSpeed(ship.sog, mqttSettings.units)}
                                                     </div>
                                                     <div style={{ fontSize: '0.75rem', color: colors.textMuted, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
@@ -4923,7 +5033,7 @@ export default function App() {
                     pointerEvents: 'none',
                     maxWidth: '90vw'
                 }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#00ff80', animation: 'pulse 2s infinite' }}></div>
+                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></div>
                     <span style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px' }}>LATEST EVENT:</span>
                     <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isDark ? '#44aaff' : '#007080' }}>
                         {lastUpdatedShip.name} <span style={{ opacity: 0.6, fontWeight: 400, marginLeft: '5px' }}>(MMSI {lastUpdatedShip.mmsi})</span>
