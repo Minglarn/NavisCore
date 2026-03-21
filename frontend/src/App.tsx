@@ -4204,7 +4204,7 @@ export default function App() {
                                                         fontFamily: 'system-ui, -apple-system, sans-serif'
                                                     }}>
                                                         {/* Top: Vessel Image */}
-                                                        <div style={{ position: 'relative', width: '100%', height: '120px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
+                                                        <div style={{ position: 'relative', width: '100%', height: '160px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
                                                             {s.imageUrl ? (
                                                                 <img
                                                                     src={s.imageUrl}
@@ -4247,7 +4247,7 @@ export default function App() {
                                                             {/* Status */}
                                                             <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}>
                                                                 <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Status</div>
-                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', lineHeight: '1.1', whiteSpace: 'normal' }}>
                                                                     {s.status_text || 'Underway'}
                                                                 </div>
                                                             </div>
