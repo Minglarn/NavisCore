@@ -151,6 +151,11 @@ function getShipFilterCategory(s: any): string {
         return 'aton';
     }
     
+    // 1b. Meteo
+    if (s.is_meteo || typeStr.includes('METEO') || typeStr.includes('WEATHER')) {
+        return 'meteo';
+    }
+    
     // 2. Base Station
     if (mmsiStr.startsWith('00')) return 'base_station';
     
@@ -3155,8 +3160,8 @@ export default function App() {
             const mmsiStr = String(s.mmsi || "");
             const type = s.shiptype || s.ship_type;
             
-            // Basic exclusions (AtoN, Meteo, etc)
-            if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
+            // Basic exclusions shouldn't filter them out entirely, we let ship filters handle them
+            // if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
             
             // Internet vessel filtering
             if (!showAisStream && (s.source === 'aisstream')) return false;
@@ -3190,8 +3195,8 @@ export default function App() {
     const vesselCount = useMemo(() => {
         return filteredShips.filter(s => {
             const cat = getShipFilterCategory(s);
-            // Non-vessels are AtoNs and Base Stations and Meteo (meteo already excluded from filteredShips)
-            return cat !== 'aton' && cat !== 'base_station';
+            // Non-vessels are AtoNs, Base Stations, and Meteo
+            return cat !== 'aton' && cat !== 'base_station' && cat !== 'meteo';
         }).length;
     }, [filteredShips]);
 
@@ -3548,7 +3553,11 @@ export default function App() {
 
         const interval = setInterval(() => {
             const nu = Date.now();
-            setShips((prev: any[]) => prev.filter((s: any) => (nu - s.timestamp) < msTimeout));
+            setShips((prev: any[]) => prev.filter((s: any) => {
+                const isMeteo = s.is_meteo || (s.name && (s.name.toUpperCase().includes('METEO') || s.name.toUpperCase().includes('WEATHER')));
+                if (isMeteo) return (nu - s.timestamp) < 15 * 60 * 1000;
+                return (nu - s.timestamp) < msTimeout;
+            }));
         }, 15000);
         return () => clearInterval(interval);
     }, [mqttSettings.ship_timeout]);
@@ -4602,6 +4611,7 @@ export default function App() {
                                         { value: 'military', label: 'Military / Law' },
                                         { value: 'wig', label: 'Wing In Ground (WIG)' },
                                         { value: 'special', label: 'Special / Ops' },
+                                        { value: 'meteo', label: 'Stationära / Meteo' },
                                         { value: 'other', label: 'Other Types' }
                                     ]}
                                 />
