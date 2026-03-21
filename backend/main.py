@@ -602,10 +602,11 @@ async def process_ais_data(data: dict):
                     if not hr or haversine_distance(hr[0], hr[1], lat, lon) > 0.05:
                         await db.execute('INSERT INTO ship_history (mmsi, latitude, longitude, timestamp) VALUES (?, ?, ?, ?)', (mmsi_str, lat, lon, int(datetime.now().timestamp() * 1000)))
             
-            # Stats
-            today, time_min = datetime.utcnow().strftime('%Y-%m-%d'), datetime.utcnow().strftime('%Y-%m-%d %H:%M')
+            # Stats (Switching to Local Time for user-facing consistency)
+            now_local = datetime.now()
+            today, time_min = now_local.strftime('%Y-%m-%d'), now_local.strftime('%Y-%m-%d %H:%M')
             await db.execute('INSERT INTO daily_stats (date, total_messages) VALUES (?, 1) ON CONFLICT(date) DO UPDATE SET total_messages = total_messages + 1', (today,))
-            await db.execute('INSERT INTO hourly_stats (date, hour, message_count) VALUES (?, ?, 1) ON CONFLICT(date, hour) DO UPDATE SET message_count = message_count + 1', (today, datetime.utcnow().hour))
+            await db.execute('INSERT INTO hourly_stats (date, hour, message_count) VALUES (?, ?, 1) ON CONFLICT(date, hour) DO UPDATE SET message_count = message_count + 1', (today, now_local.hour))
             await db.execute('INSERT INTO minute_stats (time_min, total_messages) VALUES (?, 1) ON CONFLICT(time_min) DO UPDATE SET total_messages = total_messages + 1', (time_min,))
             try:
                 await db.execute('INSERT INTO daily_mmsi (date, mmsi) VALUES (?, ?)', (today, mmsi_str))
@@ -891,12 +892,13 @@ async def mqtt_stats_reporter():
     """Background task to send hourly and daily statistics to MQTT."""
     logger.info("MQTT Statistics Reporter task started.")
     
-    last_hour = datetime.utcnow().hour
-    last_day = datetime.utcnow().date()
+    # Switch to Local Time for consistency with user discovery/reporting expectations
+    last_hour = datetime.now().hour
+    last_day = datetime.now().date()
     
     while True:
         try:
-            now = datetime.utcnow()
+            now = datetime.now()
             current_hour = now.hour
             current_day = now.date()
             
