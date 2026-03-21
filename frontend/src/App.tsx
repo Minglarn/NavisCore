@@ -1031,6 +1031,7 @@ function ChartCard({ title, children, colors }: any) {
 
 function StatisticsModal({ isOpen, onClose, colors }: any) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+    const [timeRange, setTimeRange] = useState<'7d' | '30d' | '1y'>('30d');
     const [stats, setStats] = useState<any>(null);
     const [loading, setLoading] = useState(false);
 
@@ -1054,7 +1055,13 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
 
     if (!isOpen) return null;
 
-    const history30d = stats?.history_30d || [];
+    const allHistory = stats?.history_30d || [];
+    const historyFiltered = timeRange === '7d' 
+        ? allHistory.slice(-7) 
+        : timeRange === '1y' 
+            ? allHistory 
+            : allHistory.slice(-30);
+            
     const hourlyBreakdown = stats?.hourly_breakdown || [];
     const typeBreakdown = stats?.type_breakdown || [];
 
@@ -1064,20 +1071,20 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
         '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#0ea5e9', '#ec4899'
     ];
 
-    // 1. History 30d (Messages & Vessels)
+    // 1. History (Messages & Vessels)
     const historyData = {
-        labels: history30d.map((h: any) => h.date.split('-').slice(1).join('/')),
+        labels: historyFiltered.map((h: any) => h.date.split('-').slice(1).join('/')),
         datasets: [
             {
                 label: 'Vessels',
-                data: history30d.map((h: any) => h.unique_ships),
+                data: historyFiltered.map((h: any) => h.unique_ships),
                 backgroundColor: '#36A2EB',
                 borderRadius: 4,
                 yAxisID: 'y',
             },
             {
                 label: 'Messages',
-                data: history30d.map((h: any) => h.total_messages),
+                data: historyFiltered.map((h: any) => h.total_messages),
                 backgroundColor: '#4BC0C088',
                 borderRadius: 4,
                 yAxisID: 'y1',
@@ -1161,6 +1168,35 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
             x: { grid: { display: false }, ticks: { color: colors.textMuted } }
         }
     };
+    
+    // 4. Station Range (Area Chart)
+    const rangeData = {
+        labels: historyFiltered.map((h: any) => h.date.split('-').slice(1).join('/')),
+        datasets: [{
+            label: 'Station Max Range (nm)',
+            data: historyFiltered.map((h: any) => (h.max_range_km * 0.539957).toFixed(1)),
+            borderColor: '#ff00ff',
+            backgroundColor: 'rgba(255, 0, 255, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointBackgroundColor: '#ff00ff'
+        }]
+    };
+
+    const rangeOptions: any = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { 
+            y: { 
+                beginAtZero: true, 
+                title: { display: true, text: 'Nautical Miles (nm)', color: colors.textMuted },
+                grid: { color: colors.border }, ticks: { color: colors.textMuted } 
+            },
+            x: { grid: { display: false }, ticks: { color: colors.textMuted } }
+        }
+    };
 
     return (
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
@@ -1192,27 +1228,54 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                 <div style={{ flex: 1, padding: '30px 40px', overflowY: 'auto' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                         
-                        {/* Select Date Card */}
-                        <div style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
-                            <div>
-                                <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: colors.textMain }}>Select Date</h2>
-                                <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: colors.textMuted }}>Viewing data for {selectedDate}</p>
+                        {/* Controls Row */}
+                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px' }}>
+                            {/* Time Range Selector */}
+                            <div style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: colors.textMain }}>History Range</h2>
+                                    <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: colors.textMuted }}>For trending charts</p>
+                                </div>
+                                <div style={{ display: 'flex', background: colors.bgApp, borderRadius: '8px', padding: '4px' }}>
+                                    {[ {v:'7d', l:'Week'}, {v:'30d', l:'Month'}, {v:'1y', l:'Year'} ].map(t => (
+                                        <button 
+                                            key={t.v}
+                                            onClick={() => setTimeRange(t.v as any)}
+                                            style={{
+                                                background: timeRange === t.v ? 'rgba(68,170,255,0.2)' : 'transparent',
+                                                color: timeRange === t.v ? '#44aaff' : colors.textMuted,
+                                                border: 'none', padding: '8px 16px', borderRadius: '6px',
+                                                cursor: 'pointer', fontWeight: 700, transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {t.l}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
-                            <div style={{ position: 'relative', width: '220px' }}>
-                                <Calendar size={18} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted, pointerEvents: 'none' }} />
-                                <input 
-                                    type="date" 
-                                    value={selectedDate}
-                                    onChange={(e) => setSelectedDate(e.target.value)}
-                                    style={{ 
-                                        width: '100%',
-                                        padding: '12px 45px 12px 15px', borderRadius: '12px',
-                                        border: `1px solid ${colors.border}`, fontSize: '1rem', outline: 'none', 
-                                        color: colors.textMain, background: colors.bgMain,
-                                        cursor: 'pointer',
-                                        fontWeight: 600
-                                    }}
-                                />
+
+                            {/* Select Date Card */}
+                            <div style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                                <div>
+                                    <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: colors.textMain }}>Select Date</h2>
+                                    <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: colors.textMuted }}>Viewing data for {selectedDate}</p>
+                                </div>
+                                <div style={{ position: 'relative', width: '220px' }}>
+                                    <Calendar size={18} style={{ position: 'absolute', right: '15px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted, pointerEvents: 'none' }} />
+                                    <input 
+                                        type="date" 
+                                        value={selectedDate}
+                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        style={{ 
+                                            width: '100%',
+                                            padding: '12px 45px 12px 15px', borderRadius: '12px',
+                                            border: `1px solid ${colors.border}`, fontSize: '1rem', outline: 'none', 
+                                            color: colors.textMain, background: colors.bgMain,
+                                            cursor: 'pointer',
+                                            fontWeight: 600
+                                        }}
+                                    />
+                                </div>
                             </div>
                         </div>
 
@@ -1225,7 +1288,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                             <>
                                 {/* Middle Row Grid */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '30px' }}>
-                                    <ChartCard title="Messages & Vessels per Day (30d)" colors={colors}>
+                                    <ChartCard title="Messages & Vessels History" colors={colors}>
                                         <Bar data={historyData} options={historyOptions} />
                                     </ChartCard>
                                     
@@ -1240,9 +1303,13 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                                     </ChartCard>
                                 </div>
 
-                                {/* Bottom Row Wide Chart */}
-                                <div style={{ minHeight: '450px' }}>
-                                    <ChartCard title="Messages per Hour (Selected Day)" colors={colors}>
+                                {/* Bottom Row Wide Charts */}
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', minHeight: '350px' }}>
+                                    <ChartCard title="Station Range History (nm)" colors={colors} style={{ height: '350px' }}>
+                                        <Line data={rangeData} options={rangeOptions} />
+                                    </ChartCard>
+                                    
+                                    <ChartCard title="Messages per Hour (Selected Day)" colors={colors} style={{ height: '350px' }}>
                                         <Line data={hourlyData} options={hourlyOptions} />
                                     </ChartCard>
                                 </div>

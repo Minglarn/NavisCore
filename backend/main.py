@@ -1324,7 +1324,7 @@ async def get_statistics(date: str = None):
             y_row = dict(row) if row else {"unique_ships":0,"new_ships":0,"total_messages":0}
             r = await db.execute("SELECT MAX(unique_ships), MAX(total_messages), MAX(max_range_km) FROM daily_stats")
             a_row = await r.fetchone() or (0, 0, 0)
-            r = await db.execute("SELECT date, unique_ships, total_messages FROM daily_stats ORDER BY date DESC LIMIT 30")
+            r = await db.execute("SELECT date, unique_ships, total_messages, max_range_km FROM daily_stats ORDER BY date DESC LIMIT 365")
             h30 = [dict(row) for row in await r.fetchall()]; h30.reverse()
             h_brk = []
             r = await db.execute("SELECT hour, message_count FROM hourly_stats WHERE date = ? ORDER BY hour ASC", (sel,))
