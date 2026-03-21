@@ -4199,12 +4199,12 @@ export default function App() {
                                                         color: colors.textMain,
                                                         boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                                                         border: `1px solid ${colors.border}`,
-                                                        minWidth: '220px',
+                                                        width: '280px',
                                                         overflow: 'hidden',
                                                         fontFamily: 'system-ui, -apple-system, sans-serif'
                                                     }}>
-                                                        {/* Top: Vessel Image (Full Width) */}
-                                                        <div style={{ position: 'relative', width: '100%', height: '110px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
+                                                        {/* Top: Vessel Image */}
+                                                        <div style={{ position: 'relative', width: '100%', height: '120px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
                                                             {s.imageUrl ? (
                                                                 <img
                                                                     src={s.imageUrl}
@@ -4219,78 +4219,103 @@ export default function App() {
                                                             )}
                                                         </div>
 
-                                                        {/* Bottom: Info Area */}
-                                                        <div style={{ display: 'flex', flexDirection: 'column', padding: '8px 12px', gap: '4px' }}>
-                                                            {/* Top Row: Flag, Name, Speed */}
-                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                                                    <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
-                                                                    <strong style={{ fontSize: '0.95rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                                                        {s.name || mmsiStr}
-                                                                    </strong>
-                                                                </div>
-                                                                <span style={{ color: '#22c55e', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap', marginLeft: '8px', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                        <span style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>
-                                                                            {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
-                                                                        </span>
-                                                                        {formatSpeed(s.sog, mqttSettings.units)}
-                                                                    </div>
-                                                                    {Boolean(s.shiptype === 9 || s.is_sar) && s.altitude !== undefined && (
-                                                                        <div style={{ fontSize: '0.75rem', color: '#44aaff', fontWeight: 800 }}>
-                                                                            {s.altitude * 10} ft
-                                                                        </div>
-                                                                    )}
+                                                        {/* Header: Flag, Name, Speed */}
+                                                        <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                                <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                                <strong style={{ fontSize: '0.95rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
+                                                                    {s.name || mmsiStr}
+                                                                </strong>
+                                                            </div>
+                                                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                                                                <span style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold', lineHeight: 1 }}>
+                                                                    {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
                                                                 </span>
+                                                                <span style={{ color: '#22c55e', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap' }}>
+                                                                    {formatSpeed(s.sog, mqttSettings.units)}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Grid: Status, Type, Distance, Bearing */}
+                                                        <div style={{ 
+                                                            display: 'grid', 
+                                                            gridTemplateColumns: '1fr 1fr', 
+                                                            borderTop: `1px solid ${colors.border}`,
+                                                            background: 'rgba(0,0,0,0.05)'
+                                                        }}>
+                                                            {/* Status */}
+                                                            <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}>
+                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Status</div>
+                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    {s.status_text || 'Underway'}
+                                                                </div>
                                                             </div>
 
-                                                            {/* Bottom Row: Type, Distance, Source, Bearing */}
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500 }}>
-                                                                <span style={{ fontSize: '0.7rem' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}</span>
-                                                                <span>•</span>
-                                                                <span style={{ color: '#44aaff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                                                    <span style={{ fontSize: '0.65rem', color: colors.textMuted }}>Distance:</span>
-                                                                    {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
-                                                                </span>
-                                                                
-                                                                {/* Bearing Icon & Angle */}
-                                                                <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: 'auto' }}>
-                                                                    <Navigation 
-                                                                        size={11} 
-                                                                        style={{ 
-                                                                            transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, 
-                                                                            color: colors.textMuted,
-                                                                            opacity: 0.8
-                                                                        }} 
-                                                                    />
-                                                                    <span>{calculateBearing(originLat, originLon, s.lat, s.lon).toFixed(0)}°</span>
+                                                            {/* Type */}
+                                                            <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}` }}>
+                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Type</div>
+                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    {s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}
                                                                 </div>
                                                             </div>
-                                                            
-                                                            {/* Emergency indicator if active */}
-                                                            {s.is_emergency && (
-                                                                <div style={{ background: '#ff0000', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', marginTop: '2px' }}>
-                                                                    ⚠️ EMERGENCY
+
+                                                            {/* Distance */}
+                                                            <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}` }}>
+                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Dist</div>
+                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff' }}>
+                                                                    {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
                                                                 </div>
-                                                            )}
-                                                            {(() => {
-                                                                const dist = haversineDistance(originLat, originLon, s.lat, s.lon);
-                                                                if (dist > 185.2) {
-                                                                    return (
-                                                                        <div style={{ background: 'linear-gradient(90deg, #ff00ff, #aa00ff)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', marginTop: '2px', boxShadow: '0 0 8px rgba(255, 0, 255, 0.4)' }}>
-                                                                            ✨ TROPO DUCTING
-                                                                        </div>
-                                                                    );
-                                                                } else if (dist > 74.08 && dist < 148.16) {
-                                                                    return (
-                                                                        <div style={{ background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', marginTop: '2px', boxShadow: '0 0 8px rgba(0, 210, 255, 0.4)' }}>
-                                                                            📡 ENHANCED RANGE
-                                                                        </div>
-                                                                    );
-                                                                }
-                                                                return null;
-                                                            })()}
+                                                            </div>
+
+                                                            {/* Bearing */}
+                                                            <div style={{ padding: '6px 12px', display: 'flex', flexDirection: 'column' }}>
+                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Brg</div>
+                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                    <Navigation 
+                                                                        size={10} 
+                                                                        style={{ 
+                                                                            transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, 
+                                                                            color: colors.textMuted
+                                                                        }} 
+                                                                    />
+                                                                    {calculateBearing(originLat, originLon, s.lat, s.lon).toFixed(0)}°
+                                                                </div>
+                                                            </div>
                                                         </div>
+
+                                                        {/* Special Indicators (Tropo, Emergency, Altitude) */}
+                                                        {((s.shiptype === 9 || s.is_sar) && s.altitude !== undefined) || s.is_emergency || (haversineDistance(originLat, originLon, s.lat, s.lon) > 74.08) ? (
+                                                            <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}`, background: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                                                {Boolean(s.shiptype === 9 || s.is_sar) && s.altitude !== undefined && (
+                                                                    <div style={{ fontSize: '0.7rem', color: '#44aaff', fontWeight: 800, textAlign: 'center' }}>
+                                                                        Altitude: {s.altitude * 10} ft
+                                                                    </div>
+                                                                )}
+                                                                {s.is_emergency && (
+                                                                    <div style={{ background: '#ff0000', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center' }}>
+                                                                        ⚠️ EMERGENCY
+                                                                    </div>
+                                                                )}
+                                                                {(() => {
+                                                                    const dist = haversineDistance(originLat, originLon, s.lat, s.lon);
+                                                                    if (dist > 185.2) {
+                                                                        return (
+                                                                            <div style={{ background: 'linear-gradient(90deg, #ff00ff, #aa00ff)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', boxShadow: '0 0 8px rgba(255, 0, 255, 0.4)' }}>
+                                                                                ✨ TROPO DUCTING
+                                                                            </div>
+                                                                        );
+                                                                    } else if (dist > 74.08) {
+                                                                        return (
+                                                                            <div style={{ background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', boxShadow: '0 0 8px rgba(0, 210, 255, 0.4)' }}>
+                                                                                📡 ENHANCED RANGE
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return null;
+                                                                })()}
+                                                            </div>
+                                                        ) : null}
                                                     </div>
                                                 )}
                                             </Tooltip>
@@ -4728,6 +4753,12 @@ export default function App() {
                                                         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: sidebarViewMode === 'compact' ? '120px' : 'none' }}>
                                                             {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text, ship.is_meteo)}
                                                         </span>
+                                                        {ship.status_text && (
+                                                            <>
+                                                                <span style={{ opacity: 0.5 }}>•</span>
+                                                                <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.status_text}</span>
+                                                            </>
+                                                        )}
                                                         <span style={{ opacity: 0.5 }}>•</span>
                                                         <span style={{ color: '#44aaff', fontWeight: 600 }}>
                                                             <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distance:</span>
