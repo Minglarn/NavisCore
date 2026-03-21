@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -139,6 +139,56 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) 
         case 59: return "Noncombatant ship";
         default: return "Unknown Type";
     }
+}
+
+function getShipFilterCategory(s: any): string {
+    const mmsiStr = String(s.mmsi || "");
+    const typeNum = parseInt(String(s.shiptype || s.ship_type || 0));
+    const typeStr = (s.ship_type_text || "").toUpperCase();
+    
+    // 1. AtoN (Highest priority)
+    if (s.is_aton || mmsiStr.startsWith('99') || typeStr.includes('AID TO NAVIGATION') || typeStr.includes('ATON')) {
+        return 'aton';
+    }
+    
+    // 2. Base Station
+    if (mmsiStr.startsWith('00')) return 'base_station';
+    
+    // 3. SAR / Pilot
+    if (typeNum === 50 || typeNum === 51 || typeNum === 9 || typeStr.includes('PILOT') || typeStr.includes('SAR')) return 'pilot_sar';
+    
+    // 4. Military / Law
+    if (typeNum === 35 || typeNum === 55 || typeNum === 59 || typeStr.includes('MILITARY') || typeStr.includes('LAW')) return 'military';
+    
+    // 5. Cargo
+    if ((typeNum >= 70 && typeNum <= 79) || typeStr.includes('CARGO')) return 'cargo';
+    
+    // 6. Tanker
+    if ((typeNum >= 80 && typeNum <= 89) || typeStr.includes('TANKER')) return 'tanker';
+    
+    // 7. Passenger
+    if ((typeNum >= 60 && typeNum <= 69) || typeStr.includes('PASSENGER')) return 'passenger';
+    
+    // 8. Fishing
+    if (typeNum === 30 || typeStr.includes('FISHING')) return 'fishing';
+    
+    // 9. Pleasure / Sailing
+    if (typeNum === 36 || typeNum === 37 || typeStr.includes('SAILING') || typeStr.includes('PLEASURE')) return 'pleasure';
+    
+    // 10. Tug / Towing
+    if (typeNum === 52 || typeNum === 31 || typeNum === 32 || typeStr.includes('TUG') || typeStr.includes('TOWING')) return 'tug';
+    
+    // 11. High Speed
+    if ((typeNum >= 40 && typeNum <= 49) || typeStr.includes('HSC') || typeStr.includes('HIGH SPEED')) return 'highspeed';
+    
+    // 12. WIG
+    if ((typeNum >= 20 && typeNum <= 29) || typeStr.includes('WIG') || typeStr.includes('WING')) return 'wig';
+    
+    // 13. Special
+    if (typeNum === 33 || typeNum === 34 || typeNum === 53 || typeNum === 54 || typeNum === 58 || typeStr.includes('DREDGING') || typeStr.includes('DIVING') || typeStr.includes('PORT') || typeStr.includes('MEDICAL')) return 'special';
+    
+    // Default
+    return 'other';
 }
  
 const aisShipTypes = [
@@ -657,17 +707,17 @@ const extraStyles = `
     border-right: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     flex-direction: column;
-    padding: 40px 0;
+    padding: 28px 0;
 }
 
 .settings-sidebar-header {
-    padding: 0 40px 30px 40px;
+    padding: 0 30px 20px 30px;
     border-bottom: 1px solid rgba(255,255,255,0.06);
-    margin-bottom: 25px;
+    margin-bottom: 18px;
 }
 
 .settings-sidebar-title {
-    font-size: 1.6rem;
+    font-size: 1.35rem;
     font-weight: 900;
     color: #44aaff;
     letter-spacing: -0.5px;
@@ -676,14 +726,14 @@ const extraStyles = `
 .settings-tab-sidebar-btn {
     display: flex;
     align-items: center;
-    gap: 18px;
-    padding: 18px 40px;
+    gap: 12px;
+    padding: 12px 30px;
     width: 100%;
     border: none;
     background: transparent;
     color: #8892b0;
     font-weight: 700;
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     cursor: pointer;
     transition: all 0.2s;
     text-align: left;
@@ -709,13 +759,13 @@ const extraStyles = `
 }
 
 .settings-header {
-    padding: 40px 60px;
+    padding: 28px 42px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(255, 255, 255, 0.01);
 }
 
 .settings-header-title {
-    font-size: 2.2rem;
+    font-size: 1.85rem;
     font-weight: 900;
     margin: 0;
     color: #fff;
@@ -723,14 +773,14 @@ const extraStyles = `
 }
 
 .settings-header-desc {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
     color: #8892b0;
     margin-top: 8px;
 }
 
 .settings-scroll-area {
     flex: 1;
-    padding: 40px 60px;
+    padding: 28px 42px;
     overflow-y: auto;
 }
 
@@ -738,13 +788,13 @@ const extraStyles = `
     background: rgba(255, 255, 255, 0.04);
     border: 1px solid rgba(255, 255, 255, 0.08);
     border-radius: 20px;
-    padding: 35px;
-    margin-bottom: 40px;
+    padding: 24px;
+    margin-bottom: 28px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.3);
 }
 
 .settings-card-title {
-    font-size: 0.9rem;
+    font-size: 0.75rem;
     font-weight: 900;
     text-transform: uppercase;
     color: #44aaff;
@@ -759,11 +809,11 @@ const extraStyles = `
 .settings-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; }
 
 .settings-footer {
-    padding: 30px 60px;
+    padding: 20px 42px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     justify-content: flex-end;
-    gap: 25px;
+    gap: 18px;
     background: rgba(0, 0, 0, 0.3);
 }
 
@@ -787,8 +837,8 @@ const extraStyles = `
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 30px;
-    padding-bottom: 20px;
+    gap: 20px;
+    padding-bottom: 14px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
@@ -796,36 +846,36 @@ const extraStyles = `
 .form-group-premium.vertical { 
     flex-direction: column; 
     align-items: flex-start; 
-    gap: 15px; 
+    gap: 10px; 
 }
 
 .form-group-grid-item {
     display: flex;
     flex-direction: column;
-    gap: 15px;
+    gap: 10px;
     padding: 0;
     border: none;
 }
 
 .label-desc-container {
-    min-height: 56px;
+    min-height: 40px;
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
     width: 100%;
 }
 
-.form-group-premium label { font-size: 1.1rem; font-weight: 700; color: #fff; }
-.form-group-premium .description { font-size: 0.9rem; color: #8892b0; margin-top: 6px; max-width: 600px; }
+.form-group-premium label { font-size: 0.95rem; font-weight: 700; color: #fff; }
+.form-group-premium .description { font-size: 0.75rem; color: #8892b0; margin-top: 6px; max-width: 600px; }
 
 .input-premium, .select-premium {
     width: 300px;
-    padding: 14px 20px;
+    padding: 10px 16px;
     border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.15);
     background: rgba(0, 0, 0, 0.5);
     color: #fff;
-    font-size: 1.05rem;
+    font-size: 0.9rem;
     transition: all 0.2s;
 }
 
@@ -1320,6 +1370,41 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                     <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 900, color: '#44aaff', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                         {ship.name || 'UNKNOWN'}
                     </h2>
+                    {(() => {
+                        const dist = haversineDistance(parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon), ship.lat, ship.lon);
+                        if (dist > 185.2) {
+                            return (
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #ff00ff 0%, #aa00ff 100%)',
+                                    color: 'white',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 900,
+                                    letterSpacing: '1px',
+                                    boxShadow: '0 0 10px rgba(255, 0, 255, 0.4)'
+                                }}>
+                                    TROPO DUCTING
+                                </div>
+                            );
+                        } else if (dist > 74.08 && dist < 148.16) {
+                            return (
+                                <div style={{
+                                    background: 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)',
+                                    color: 'white',
+                                    padding: '2px 8px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.65rem',
+                                    fontWeight: 900,
+                                    letterSpacing: '1px',
+                                    boxShadow: '0 0 10px rgba(0, 210, 255, 0.4)'
+                                }}>
+                                    ENHANCED RANGE
+                                </div>
+                            );
+                        }
+                        return null;
+                    })()}
                     <button 
                         onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                         style={{ 
@@ -1866,6 +1951,47 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                                     }}>
                                         {ship.source === 'aisstream' ? 'STREAM' : 'LIVE'}
                                     </div>
+                                    {(() => {
+                                        const dist = haversineDistance(parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon), ship.lat, ship.lon);
+                                        if (dist > 185.2) {
+                                            return (
+                                                <div style={{
+                                                    background: 'linear-gradient(135deg, #ff00ff 0%, #aa00ff 100%)',
+                                                    color: 'white',
+                                                    padding: '2px 10px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 800,
+                                                    letterSpacing: '0.5px',
+                                                    textTransform: 'uppercase',
+                                                    border: '1px solid rgba(255, 0, 255, 0.4)',
+                                                    backdropFilter: 'blur(4px)',
+                                                    boxShadow: '0 0 15px rgba(255, 0, 255, 0.3)'
+                                                }}>
+                                                    TROPO DUCTING
+                                                </div>
+                                            );
+                                        } else if (dist > 74.08 && dist < 148.16) {
+                                            return (
+                                                <div style={{
+                                                    background: 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)',
+                                                    color: 'white',
+                                                    padding: '2px 10px',
+                                                    borderRadius: '20px',
+                                                    fontSize: '0.7rem',
+                                                    fontWeight: 800,
+                                                    letterSpacing: '0.5px',
+                                                    textTransform: 'uppercase',
+                                                    border: '1px solid rgba(0, 210, 255, 0.4)',
+                                                    backdropFilter: 'blur(4px)',
+                                                    boxShadow: '0 0 15px rgba(0, 210, 255, 0.3)'
+                                                }}>
+                                                    ENHANCED RANGE
+                                                </div>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
                                 </div>
                                 <div style={{ opacity: 0.9, fontSize: '1rem', fontWeight: 500, display: 'flex', alignItems: 'center', gap: '8px' }}>
                                     <Anchor size={16} />
@@ -2570,6 +2696,187 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
 }
 
 
+// --- UI Components ---
+const MultiSelect = ({ label, options, selected, onChange, colors, isDark }: { 
+    label: string, 
+    options: { value: string, label: string }[], 
+    selected: string[], 
+    onChange: (values: string[]) => void,
+    colors: any,
+    isDark: boolean
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const isAllSelected = selected.includes('all') || (selected.length === options.length - 1 && !selected.includes('all'));
+
+    const toggleOption = (val: string) => {
+        if (val === 'all') {
+            if (isAllSelected) {
+                onChange([]); // Deselect all
+            } else {
+                onChange(['all']); // Select all (using virtual 'all')
+            }
+        } else {
+            let newSelected: string[];
+            if (selected.includes('all')) {
+                // If 'all' is active, and we click an individual item, 
+                // it means we want all EXCEPT that item.
+                newSelected = options
+                    .map(o => o.value)
+                    .filter(v => v !== 'all' && v !== val);
+            } else {
+                newSelected = [...selected];
+                if (newSelected.includes(val)) {
+                    newSelected = newSelected.filter(v => v !== val);
+                } else {
+                    newSelected.push(val);
+                }
+                
+                // If we've manually checked everything, switch back to 'all' for clean state
+                if (newSelected.length === options.length - 1) {
+                    newSelected = ['all'];
+                }
+            }
+            onChange(newSelected);
+        }
+    };
+
+    const selectOnly = (e: React.MouseEvent, val: string) => {
+        e.stopPropagation();
+        onChange([val]);
+    };
+
+    const displayText = selected.includes('all') 
+        ? label 
+        : (selected.length === 0
+            ? 'None selected'
+            : (selected.length === 1 
+                ? options.find(o => o.value === selected[0])?.label 
+                : `${selected.length} selected`));
+
+    return (
+        <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+            <div 
+                onClick={() => setIsOpen(!isOpen)}
+                style={{
+                    background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
+                    color: (selected.includes('all') || selected.length === 0) ? colors.textMuted : colors.textMain,
+                    border: `1px solid ${isOpen ? '#44aaff' : colors.border}`,
+                    borderRadius: '6px',
+                    padding: '6px 10px',
+                    fontSize: '0.8rem',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    transition: 'all 0.2s',
+                    minHeight: '32px',
+                    boxSizing: 'border-box'
+                }}
+            >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayText}</span>
+                <ChevronDown size={14} style={{ transform: isOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', flexShrink: 0 }} />
+            </div>
+
+            {isOpen && (
+                <div style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    zIndex: 1050,
+                    marginTop: '4px',
+                    background: isDark ? '#1a1a2e' : '#fff',
+                    border: `1px solid ${colors.border}`,
+                    borderRadius: '8px',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+                    maxHeight: '350px',
+                    overflowY: 'auto',
+                    padding: '4px'
+                }}>
+                    {options.map((opt, idx) => {
+                        const isChecked = selected.includes('all') || selected.includes(opt.value);
+                        return (
+                            <div 
+                                key={opt.value}
+                                onClick={() => toggleOption(opt.value)}
+                                className="multiselect-option"
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: '8px 10px',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    background: isChecked ? (isDark ? 'rgba(68,170,255,0.15)' : '#f0f9ff') : 'transparent',
+                                    color: isChecked ? '#44aaff' : colors.textMain,
+                                    fontSize: '0.8rem',
+                                    transition: 'all 0.1s',
+                                    group: 'option'
+                                } as any}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                    <div style={{
+                                        width: '14px',
+                                        height: '14px',
+                                        borderRadius: '3px',
+                                        border: `1.5px solid ${isChecked ? '#44aaff' : colors.textMuted}`,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        background: isChecked ? '#44aaff' : 'transparent',
+                                        transition: 'all 0.1s',
+                                        flexShrink: 0
+                                    }}>
+                                        {isChecked && <Check size={10} color="#fff" strokeWidth={4} />}
+                                    </div>
+                                    <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                                        {opt.value === 'all' ? `(Select All)` : opt.label}
+                                    </span>
+                                </div>
+                                {opt.value !== 'all' && (
+                                    <button
+                                        onClick={(e) => selectOnly(e, opt.value)}
+                                        className="only-button"
+                                        style={{
+                                            fontSize: '0.65rem',
+                                            padding: '2px 6px',
+                                            borderRadius: '4px',
+                                            background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
+                                            border: 'none',
+                                            color: colors.textMuted,
+                                            cursor: 'pointer',
+                                            opacity: 0,
+                                            transition: 'opacity 0.2s'
+                                        }}
+                                    >
+                                        Only
+                                    </button>
+                                )}
+                            </div>
+                        );
+                    })}
+                    <style>{`
+                        .multiselect-option:hover .only-button { opacity: 1 !important; }
+                        .only-button:hover { background: #44aaff !important; color: white !important; }
+                    `}</style>
+                </div>
+            )}
+        </div>
+    );
+};
+
 export default function App() {
     const [ships, setShips] = useState<any[]>([]);
     const [status, setStatus] = useState('Connecting...');
@@ -2697,8 +3004,20 @@ export default function App() {
 
     // Sidebar Filters
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterSource, setFilterSource] = useState('all'); // all, sdr, stream
-    const [filterShipType, setFilterShipType] = useState('all');
+    const [filterSource, setFilterSource] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('naviscore_filter_source');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { console.error("Could not load filter source", e); }
+        return ['all'];
+    });
+    const [filterShipType, setFilterShipType] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('naviscore_filter_shiptype');
+            if (saved) return JSON.parse(saved);
+        } catch (e) { console.error("Could not load filter shiptype", e); }
+        return ['all'];
+    });
     const hoverTimerRef = useRef<number | null>(null);
     const lastFlashRef = useRef<Record<string, number>>({});
     const mapRef = useRef<L.Map>(null);
@@ -2728,6 +3047,14 @@ export default function App() {
         localStorage.setItem('naviscore_trail_opacity', mqttSettings.trail_opacity);
     }, [mqttSettings.trail_opacity]);
 
+    useEffect(() => {
+        localStorage.setItem('naviscore_filter_source', JSON.stringify(filterSource));
+    }, [filterSource]);
+
+    useEffect(() => {
+        localStorage.setItem('naviscore_filter_shiptype', JSON.stringify(filterShipType));
+    }, [filterShipType]);
+
     // Performance & Hybrid Visibility
     const [pinnedMmsis, setPinnedMmsis] = useState<Set<string>>(new Set());
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, mmsi: string } | null>(null);
@@ -2754,27 +3081,52 @@ export default function App() {
     }, []);
 
 
-    const filteredShipsCount = useMemo(() => {
+    const filteredShips = useMemo(() => {
         const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
         return ships.filter(s => {
             const nameUpper = (s.name || "").toUpperCase();
             const mmsiStr = String(s.mmsi || "");
             const type = s.shiptype || s.ship_type;
-            const isMeteo = s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER');
-            if (isMeteo) return false;
-
+            
+            // Basic exclusions (AtoN, Meteo, etc)
+            if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
+            
             // Internet vessel filtering
             if (!showAisStream && (s.source === 'aisstream')) return false;
 
-            // Exclude ATONs (Buoys/Beacons/etc)
-            if (mmsiStr.startsWith('99') || (type >= 91 && type <= 99) || type === 21) return false;
+            // Search Filter
+            if (searchTerm) {
+                const term = searchTerm.toUpperCase();
+                if (!nameUpper.includes(term) && !mmsiStr.includes(term)) return false;
+            }
 
-            // Exclude Aircraft (SAR typically type 18)
-            if (type === 18) return false;
+            // Source Filter
+            if (!filterSource.includes('all')) {
+                const source = s.source || 'sdr';
+                const isMatched = (filterSource.includes('sdr') && (source === 'sdr' || source === 'local')) ||
+                                  (filterSource.includes('stream') && source === 'aisstream');
+                if (!isMatched) return false;
+            }
+
+            // Ship Type Filter
+            if (!filterShipType.includes('all')) {
+                const category = getShipFilterCategory(s);
+                if (!filterShipType.includes(category)) return false;
+            }
 
             return true;
+        });
+    }, [ships, mqttSettings.show_aisstream_on_map, searchTerm, filterSource, filterShipType]);
+
+    const filteredShipsCount = useMemo(() => filteredShips.length, [filteredShips]);
+    
+    const vesselCount = useMemo(() => {
+        return filteredShips.filter(s => {
+            const cat = getShipFilterCategory(s);
+            // Non-vessels are AtoNs and Base Stations and Meteo (meteo already excluded from filteredShips)
+            return cat !== 'aton' && cat !== 'base_station';
         }).length;
-    }, [ships, mqttSettings.show_aisstream_on_map]);
+    }, [filteredShips]);
 
     // Fetch settings on mount
     useEffect(() => {
@@ -3364,7 +3716,7 @@ export default function App() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px', color: colors.textMain, fontSize: '0.9rem', fontWeight: 600, paddingLeft: '10px', borderLeft: `1px solid ${colors.border}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ship size={16} color={isDark ? '#44aaff' : '#00838f'} />
-                            <span>Vessels: {filteredShipsCount}</span>
+                            <span>Vessels: {vesselCount}</span>
                         </div>
                         
                         {!isNaN(originLat) && !isNaN(originLon) && maxDistance > 0 && (
@@ -3590,7 +3942,7 @@ export default function App() {
                                                 />
                                             )}
 
-                                            {[5, 10, 15, 20, 30, 40].map(nm => (
+                                            {[5, 10, 15, 20, 30, 40, 50, 60].map(nm => (
                                                 <Circle 
                                                     key={`ring-${nm}`}
                                                     center={[originLat, originLon]} 
@@ -3617,18 +3969,13 @@ export default function App() {
                                 zoomToBoundsOnClick={true}
                                 iconCreateFunction={createClusterCustomIcon}
                             >
-                            {ships.map((s: any, idx: number) => {
+                            {filteredShips.map((s: any, idx: number) => {
                                 const mmsiStr = String(s.mmsi);
                                 const now = Date.now();
                                 const threshold = parseInt(mqttSettings.new_vessel_threshold || '5');
                                 const isNew = s.session_start && (now - s.session_start < threshold * 60000);
                                 
-                                const nameUpper = (s.name || "").toUpperCase();
                                 if (!s.lat || !s.lon) return null;
-
-                                // Internet vessel filtering
-                                const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
-                                if (!showAisStream && (s.source === 'aisstream')) return null;
 
                                 // Smart Label Logic:
                                 // 1. Emergency: Always show name
@@ -3856,6 +4203,23 @@ export default function App() {
                                                                     ⚠️ EMERGENCY
                                                                 </div>
                                                             )}
+                                                            {(() => {
+                                                                const dist = haversineDistance(originLat, originLon, s.lat, s.lon);
+                                                                if (dist > 185.2) {
+                                                                    return (
+                                                                        <div style={{ background: 'linear-gradient(90deg, #ff00ff, #aa00ff)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', marginTop: '2px', boxShadow: '0 0 8px rgba(255, 0, 255, 0.4)' }}>
+                                                                            ✨ TROPO DUCTING
+                                                                        </div>
+                                                                    );
+                                                                } else if (dist > 74.08 && dist < 148.16) {
+                                                                    return (
+                                                                        <div style={{ background: 'linear-gradient(90deg, #00d2ff, #3a7bd5)', color: '#fff', padding: '2px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 900, textAlign: 'center', marginTop: '2px', boxShadow: '0 0 8px rgba(0, 210, 255, 0.4)' }}>
+                                                                            📡 ENHANCED RANGE
+                                                                        </div>
+                                                                    );
+                                                                }
+                                                                return null;
+                                                            })()}
                                                         </div>
                                                     </div>
                                                 )}
@@ -4066,7 +4430,7 @@ export default function App() {
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: `1px solid ${colors.border}` }}>
                                 <h1 style={{ margin: 0, fontSize: '1.1rem', color: colors.textMain, fontWeight: 700 }}>
-                                    Seen Objects
+                                    Seen Objects ({filteredShipsCount})
                                 </h1>
                                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                     <button 
@@ -4118,24 +4482,18 @@ export default function App() {
                                     )}
                                 </div>
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                                    <select
-                                        value={filterSource}
-                                        onChange={(e) => setFilterSource(e.target.value)}
-                                        style={{
-                                            background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-                                            color: colors.textMain,
-                                            border: `1px solid ${colors.border}`,
-                                            borderRadius: '6px',
-                                            padding: '6px 8px',
-                                            fontSize: '0.8rem',
-                                            cursor: 'pointer',
-                                            width: '100%'
-                                        }}
-                                    >
-                                        <option value="all">Any Source</option>
-                                        <option value="sdr">Local SDR</option>
-                                        <option value="stream">AisStream</option>
-                                    </select>
+                                    <MultiSelect 
+                                        label="Any Source"
+                                        isDark={isDark}
+                                        colors={colors}
+                                        selected={filterSource}
+                                        onChange={setFilterSource}
+                                        options={[
+                                            { value: 'all', label: 'Any Source' },
+                                            { value: 'sdr', label: 'Local SDR' },
+                                            { value: 'stream', label: 'AisStream' }
+                                        ]}
+                                    />
                                     <select
                                         value={sortConfig.key}
                                         onChange={(e) => setSortConfig({ ...sortConfig, key: e.target.value })}
@@ -4146,7 +4504,8 @@ export default function App() {
                                             borderRadius: '6px',
                                             padding: '6px 8px',
                                             fontSize: '0.8rem',
-                                            cursor: 'pointer'
+                                            cursor: 'pointer',
+                                            height: '32px'
                                         }}
                                     >
                                         <option value="last_seen">Sort: Last Seen</option>
@@ -4156,34 +4515,29 @@ export default function App() {
                                         <option value="message_count">Sort: Messages</option>
                                     </select>
                                 </div>
-                                <select
-                                    value={filterShipType}
-                                    onChange={(e) => setFilterShipType(e.target.value)}
-                                    style={{
-                                        background: isDark ? 'rgba(0,0,0,0.2)' : '#fff',
-                                        color: colors.textMain,
-                                        border: `1px solid ${colors.border}`,
-                                        borderRadius: '6px',
-                                        padding: '6px 8px',
-                                        fontSize: '0.8rem',
-                                        cursor: 'pointer',
-                                        width: '100%'
-                                    }}
-                                >
-                                    <option value="all">All Ship Types</option>
-                                    <option value="cargo">Cargo Vessels</option>
-                                    <option value="tanker">Tankers</option>
-                                    <option value="passenger">Passenger</option>
-                                    <option value="pilot_sar">Pilot / SAR</option>
-                                    <option value="tug">Tugs / Towing</option>
-                                    <option value="fishing">Fishing</option>
-                                    <option value="pleasure">Pleasure / Sailing</option>
-                                    <option value="highspeed">High Speed Craft</option>
-                                    <option value="military">Military / Law</option>
-                                    <option value="wig">Wing In Ground (WIG)</option>
-                                    <option value="special">Special / Ops</option>
-                                    <option value="other">Other Types</option>
-                                </select>
+                                <MultiSelect 
+                                    label="All Ship Types"
+                                    isDark={isDark}
+                                    colors={colors}
+                                    selected={filterShipType}
+                                    onChange={setFilterShipType}
+                                    options={[
+                                        { value: 'all', label: 'All Ship Types' },
+                                        { value: 'cargo', label: 'Cargo Vessels' },
+                                        { value: 'tanker', label: 'Tankers' },
+                                        { value: 'passenger', label: 'Passenger' },
+                                        { value: 'aton', label: 'Aid to Navigation (AtoN)' },
+                                        { value: 'pilot_sar', label: 'Pilot / SAR' },
+                                        { value: 'tug', label: 'Tugs / Towing' },
+                                        { value: 'fishing', label: 'Fishing' },
+                                        { value: 'pleasure', label: 'Pleasure / Sailing' },
+                                        { value: 'highspeed', label: 'High Speed Craft' },
+                                        { value: 'military', label: 'Military / Law' },
+                                        { value: 'wig', label: 'Wing In Ground (WIG)' },
+                                        { value: 'special', label: 'Special / Ops' },
+                                        { value: 'other', label: 'Other Types' }
+                                    ]}
+                                />
                             </div>
 
                             <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
@@ -4192,57 +4546,7 @@ export default function App() {
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
                                             No objects on the radar yet...
                                         </div>
-                                    ) : ships
-                                        .filter(s => {
-                                            const nameUpper = (s.name || "").toUpperCase();
-                                            const mmsiStr = String(s.mmsi);
-                                            const type = s.shiptype || s.ship_type;
-                                            
-                                            // Basic exclusions (AtoN, Meteo, etc)
-                                            if (s.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return false;
-
-                                            // Internet vessel filtering
-                                            const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
-                                            if (!showAisStream && (s.source === 'aisstream')) return false;
-
-                                            // Search Filter
-                                            if (searchTerm) {
-                                                const term = searchTerm.toUpperCase();
-                                                if (!nameUpper.includes(term) && !mmsiStr.includes(term)) return false;
-                                            }
-
-                                            // Source Filter
-                                            if (filterSource !== 'all') {
-                                                const source = s.source || 'sdr';
-                                                if (filterSource === 'sdr' && source !== 'sdr' && source !== 'local') return false;
-                                                if (filterSource === 'stream' && source !== 'aisstream') return false;
-                                            }
-
-                                            // Ship Type Filter
-                                            if (filterShipType !== 'all') {
-                                                const typeNum = parseInt(String(type));
-                                                const typeStr = (s.ship_type_text || "").toUpperCase();
-                                                
-                                                if (filterShipType === 'cargo' && !(typeNum >= 70 && typeNum <= 79 || typeStr.includes('CARGO'))) return false;
-                                                if (filterShipType === 'tanker' && !(typeNum >= 80 && typeNum <= 89 || typeStr.includes('TANKER'))) return false;
-                                                if (filterShipType === 'passenger' && !(typeNum >= 60 && typeNum <= 69 || typeStr.includes('PASSENGER'))) return false;
-                                                if (filterShipType === 'fishing' && !(typeNum === 30 || typeStr.includes('FISHING'))) return false;
-                                                if (filterShipType === 'pleasure' && !(typeNum >= 36 && typeNum <= 37 || typeStr.includes('SAILING') || typeStr.includes('PLEASURE'))) return false;
-                                                if (filterShipType === 'tug' && !(typeNum === 52 || typeNum === 31 || typeNum === 32 || typeStr.includes('TUG') || typeStr.includes('TOWING'))) return false;
-                                                if (filterShipType === 'pilot_sar' && !(typeNum === 50 || typeNum === 51 || typeStr.includes('PILOT') || typeStr.includes('SAR'))) return false;
-                                                if (filterShipType === 'highspeed' && !(typeNum >= 40 && typeNum <= 49 || typeStr.includes('HSC') || typeStr.includes('HIGH SPEED'))) return false;
-                                                if (filterShipType === 'military' && !(typeNum === 35 || typeNum === 55 || typeNum === 59 || typeStr.includes('MILITARY') || typeStr.includes('LAW'))) return false;
-                                                if (filterShipType === 'wig' && !(typeNum >= 20 && typeNum <= 29 || typeStr.includes('WIG') || typeStr.includes('WING'))) return false;
-                                                if (filterShipType === 'special' && !(typeNum === 33 || typeNum === 34 || typeNum === 53 || typeNum === 54 || typeNum === 58 || typeStr.includes('DREDGING') || typeStr.includes('DIVING') || typeStr.includes('PORT') || typeStr.includes('MEDICAL'))) return false;
-                                                
-                                                if (filterShipType === 'other') {
-                                                    const known = (typeNum >= 20 && typeNum <= 89) || typeStr.includes('CARGO') || typeStr.includes('TANKER') || typeStr.includes('PASSENGER') || typeStr.includes('FISHING') || typeStr.includes('SAILING') || typeStr.includes('PLEASURE') || typeStr.includes('TUG') || typeStr.includes('TOWING') || typeStr.includes('PILOT') || typeStr.includes('SAR') || typeStr.includes('HSC') || typeStr.includes('MILITARY') || typeStr.includes('WIG') || typeStr.includes('SPECIAL');
-                                                    if (known) return false;
-                                                }
-                                            }
-
-                                            return true;
-                                        })
+                                    ) : filteredShips
                                         .map(s => {
                                             const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
                                                 ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
@@ -4295,12 +4599,16 @@ export default function App() {
                                                 }}
                                                 onMouseEnter={e => {
                                                     e.currentTarget.style.transform = 'translateX(-4px)';
-                                                    e.currentTarget.style.borderColor = '#44aaff';
+                                                    e.currentTarget.style.borderTopColor = '#44aaff';
+                                                    e.currentTarget.style.borderRightColor = '#44aaff';
+                                                    e.currentTarget.style.borderBottomColor = '#44aaff';
                                                     e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
                                                 }}
                                                 onMouseLeave={e => {
                                                     e.currentTarget.style.transform = 'translateX(0)';
-                                                    e.currentTarget.style.borderColor = colors.border;
+                                                    e.currentTarget.style.borderTopColor = colors.border;
+                                                    e.currentTarget.style.borderRightColor = colors.border;
+                                                    e.currentTarget.style.borderBottomColor = colors.border;
                                                     e.currentTarget.style.boxShadow = 'none';
                                                 }}
                                             >

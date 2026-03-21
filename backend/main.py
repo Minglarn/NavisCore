@@ -81,7 +81,12 @@ class StatsCollector:
         self.hourly_messages = 0
         self.hourly_new_vessels = 0
         self.hourly_mmsis = set()
-        self.hourly_shiptypes = {} # type_id -> count
+        self.hourly_max_range = 0.0
+        self.hourly_shiptypes = {} # type_id -> set(mmsis)
+        
+    def update_range(self, dist_km):
+        if dist_km > self.hourly_max_range:
+            self.hourly_max_range = dist_km
         
     def update(self, mmsi, is_new, shiptype_id):
         self.hourly_messages += 1
@@ -92,20 +97,24 @@ class StatsCollector:
         if shiptype_id:
             try:
                 sid = int(shiptype_id)
-                self.hourly_shiptypes[sid] = self.hourly_shiptypes.get(sid, 0) + 1
+                if sid not in self.hourly_shiptypes:
+                    self.hourly_shiptypes[sid] = set()
+                self.hourly_shiptypes[sid].add(mmsi)
             except: pass
 
     def get_hourly_snapshot(self):
         # Convert shiptype IDs to labels for the payload
         shiptype_dist = {}
-        for sid, count in self.hourly_shiptypes.items():
+        for sid, mmsis in self.hourly_shiptypes.items():
             label = get_ship_type_name(sid)
-            shiptype_dist[label] = shiptype_dist.get(label, 0) + count
+            shiptype_dist[label] = shiptype_dist.get(label, 0) + len(mmsis)
             
         return {
             "messages_received": self.hourly_messages,
             "new_vessels": self.hourly_new_vessels,
             "max_vessels": len(self.hourly_mmsis),
+            "max_range_km": round(self.hourly_max_range, 2),
+            "max_range_nm": round(self.hourly_max_range * 0.539957, 2),
             "shiptypes": shiptype_dist
         }
 
@@ -665,6 +674,7 @@ async def process_ais_data(data: dict):
                     try:
                         dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
                         if ship_data.get("message_count", 0) >= 1 and 1.0 <= dist <= 370.4:
+                            stats_collector.update_range(dist)
                             bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
                             sector = int(bearing // 5) % 72
                             async with db.execute('SELECT range_km_24h, range_km_alltime FROM coverage_sectors WHERE sector_id = ?', (sector,)) as cursor:
@@ -702,8 +712,8 @@ async def process_ais_data(data: dict):
                             pub_payload = {
                                 "mmsi": mmsi_str,
                                 "name": ship_data.get("name"),
-                                "lat": ship_data.get("lat"),
-                                "lon": ship_data.get("lon"),
+                                "lat": round(ship_data.get("lat"), 5) if ship_data.get("lat") is not None else None,
+                                "lon": round(ship_data.get("lon"), 5) if ship_data.get("lon") is not None else None,
                                 # Basic Identification
                                 "msg_type": msg_type,
                                 "imo": ship_data.get("imo"),
@@ -749,7 +759,12 @@ async def process_ais_data(data: dict):
                                     dist_km = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
                                     pub_payload["dist_to_station_km"] = round(dist_km, 2)
                                     pub_payload["dist_to_station_nm"] = round(dist_km * 0.539957, 2)
-                                except: pass
+                                    # Signal Propagation classification
+                                    if dist_km > 185.2: pub_payload["propagation"] = "tropo_ducting"
+                                    elif 74.08 < dist_km < 148.16: pub_payload["propagation"] = "enhanced_range"
+                                    else: pub_payload["propagation"] = "normal"
+                                except: 
+                                    pub_payload["propagation"] = "normal"
 
                             if event_type == "new":
                                 img_bytes = get_image_bytes(mmsi_str)
@@ -937,6 +952,10 @@ async def mqtt_stats_reporter():
                     day_row = await r.fetchone()
                     if day_row:
                         daily_payload = dict(day_row)
+                        if daily_payload.get("max_range_km") is not None:
+                            km = daily_payload["max_range_km"]
+                            daily_payload["max_range_km"] = round(km, 2)
+                            daily_payload["max_range_nm"] = round(km * 0.539957, 2)
                         
                         s = await get_all_settings()
                         base_topic = s.get("mqtt_pub_topic", "naviscore/objects")

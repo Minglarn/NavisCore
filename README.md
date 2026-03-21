@@ -53,6 +53,13 @@ Understanding what happens on the map:
 - **Wind Sock**: Weather or Meteorological station.
 - **Aircraft**: Search & Rescue aircraft or helicopters.
 
+### 📡 Signal Propagation Indicators (Tropy)
+
+NavisCore automatically classifies signals based on reception distance to identify unusual atmospheric conditions:
+
+- **📡 ENHANCED RANGE** (Teal Badge): Signals received from **40–80 NM** (74–148 km). This typically indicates *Tropospheric Enhancement*.
+- **✨ TROPO DUCTING** (Purple Badge): Signals received from **>100 NM** (>185.2 km). This is a definitive indicator of *Tropospheric Ducting*, where signals travel far beyond the normal line-of-sight.
+
 ## 🛠 Architecture
 
 NavisCore is built with a modern, modular architecture:
@@ -135,6 +142,7 @@ NavisCore is designed to be a central hub for maritime data:
       - `event_type`: `"new"` for first discovery, `"update"` for positional updates.
       - `source`: Data origin (`"sdr"`, `"aisstream"`, or `"udp"`).
       - `image_url`: Filename of the vessel's image from the local cache.
+      - `propagation`: Signal classification based on distance (`"tropo_ducting"`, `"enhanced_range"`, or `"normal"`).
       - `is_nav_aid`: Boolean for markers, buoys, and virtual aids.
   - **Statistics**:
     - **Hourly**: Publishes `naviscore/objects_stat_hourly` every hour with message counts, new/unique vessels, and shiptype distribution.
@@ -144,7 +152,8 @@ NavisCore is designed to be a central hub for maritime data:
       - `new_vessels`: Number of vessels seen for the first time in the database.
       - `max_vessels`: Total unique MMSIs observed during the period.
       - `shiptypes`: Dictionary of ship type categories and their counts (e.g., `{"Cargo": 12}`).
-      - `max_range_km` (Daily only): The maximum reception range recorded during the day.
+      - `max_range_km`: The maximum reception range recorded during the period (Unit: km).
+      - `max_range_nm`: The maximum reception range recorded during the period (Unit: Nautical Miles).
   - **Raw Image Feed**: Publishes the raw binary data (JPEG) of a vessel's image to `naviscore/new_detected` whenever a new vessel is first identified.
 - **AisStream.io (Hybrid)**: This is a powerful feature that allows you to fetch real-time global AIS data.
   - **API Key Required**: To use this, you need a free API key from [AisStream.io](https://aisstream.io).
@@ -202,6 +211,7 @@ action:
         Messages: {{ trigger.payload_json.messages_received }}
         Unique Ships: {{ trigger.payload_json.max_vessels }}
         New Ships: {{ trigger.payload_json.new_vessels }}
+        Max Range: {{ trigger.payload_json.max_range_nm }} nm
 ```
 
 ## 📄 License & Contributing
