@@ -103,7 +103,8 @@ function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?
     return '#a0a0a0'; // Other Type
 }
 
-function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string) {
+function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string, isMeteo?: boolean) {
+    if (isMeteo) return 'Stationary / Meteo';
     if (mmsiStr.startsWith('99')) return 'Aid to Navigation (Light/Buoy)';
     if (mmsiStr.startsWith('00')) return 'Base Station';
 
@@ -1653,7 +1654,7 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         />
                         <AccordionRow label="Source" value={ship.source || 'Local'} colors={colors} />
                         <AccordionRow 
-                            label="Distans till Station" 
+                            label="Distance to Station" 
                             value={formatDistance(haversineDistance(parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon), ship.lat, ship.lon), mqttSettings.units)} 
                             colors={colors} 
                         />
@@ -1719,7 +1720,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                         </div>
                         <div>
                             <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Vessel Database</h2>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textMuted }}>Sök och bläddra bland alla historiska fartyg</p>
+                            <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textMuted }}>Search and browse all historical vessels</p>
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
@@ -1727,7 +1728,7 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
                             <input 
                                 type="text"
-                                placeholder="Sök på namn eller MMSI..."
+                                placeholder="Search by name or MMSI..."
                                 value={dbSearchTerm}
                                 onChange={e => setDbSearchTerm(e.target.value)}
                                 style={{
@@ -3754,7 +3755,7 @@ export default function App() {
             {/* Header */}
             <header style={{
                 position: 'relative',
-                padding: '15px 25px',
+                padding: '11px 25px',
                 background: isDark ? '#0f0f1a' : '#ffffff',
                 color: isDark ? '#44aaff' : '#00838f',
                 display: 'flex',
@@ -4611,7 +4612,7 @@ export default function App() {
                                         { value: 'military', label: 'Military / Law' },
                                         { value: 'wig', label: 'Wing In Ground (WIG)' },
                                         { value: 'special', label: 'Special / Ops' },
-                                        { value: 'meteo', label: 'Stationära / Meteo' },
+                                        { value: 'meteo', label: 'Stationary / Meteo' },
                                         { value: 'other', label: 'Other Types' }
                                     ]}
                                 />
@@ -4727,11 +4728,11 @@ export default function App() {
                                                     </div>
                                                     <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
                                                         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: sidebarViewMode === 'compact' ? '120px' : 'none' }}>
-                                                            {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text)}
+                                                            {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text, ship.is_meteo)}
                                                         </span>
                                                         <span style={{ opacity: 0.5 }}>•</span>
                                                         <span style={{ color: '#44aaff', fontWeight: 600 }}>
-                                                            <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distans:</span>
+                                                            <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distance:</span>
                                                             {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}
                                                         </span>
                                                         <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(0,255,128,0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#00ff80', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}` }}>

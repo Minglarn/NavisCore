@@ -537,15 +537,17 @@ async def process_ais_data(data: dict):
             settings = await get_all_settings(db)
             
             # 1. Determine Event Type (New, Re-acquired, or Update)
-            async with db.execute('SELECT last_seen, latitude, longitude FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 row = await cursor.fetchone()
             
             is_new_v = row is None
             reset_count = False
             last_known_lat, last_known_lon = None, None
+            db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = False, False, False, False
             
             if row:
                 last_known_lat, last_known_lon = row[1], row[2]
+                db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = bool(row[3]), bool(row[4]), bool(row[5]), bool(row[6])
                 try:
                     last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
                     if (datetime.utcnow() - last_seen_dt).total_seconds() > (int(settings.get("ship_timeout", 60)) * 60):
@@ -554,17 +556,17 @@ async def process_ais_data(data: dict):
                 except Exception: pass
 
             # 2. Prepare ship data dictionary
-            is_meteo = data.get("is_meteo", False) or msg_type in [4, 8]
+            is_meteo = data.get("is_meteo", False) or msg_type in [4, 8] or db_is_meteo
             if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
             
             ship_data = {
                 "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
                 "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype") or (9 if msg_type == 9 else None),
                 "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
-                "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": data.get("is_aton", False),
-                "is_sar": data.get("is_sar", False) or msg_type == 9, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
+                "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": data.get("is_aton", False) or db_is_aton,
+                "is_sar": data.get("is_sar", False) or msg_type == 9 or db_is_sar, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
                 "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
-                "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False), "is_advanced_binary": data.get("is_advanced_binary", False),
+                "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False) or db_virtual_aton, "is_advanced_binary": data.get("is_advanced_binary", False),
                 "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
                 "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
                 "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
@@ -801,7 +803,7 @@ class UDPProtocol(asyncio.DatagramProtocol):
         self.stream_manager = AisStreamManager()
         self.stream_manager.on_decode(self.handle_parsed_custom)
         asyncio.create_task(self.update_settings_loop())
-    def handle_parsed_custom(self, d): d["source"] = "local"; asyncio.create_task(process_ais_data(d))
+    def handle_parsed_custom(self, d): d["source"] = "udp"; asyncio.create_task(process_ais_data(d))
     async def update_settings_loop(self):
         while True: self.settings = await get_all_settings(); await asyncio.sleep(5)
     def datagram_received(self, data, addr):
@@ -1039,7 +1041,7 @@ async def startup_event():
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
         await db.execute('CREATE TABLE IF NOT EXISTS ships (mmsi TEXT PRIMARY KEY, imo TEXT, name TEXT, callsign TEXT, type INTEGER, image_url TEXT, image_fetched_at DATETIME, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP, session_start DATETIME DEFAULT CURRENT_TIMESTAMP)')
-        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER", "session_start DATETIME"]:
+        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "is_sar BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER", "session_start DATETIME"]:
             try: await db.execute(f"ALTER TABLE ships ADD COLUMN {c}")
             except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
