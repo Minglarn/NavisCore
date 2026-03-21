@@ -4192,20 +4192,19 @@ export default function App() {
                                                 ) : (
                                                     <div style={{ 
                                                         display: 'flex', 
-                                                        flexDirection: 'row', 
-                                                        alignItems: 'center', 
-                                                        gap: '10px', 
+                                                        flexDirection: 'column', 
                                                         background: colors.bgCard, 
-                                                        padding: '8px 12px', 
+                                                        padding: '0', 
                                                         borderRadius: '12px', 
                                                         color: colors.textMain,
                                                         boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                                                         border: `1px solid ${colors.border}`,
-                                                        minWidth: '300px',
+                                                        minWidth: '220px',
+                                                        overflow: 'hidden',
                                                         fontFamily: 'system-ui, -apple-system, sans-serif'
                                                     }}>
-                                                        {/* Left: Vessel Image */}
-                                                        <div style={{ position: 'relative', width: '54px', height: '54px', minWidth: '54px', borderRadius: '6px', overflow: 'hidden', background: '#0a0a0a' }}>
+                                                        {/* Top: Vessel Image (Full Width) */}
+                                                        <div style={{ position: 'relative', width: '100%', height: '110px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
                                                             {s.imageUrl ? (
                                                                 <img
                                                                     src={s.imageUrl}
@@ -4215,17 +4214,17 @@ export default function App() {
                                                                 />
                                                             ) : (
                                                                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-                                                                    <Ship size={24} />
+                                                                    <Ship size={32} />
                                                                 </div>
                                                             )}
                                                         </div>
 
-                                                        {/* Right: Info Area */}
-                                                        <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '2px' }}>
+                                                        {/* Bottom: Info Area */}
+                                                        <div style={{ display: 'flex', flexDirection: 'column', padding: '8px 12px', gap: '4px' }}>
                                                             {/* Top Row: Flag, Name, Speed */}
                                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px', overflow: 'hidden' }}>
-                                                                    <span style={{ fontSize: '1.4rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                                    <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
                                                                     <strong style={{ fontSize: '0.95rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
                                                                         {s.name || mmsiStr}
                                                                     </strong>
@@ -4247,32 +4246,17 @@ export default function App() {
 
                                                             {/* Bottom Row: Type, Distance, Source, Bearing */}
                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: colors.textMuted, fontWeight: 500 }}>
-                                                                <span style={{ whiteSpace: 'nowrap' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}</span>
+                                                                <span style={{ fontSize: '0.7rem' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}</span>
                                                                 <span>•</span>
                                                                 <span style={{ color: '#44aaff', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '3px' }}>
                                                                     <span style={{ fontSize: '0.65rem', color: colors.textMuted }}>Distance:</span>
                                                                     {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
                                                                 </span>
                                                                 
-                                                                {/* Source Tag */}
-                                                                {s.source && (
-                                                                    <span style={{ 
-                                                                        background: s.source === 'aisstream' ? 'rgba(68,170,255,0.15)' : 'rgba(0,255,128,0.15)',
-                                                                        color: s.source === 'aisstream' ? '#44aaff' : '#00ff80',
-                                                                        padding: '1px 6px',
-                                                                        borderRadius: '4px',
-                                                                        fontSize: '0.65rem',
-                                                                        fontWeight: 800,
-                                                                        border: `1px solid ${s.source === 'aisstream' ? 'rgba(68,170,255,0.2)' : 'rgba(0,255,128,0.2)'}`
-                                                                    }}>
-                                                                        {s.source.toUpperCase() === 'AISSTREAM' ? 'STRM' : s.source.toUpperCase()}
-                                                                    </span>
-                                                                )}
-
                                                                 {/* Bearing Icon & Angle */}
                                                                 <div style={{ display: 'flex', alignItems: 'center', gap: '2px', marginLeft: 'auto' }}>
                                                                     <Navigation 
-                                                                        size={12} 
+                                                                        size={11} 
                                                                         style={{ 
                                                                             transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, 
                                                                             color: colors.textMuted,
