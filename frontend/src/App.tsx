@@ -1766,9 +1766,18 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
     );
 }
 
-function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearchTerm, setDbSearchTerm, databaseShips, fetchMore, hasMore, loading, dbSort, setDbSort, dbTotal }: any) {
+function VesselDatabaseModal({ 
+    isOpen, onClose, onSelectVessel, colors, 
+    dbSearchTerm, setDbSearchTerm, 
+    dbFilterType, setDbFilterType, 
+    dbFilterSource, setDbFilterSource,
+    databaseShips, fetchMore, hasMore, loading, 
+    dbSort, setDbSort, dbTotal, onRefresh, isDark
+}: any) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [shipToEdit, setShipToEdit] = useState<any>(null);
 
     const handleScroll = () => {
         if (!scrollRef.current || loading || !hasMore) return;
@@ -1792,6 +1801,49 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
             : <ChevronUp size={14} className="db-sort-icon" style={{ color: '#44aaff' }} />;
     };
 
+    const handleEditStart = (ship: any) => {
+        setShipToEdit(ship);
+        setIsEditModalOpen(true);
+    };
+
+    const handleDeleteShip = async (mmsi: number) => {
+        if (!window.confirm(`Are you sure you want to delete vessel ${mmsi} from the archive? This cannot be undone.`)) return;
+        
+        try {
+            const resp = await fetch(`/api/ships/${mmsi}`, { method: 'DELETE' });
+            const data = await resp.json();
+            if (data.status === 'success') {
+                setIsEditModalOpen(false);
+                onRefresh();
+            } else {
+                alert("Error deleting ship: " + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to delete ship.");
+        }
+    };
+
+    const handleEditSave = async (updatedData: any) => {
+        try {
+            const resp = await fetch(`/api/ships/${updatedData.mmsi}/details`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(updatedData)
+            });
+            const data = await resp.json();
+            if (data.status === 'success') {
+                setIsEditModalOpen(false);
+                onRefresh();
+            } else {
+                alert("Error saving: " + (data.error || 'Unknown error'));
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Failed to save changes.");
+        }
+    };
+
     if (!isOpen) return null;
 
     const getTimeStampFromStr = (dtStr: string) => {
@@ -1802,11 +1854,12 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
     };
 
     return (
+        <>
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1500 }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
-                height: '90vh', 
-                width: '65vw', 
-                maxWidth: '1200px',
+                height: '92vh', 
+                width: '85vw', 
+                maxWidth: '1600px',
                 borderRadius: '16px', 
                 overflow: 'hidden', 
                 display: 'flex', 
@@ -1814,41 +1867,97 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                 boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                 background: colors.bgCard 
             }}>
-                <div style={{ padding: '25px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgApp }}>
+                <div style={{ padding: '20px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgApp }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <div style={{ background: 'rgba(68, 170, 255, 0.15)', color: '#44aaff', padding: '10px', borderRadius: '12px' }}>
                             <Database size={24} />
                         </div>
                         <div>
-                            <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 800 }}>Vessel Database</h2>
-                            <p style={{ margin: 0, fontSize: '0.85rem', color: colors.textMuted }}>Search and browse all historical vessels</p>
+                            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>Vessel Database</h2>
+                            <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textMuted }}>Explore archive • Double-click a row to edit</p>
                         </div>
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                        <div style={{ position: 'relative', width: '250px' }}>
-                            <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
-                            <input 
-                                type="text"
-                                placeholder="Search by name or MMSI..."
-                                value={dbSearchTerm}
-                                onChange={e => setDbSearchTerm(e.target.value)}
-                                style={{
-                                    width: '100%',
-                                    padding: '12px 15px 12px 40px',
-                                    borderRadius: '12px',
-                                    background: colors.bgApp || 'rgba(0,0,0,0.1)',
-                                    border: `1px solid ${colors.border}`,
-                                    color: colors.textMain,
-                                    outline: 'none',
-                                    fontSize: '0.95rem',
-                                    transition: 'border-color 0.2s'
-                                }}
-                                onFocus={e => e.target.style.borderColor = '#44aaff'}
-                                onBlur={e => e.target.style.borderColor = colors.border}
-                            />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        {/* Filter Section */}
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div style={{ position: 'relative', width: '180px' }}>
+                                <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
+                                <input 
+                                    type="text"
+                                    placeholder="Search Name/MMSI..."
+                                    value={dbSearchTerm}
+                                    onChange={e => setDbSearchTerm(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 10px 8px 32px',
+                                        borderRadius: '6px',
+                                        background: colors.bgApp,
+                                        border: `1px solid ${colors.border}`,
+                                        color: colors.textMain,
+                                        outline: 'none',
+                                        fontSize: '0.8rem'
+                                    }}
+                                />
+                            </div>
+                            
+                            <div style={{ position: 'relative', width: '140px' }}>
+                                <select
+                                    value={dbFilterSource}
+                                    onChange={e => setDbFilterSource(e.target.value)}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 30px 8px 10px',
+                                        borderRadius: '6px',
+                                        background: colors.bgApp,
+                                        border: `1px solid ${colors.border}`,
+                                        color: colors.textMain,
+                                        outline: 'none',
+                                        fontSize: '0.8rem',
+                                        appearance: 'none',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="all">All Sources</option>
+                                    <option value="local">SDR (Local)</option>
+                                    <option value="aisstream">STR (Stream)</option>
+                                    <option value="udp">UDP (Network)</option>
+                                </select>
+                                <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }} />
+                            </div>
+
+                            <div style={{ position: 'relative', width: '180px' }}>
+                                <select
+                                    value={dbFilterType}
+                                    onChange={e => {
+                                        const val = e.target.value;
+                                        setDbFilterType(val === 'all' ? 'all' : parseInt(val));
+                                    }}
+                                    style={{
+                                        width: '100%',
+                                        padding: '8px 30px 8px 10px',
+                                        borderRadius: '6px',
+                                        background: colors.bgApp,
+                                        border: `1px solid ${colors.border}`,
+                                        color: colors.textMain,
+                                        outline: 'none',
+                                        fontSize: '0.8rem',
+                                        appearance: 'none',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <option value="all">All Ship Types</option>
+                                    {aisShipTypes.map(t => (
+                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                    ))}
+                                </select>
+                                <ChevronDown size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', opacity: 0.5 }} />
+                            </div>
                         </div>
-                        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '10px', borderRadius: '50%', transition: 'all 0.2s' }}>
-                            <X size={20} />
+
+                        <div style={{ width: '1px', height: '24px', background: colors.border, margin: '0 5px' }} />
+
+                        <button onClick={onClose} style={{ background: 'rgba(255,255,255,0.05)', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '8px', borderRadius: '50%', transition: 'all 0.2s' }}>
+                            <X size={18} />
                         </button>
                     </div>
                 </div>
@@ -1856,78 +1965,111 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                 <div 
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    style={{ flex: 1, overflowY: 'auto', padding: '10px 0' }}
+                    style={{ flex: 1, overflowY: 'auto', padding: '0' }}
                 >
-                    <table className="db-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: '80px' }}>Bild</th>
-                                <th style={{ width: '130px' }} onClick={() => handleSort('mmsi')}>MMSI {renderSortIcon('mmsi')}</th>
-                                <th onClick={() => handleSort('name')}>Namn {renderSortIcon('name')}</th>
-                                <th style={{ width: '180px' }} onClick={() => handleSort('type')}>Typ {renderSortIcon('type')}</th>
-                                <th style={{ width: '120px' }}>Mått</th>
-                                <th style={{ textAlign: 'center', width: '90px' }} onClick={() => handleSort('registration_count')}>Obs {renderSortIcon('registration_count')}</th>
-                                <th style={{ width: '180px' }} onClick={() => handleSort('last_seen')}>Senast sedd {renderSortIcon('last_seen')}</th>
+                    <table className="db-table-compact" style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
+                        <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: colors.bgCard }}>
+                            <tr style={{ background: colors.bgApp }}>
+                                <th style={{ width: '60px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700 }}>Img</th>
+                                <th style={{ width: '100px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleSort('mmsi')}>MMSI {renderSortIcon('mmsi')}</th>
+                                <th style={{ padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleSort('name')}>Name {renderSortIcon('name')}</th>
+                                <th style={{ width: '150px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleSort('type')}>Type {renderSortIcon('type')}</th>
+                                <th style={{ width: '100px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700 }}>IMO/Call</th>
+                                <th style={{ width: '100px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700 }}>Dim/Dr</th>
+                                <th style={{ width: '60px', padding: '10px 15px', textAlign: 'center', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleSort('registration_count')}>Seen {renderSortIcon('registration_count')}</th>
+                                <th style={{ width: '160px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700, cursor: 'pointer' }} onClick={() => handleSort('last_seen')}>Last Seen {renderSortIcon('last_seen')}</th>
+                                <th style={{ width: '120px', padding: '10px 15px', textAlign: 'left', borderBottom: `2px solid ${colors.border}`, fontSize: '0.7rem', textTransform: 'uppercase', color: colors.textMuted, fontWeight: 700 }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {databaseShips.map((ship: any) => (
-                                <tr key={ship.mmsi} onClick={() => onSelectVessel(ship)}>
-                                    <td>
-                                        <div 
-                                            style={{ width: '60px', height: '40px', borderRadius: '6px', background: '#0a0a0a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid rgba(255,255,255,0.05)', cursor: ship.imageUrl ? 'zoom-in' : 'default' }}
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (ship.imageUrl && ship.imageUrl !== "/images/0.jpg") {
-                                                    setSelectedImage(ship.imageUrl);
-                                                }
-                                            }}
-                                        >
-                                            {ship.imageUrl && ship.imageUrl !== "/images/0.jpg" ? (
-                                                <img src={ship.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                                            ) : (
-                                                <Ship size={20} color={colors.textMuted} style={{ opacity: 0.3 }} />
-                                            )}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span className="ship-badge badge-mmsi">{ship.mmsi}</span>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontWeight: 800, fontSize: '0.95rem', color: colors.textMain, letterSpacing: '-0.3px' }}>{ship.name || 'Unknown Vessel'}</div>
-                                    </td>
-                                    <td>
-                                        <span className="ship-badge badge-type">
-                                            {ship.ship_type_text || (ship.type ? `Type ${ship.type}` : 'Other')}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontSize: '0.85rem', color: colors.textMuted }}>{ship.length && ship.width ? `${ship.length}m × ${ship.width}m` : '--'}</div>
-                                    </td>
-                                    <td style={{ textAlign: 'center' }}>
-                                        <span className="ship-badge badge-obs">
-                                            {ship.registration_count || 1}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div style={{ fontWeight: 700, color: '#44aaff', fontSize: '0.8rem' }}>{getTimeAgo(getTimeStampFromStr(ship.last_seen))} ago</div>
-                                        <div style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.7 }}>{ship.last_seen || '--'}</div>
-                                    </td>
-                                </tr>
-                            ))}
+                            {databaseShips.map((ship: any, idx: number) => {
+                                return (
+                                    <tr 
+                                        key={ship.mmsi} 
+                                        onDoubleClick={() => handleEditStart(ship)}
+                                        onClick={() => onSelectVessel(ship)}
+                                        style={{ 
+                                            borderBottom: `1px solid ${colors.border}`, 
+                                            cursor: 'pointer', 
+                                            background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)',
+                                            transition: 'background 0.1s' 
+                                        }}
+                                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(68,170,255,0.05)'; }}
+                                        onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)'; }}
+                                    >
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div 
+                                                style={{ width: '40px', height: '28px', borderRadius: '4px', background: '#0a0a0a', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.border}`, cursor: ship.imageUrl ? 'zoom-in' : 'default' }}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    if (ship.imageUrl && ship.imageUrl !== "/images/0.jpg") {
+                                                        setSelectedImage(ship.imageUrl);
+                                                    }
+                                                }}
+                                            >
+                                                {ship.imageUrl && ship.imageUrl !== "/images/0.jpg" ? (
+                                                    <img src={ship.imageUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                                ) : (
+                                                    <Ship size={14} color={colors.textMuted} style={{ opacity: 0.3 }} />
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div style={{ fontFamily: 'monospace', fontWeight: 600, fontSize: '0.8rem', color: colors.textMain }}>{ship.mmsi}</div>
+                                            <div style={{ fontSize: '0.65rem', color: colors.textMuted, opacity: 0.6 }}>{ship.source?.toUpperCase() || 'LOCAL'}</div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.85rem', color: colors.textMain, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ship.name || 'Unknown Vessel'}</div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div style={{ fontSize: '0.75rem', color: colors.textMain }}>
+                                                {ship.ship_type_text || (ship.type ? `Type ${ship.type}` : 'Other')}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                <div>{ship.imo || '--'}</div>
+                                                <div>{ship.callsign || '--'}</div>
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div style={{ fontSize: '0.75rem', color: colors.textMuted }}>
+                                                <div>{ship.length && ship.width ? `${ship.length}×${ship.width}m` : '--'}</div>
+                                                {ship.draught ? <div>{ship.draught}m dist</div> : null}
+                                            </div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px', textAlign: 'center' }}>
+                                            <div style={{ fontWeight: 700, fontSize: '0.8rem', color: '#10b981' }}>{ship.registration_count || 1}</div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <div style={{ fontWeight: 700, color: '#44aaff', fontSize: '0.75rem' }}>{getTimeAgo(getTimeStampFromStr(ship.last_seen))} ago</div>
+                                            <div style={{ fontSize: '0.65rem', color: colors.textMuted, opacity: 0.7 }}>{ship.last_seen || '--'}</div>
+                                        </td>
+                                        <td style={{ padding: '6px 15px' }}>
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleEditStart(ship); }}
+                                                style={{ padding: '4px 8px', background: 'rgba(68,170,255,0.1)', color: '#44aaff', border: 'none', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 600, cursor: 'pointer' }}
+                                            >
+                                                EDIT
+                                            </button>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
+                    
                     {loading && (
-                        <div style={{ textAlign: 'center', padding: '40px', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-                            <div className="loading-spinner" style={{ width: '30px', height: '30px', border: '3px solid rgba(68,170,255,0.1)', borderTopColor: '#44aaff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
-                            <span style={{ fontSize: '0.85rem', fontWeight: 600, letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.8 }}>Hämtar data...</span>
+                        <div style={{ textAlign: 'center', padding: '40px', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                            <div className="loading-spinner" style={{ width: '24px', height: '24px', border: '2px solid rgba(68,170,255,0.1)', borderTopColor: '#44aaff', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+                            <span style={{ fontSize: '0.7rem', fontWeight: 700, letterSpacing: '1px', textTransform: 'uppercase', opacity: 0.5 }}>Syncing logs...</span>
                         </div>
                     )}
                     
                     {!loading && databaseShips.length === 0 && (
                         <div style={{ textAlign: 'center', padding: '100px 0', color: colors.textMuted, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
-                            <Database size={48} style={{ opacity: 0.2 }} />
-                            <div style={{ fontSize: '1.1rem', fontWeight: 500 }}>Inga fartyg hittades</div>
+                            <Database size={40} style={{ opacity: 0.1 }} />
+                            <div style={{ fontSize: '1rem', fontWeight: 600, opacity: 0.4 }}>No data matched your filters</div>
                         </div>
                     )}
                     
@@ -1935,21 +2077,21 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                         <div style={{ textAlign: 'center', padding: '20px' }}>
                             <button 
                                 onClick={() => fetchMore()}
-                                style={{ background: 'rgba(68, 170, 255, 0.1)', color: '#44aaff', border: '1px solid rgba(68, 170, 255, 0.3)', padding: '8px 20px', borderRadius: '20px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 600 }}
+                                style={{ background: 'rgba(68, 170, 255, 0.1)', color: '#44aaff', border: '1px solid rgba(68, 170, 255, 0.3)', padding: '8px 20px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 700, transition: 'all 0.2s' }}
                             >
-                                Visa fler
+                                LOAD MORE VESSELS
                             </button>
                         </div>
                     )}
                 </div>
 
-                <div className="db-pagination-info" style={{ background: colors.bgApp, borderTop: `1px solid ${colors.border}`, color: colors.textMain }}>
-                    <div style={{ fontWeight: 500 }}>
-                        Visar <strong>{databaseShips.length}</strong> av totalt <strong>{dbTotal || databaseShips.length}</strong> objekt i databasen
+                <div className="db-pagination-info" style={{ background: colors.bgApp, borderTop: `1px solid ${colors.border}`, color: colors.textMain, padding: '15px 30px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '0.85rem' }}>
+                        Showing <strong>{databaseShips.length}</strong> of <strong>{dbTotal || databaseShips.length}</strong> historical records
                     </div>
-                    <div style={{ opacity: 0.6, display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Database size={14} />
-                        <span>Infinite Scroll Active</span>
+                    <div style={{ opacity: 0.5, display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                        <Wifi size={14} />
+                        <span>Live Database Synchronization Active</span>
                     </div>
                 </div>
 
@@ -1957,26 +2099,218 @@ function VesselDatabaseModal({ isOpen, onClose, onSelectVessel, colors, dbSearch
                     <div 
                         className="settings-modal-overlay" 
                         onClick={() => setSelectedImage(null)} 
-                        style={{ zIndex: 2000, background: 'rgba(0,0,0,0.85)' }}
+                        style={{ zIndex: 2000, background: 'rgba(0,0,0,0.9)' }}
                     >
                         <div 
-                            style={{ position: 'relative', maxWidth: '85vw', maxHeight: '85vh' }}
+                            style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}
                             onClick={e => e.stopPropagation()}
                         >
                             <img 
                                 src={selectedImage} 
-                                alt="Vessel Large" 
-                                style={{ width: '100%', height: '100%', borderRadius: '12px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)' }} 
+                                alt="Vessel High-Res" 
+                                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '90vh', borderRadius: '8px', boxShadow: '0 30px 60px rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)' }} 
                             />
                             <button 
                                 onClick={() => setSelectedImage(null)}
-                                style={{ position: 'absolute', top: '-15px', right: '-15px', background: '#ff4444', color: 'white', border: 'none', borderRadius: '50%', width: '30px', height: '30px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 10px rgba(0,0,0,0.3)' }}
+                                style={{ position: 'absolute', top: '15px', right: '15px', background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)', color: 'white', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '50%', width: '36px', height: '36px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                             >
-                                <X size={18} />
+                                <X size={20} />
                             </button>
                         </div>
                     </div>
                 )}
+            </div>
+        </div>
+
+        {/* Vessel Edit Modal */}
+        {isEditModalOpen && shipToEdit && (
+            <VesselEditModal
+                ship={shipToEdit}
+                isOpen={isEditModalOpen}
+                onClose={() => { setIsEditModalOpen(false); setShipToEdit(null); }}
+                onSave={handleEditSave}
+                onDelete={handleDeleteShip}
+                colors={colors}
+                isDark={isDark}
+            />
+        )}
+        </>
+    );
+}
+
+function VesselEditModal({ ship, isOpen, onClose, onSave, onDelete, colors, isDark }: any) {
+    const [formData, setFormData] = useState({ ...ship });
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [uploading, setUploading] = useState(false);
+    const [localImage, setLocalImage] = useState<string | null>(ship.imageUrl || null);
+
+    useEffect(() => {
+        setFormData({ ...ship });
+        setLocalImage(ship.imageUrl || null);
+    }, [ship]);
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData((prev: any) => ({ ...prev, [name]: value }));
+    };
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        
+        setUploading(true);
+        const uploadFormData = new FormData();
+        uploadFormData.append("file", file);
+        
+        try {
+            const mmsiStr = String(ship.mmsi);
+            const isDev = window.location.port === '5173';
+            const uploadUrl = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/image` : `/api/ships/${mmsiStr}/image`;
+            
+            const res = await fetch(uploadUrl, {
+                method: 'POST',
+                body: uploadFormData
+            });
+            
+            if (res.ok) {
+                const data = await res.json();
+                const newUrl = `${data.image_url}?t=${Date.now()}`;
+                setLocalImage(newUrl);
+                setFormData((prev: any) => ({ ...prev, imageUrl: newUrl, manual_image: true }));
+            } else {
+                alert("Image upload failed");
+            }
+        } catch (err) {
+            console.error(err);
+            alert("Upload error");
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="settings-modal-overlay" style={{ zIndex: 11000 }} onClick={onClose}>
+            <div className="settings-modal" style={{ width: '850px', height: 'auto', maxHeight: '90vh', flexDirection: 'column' }} onClick={e => e.stopPropagation()}>
+                <div style={{ padding: '20px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: colors.bgCard }}>
+                    <h2 style={{ margin: 0, fontSize: '1.2rem', color: colors.textMain }}>Edit Vessel: {formData.name || formData.mmsi}</h2>
+                    <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer' }}><X size={24} /></button>
+                </div>
+                
+                <div style={{ display: 'flex', padding: '30px', gap: '30px', overflowY: 'auto' }}>
+                    {/* Left side: Image Upload/Preview */}
+                    <div style={{ width: '280px', flexShrink: 0 }}>
+                        <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '8px', display: 'block' }}>Vessel Image</label>
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            style={{ 
+                                width: '100%', 
+                                height: '200px', 
+                                background: isDark ? 'rgba(0,0,0,0.3)' : '#f8fafc',
+                                border: `2px dashed ${colors.border}`,
+                                borderRadius: '12px',
+                                overflow: 'hidden',
+                                position: 'relative',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                transition: 'all 0.2s'
+                            }}
+                        >
+                            <input 
+                                type="file" 
+                                ref={fileInputRef} 
+                                style={{ display: 'none' }} 
+                                accept="image/jpeg, image/png, image/webp"
+                                onChange={handleImageUpload}
+                            />
+                            
+                            {localImage ? (
+                                <img 
+                                    src={localImage} 
+                                    alt="Preview" 
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: uploading ? 0.4 : 1 }} 
+                                />
+                            ) : (
+                                <div style={{ textAlign: 'center', color: colors.textMuted, padding: '20px' }}>
+                                    <Ship size={40} style={{ marginBottom: '10px', opacity: 0.5 }} />
+                                    <div style={{ fontSize: '0.8rem' }}>Click to upload image</div>
+                                </div>
+                            )}
+                            
+                            {uploading && (
+                                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.3)' }}>
+                                    <div className="spinning" style={{ width: '24px', height: '24px', border: '3px solid #fff', borderTopColor: 'transparent', borderRadius: '50%' }}></div>
+                                </div>
+                            )}
+                        </div>
+                        <div style={{ marginTop: '10px', fontSize: '0.7rem', color: colors.textMuted }}>
+                            Supports JPG, PNG, WebP. Click image to change.
+                        </div>
+                    </div>
+
+                    {/* Right side: Form Fields */}
+                    <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', alignContent: 'start' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Vessel Name</label>
+                            <input name="name" value={formData.name || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>MMSI (Read Only)</label>
+                            <input value={ship.mmsi} disabled style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(255,255,255,0.05)' : '#f1f5f9', color: colors.textMuted, cursor: 'not-allowed' }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>IMO Number</label>
+                            <input name="imo" value={formData.imo || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Callsign</label>
+                            <input name="callsign" value={formData.callsign || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Ship Type</label>
+                            <select name="type" value={formData.type || 0} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }}>
+                                {aisShipTypes.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                            </select>
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Destination</label>
+                            <input name="destination" value={formData.destination || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Length (m)</label>
+                            <input name="length" type="number" value={formData.length || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Width (m)</label>
+                            <input name="width" type="number" value={formData.width || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                            <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Draught (m)</label>
+                            <input name="draught" type="number" step="0.1" value={formData.draught || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ padding: '20px 30px', borderTop: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', background: colors.bgCard }}>
+                    <button 
+                        onClick={() => onDelete(ship.mmsi)}
+                        style={{ padding: '10px 20px', background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', color: '#ff4444', borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}
+                    >
+                        DELETE VESSEL
+                    </button>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                        <button onClick={onClose} style={{ padding: '10px 20px', background: 'transparent', border: `1px solid ${colors.border}`, color: colors.textMain, borderRadius: '6px', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+                        <button 
+                            onClick={() => onSave(formData)}
+                            style={{ padding: '10px 25px', background: '#10b981', border: 'none', color: '#fff', borderRadius: '6px', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(16,185,129,0.3)' }}
+                        >
+                            SAVE CHANGES
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     );
@@ -3148,6 +3482,10 @@ export default function App() {
     const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
     const [databaseShips, setDatabaseShips] = useState<any[]>([]);
     const [dbSearchTerm, setDbSearchTerm] = useState('');
+    const [dbFilterType, setDbFilterType] = useState<number | 'all'>('all');
+    const [dbFilterSource, setDbFilterSource] = useState<string>('all');
+    const [editingMmsi, setEditingMmsi] = useState<string | null>(null);
+    const [editBuffer, setEditBuffer] = useState<any>(null);
     const [dbOffset, setDbOffset] = useState(0);
     const [dbHasMore, setDbHasMore] = useState(true);
     const [dbTotal, setDbTotal] = useState(0);
@@ -3426,7 +3764,9 @@ export default function App() {
         const isDev = window.location.port === '5173';
         const baseUrl = isDev ? 'http://127.0.0.1:8080/api/database' : '/api/database';
         const sortParam = `&sort=${dbSort.key}&order=${dbSort.direction}`;
-        const url = `${baseUrl}?limit=${limit}&offset=${currentOffset}${dbSearchTerm ? `&q=${encodeURIComponent(dbSearchTerm)}` : ''}${sortParam}`;
+        const typeParam = dbFilterType !== 'all' ? `&ship_type=${dbFilterType}` : '';
+        const sourceParam = dbFilterSource !== 'all' ? `&source=${dbFilterSource}` : '';
+        const url = `${baseUrl}?limit=${limit}&offset=${currentOffset}${dbSearchTerm ? `&q=${encodeURIComponent(dbSearchTerm)}` : ''}${sortParam}${typeParam}${sourceParam}`;
 
         try {
             const res = await fetch(url);
@@ -3459,7 +3799,7 @@ export default function App() {
             }, 300);
             return () => clearTimeout(timer);
         }
-    }, [dbSearchTerm, isDatabaseModalOpen, dbSort]);
+    }, [dbSearchTerm, dbFilterType, dbFilterSource, isDatabaseModalOpen, dbSort]);
 
     useEffect(() => {
         const style = document.createElement('style');
@@ -3801,6 +4141,9 @@ export default function App() {
         let mode = 'standard';
         if (layerName.includes('Satellite')) mode = 'satellite';
         else if (layerName.includes('Sea Chart')) mode = 'osm';
+        else if (layerName.includes('Topo')) mode = 'topo';
+        else if (layerName.includes('CyclOSM')) mode = 'cyclosm';
+        else if (layerName.includes('Voyager')) mode = 'voyager';
 
         setMqttSettings(prev => {
             const next = { ...prev, base_layer: mode };
@@ -3828,11 +4171,7 @@ export default function App() {
                 const c = e.target.getCenter();
                 localStorage.setItem('naviscore_center', JSON.stringify([c.lat, c.lng]));
             },
-            mousemove: (e: any) => {
-                // To avoid tooltips sticking, clear hover if user moves mouse far from ships
-                // Markers handle their own hover, but this is a safety fallback
-            },
-            mousedown: () => { setHoveredMmsi(null); setSelectedShipMmsi(null); } // Hard clear on click anywhere else
+            mousedown: () => { setHoveredMmsi(null); setSelectedShipMmsi(null); }
         });
         return null;
     }
@@ -3874,7 +4213,7 @@ export default function App() {
             {/* Header */}
             <header style={{
                 position: 'relative',
-                padding: '8px 25px',
+                padding: '5px 25px',
                 background: isDark ? '#0f0f1a' : '#ffffff',
                 color: isDark ? '#44aaff' : '#00838f',
                 display: 'flex',
@@ -3886,23 +4225,23 @@ export default function App() {
             }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <Anchor size={28} />
-                        <h1 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 600, letterSpacing: '1px' }}>NavisCore</h1>
+                        <Anchor size={24} />
+                        <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600, letterSpacing: '1px' }}>NavisCore</h1>
                     </div>
 
                     {/* Activity Indicators */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '0 15px', borderLeft: `1px solid ${colors.border}` }}>
-                        <div title="SDR Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastSdrTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
-                            <Radio size={14} color={Date.now() - lastSdrTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastSdrTime < 500 ? 'blink-source' : ''} />
-                            <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>SDR</span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '0 15px', borderLeft: `1px solid ${colors.border}` }}>
+                        <div title="SDR Activity" style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: (Date.now() - lastSdrTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
+                            <Radio size={18} color={Date.now() - lastSdrTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastSdrTime < 500 ? 'blink-source' : ''} />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>SDR</span>
                         </div>
-                        <div title="UDP Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastUdpTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
-                            <Database size={14} color={Date.now() - lastUdpTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastUdpTime < 500 ? 'blink-source' : ''} />
-                            <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>UDP</span>
+                        <div title="UDP Activity" style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: (Date.now() - lastUdpTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
+                            <Database size={18} color={Date.now() - lastUdpTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastUdpTime < 500 ? 'blink-source' : ''} />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>UDP</span>
                         </div>
-                        <div title="Stream Activity" style={{ display: 'flex', alignItems: 'center', gap: '4px', opacity: (Date.now() - lastStreamTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
-                            <Wifi size={14} color={Date.now() - lastStreamTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastStreamTime < 500 ? 'blink-source' : ''} />
-                            <span style={{ fontSize: '0.65rem', fontWeight: 800 }}>STR</span>
+                        <div title="Stream Activity" style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: (Date.now() - lastStreamTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
+                            <Wifi size={18} color={Date.now() - lastStreamTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastStreamTime < 500 ? 'blink-source' : ''} />
+                            <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>STR</span>
                         </div>
                     </div>
                 </div>
@@ -3931,9 +4270,9 @@ export default function App() {
                         <div style={{
                             background: mqttConnected ? (isDark ? 'rgba(0, 255, 128, 0.1)' : '#e6fffa') : (isDark ? 'rgba(255, 50, 50, 0.1)' : '#fff5f5'),
                             color: mqttConnected ? (isDark ? '#00ff80' : '#047857') : (isDark ? '#ff3333' : '#c53030'),
-                            padding: '6px 16px',
+                            padding: '4px 12px',
                             borderRadius: '20px',
-                            fontSize: '0.9rem',
+                            fontSize: '0.85rem',
                             fontWeight: 500,
                             border: `1px solid ${mqttConnected ? (isDark ? 'rgba(0, 255, 128, 0.3)' : '#a7f3d0') : (isDark ? 'rgba(255, 50, 50, 0.3)' : '#feb2b2')}`,
                             display: 'flex',
@@ -4072,7 +4411,14 @@ export default function App() {
                             Loading map...
                         </div>
                     ) : (
-                        <MapContainer ref={mapRef} key={`map-${theme}`} center={initialCenter as L.LatLngExpression} zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} style={{ height: '100%', width: '100%', background: colors.bgMain }} zoomControl={false}>
+                        <MapContainer 
+                            ref={mapRef} 
+                            key={`map-${theme}`} 
+                            center={initialCenter as L.LatLngExpression} 
+                            zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} 
+                            style={{ height: '100%', width: '100%', background: colors.bgMain }} 
+                            zoomControl={false}
+                        >
                             <CenterButton originLat={originLat} originLon={originLon} />
                             <ZoomTracker setZoom={setCurrentZoom} />
                             {isSelectionMode && <BoundingBoxSelector />}
@@ -4104,6 +4450,30 @@ export default function App() {
                                     <TileLayer
                                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                                         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="OpenTopoMap" checked={mqttSettings.base_layer === 'topo'}>
+                                    <TileLayer
+                                        url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+                                        attribution='Map data: &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, <a href="http://viewfinderpanoramas.org">SRTM</a> | Map style: &copy; <a href="https://opentopomap.org">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/">CC-BY-SA</a>)'
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="CyclOSM" checked={mqttSettings.base_layer === 'cyclosm'}>
+                                    <TileLayer
+                                        url="https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png"
+                                        attribution='&copy; <a href="https://github.com/cyclosm/cyclosm-cartocss-style/releases" title="CyclOSM - OpenStreetMap bicycle layer">CyclOSM</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="CartoDB Voyager" checked={mqttSettings.base_layer === 'voyager'}>
+                                    <TileLayer
+                                        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+                                        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+                                    />
+                                </LayersControl.BaseLayer>
+                                <LayersControl.BaseLayer name="Esri World Topo" checked={mqttSettings.base_layer === 'esri_topo'}>
+                                    <TileLayer
+                                        url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}"
+                                        attribution='Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ, TomTom, Intermap, iPC, USGS, FAO, NPS, NRCAN, GeoBase, Kadaster NL, Ordnance Survey, Esri Japan, METI, Esri China (Hong Kong), and the GIS User Community'
                                     />
                                 </LayersControl.BaseLayer>
                             </LayersControl>
@@ -4175,15 +4545,15 @@ export default function App() {
 
                                 // Smart Label Logic:
                                 // 1. Emergency: Always show name
-                                // 2. Zoom >= 10: Show all names (clustering handles density)
-                                // 3. Zoom 8-9: Show every 3rd ship
-                                // 4. Zoom < 8: Show every 10th ship 
+                                // 2. Zoom >= 13: Show all names (clustering handles density)
+                                // 3. Zoom 11-12: Show every 3rd ship
+                                // 4. Zoom < 11: Show every 10th ship 
                                 let shouldShowName = false;
                                 if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
                                     if (s.is_emergency) shouldShowName = true;
-                                    else if (currentZoom >= 10) shouldShowName = true;
-                                    else if (currentZoom >= 8 && idx % 3 === 0) shouldShowName = true;
-                                    else if (currentZoom < 8 && idx % 10 === 0) shouldShowName = true;
+                                    else if (currentZoom >= 13) shouldShowName = true;
+                                    else if (currentZoom >= 11 && idx % 3 === 0) shouldShowName = true;
+                                    else if (currentZoom < 11 && idx % 10 === 0) shouldShowName = true;
                                 }
 
                                 const cog = s.course ?? s.cog;
@@ -4389,10 +4759,26 @@ export default function App() {
                                                                             color: colors.textMuted
                                                                         }} 
                                                                     />
-                                                                    {calculateBearing(originLat, originLon, s.lat, s.lon).toFixed(0)}°
-                                                                </div>
+                                                                {calculateBearing(originLat, originLon, s.lat, s.lon).toFixed(0)}°
                                                             </div>
                                                         </div>
+
+                                                        {/* Last Seen */}
+                                                        <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderTop: `1px solid ${colors.border}` }}>
+                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Last Seen</div>
+                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>
+                                                                {getTimeAgo(s.timestamp)}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* MMSI / Source */}
+                                                        <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}` }}>
+                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
+                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>
+                                                                {mmsiStr}
+                                                            </div>
+                                                        </div>
+                                                    </div>
 
                                                         {/* Special Indicators (Tropo, Emergency, Altitude) */}
                                                         {((s.shiptype === 9 || s.is_sar) && s.altitude !== undefined) || s.is_emergency || (haversineDistance(originLat, originLon, s.lat, s.lon) > 74.08) ? (
@@ -4746,7 +5132,7 @@ export default function App() {
                                 />
                             </div>
 
-                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', boxSizing: 'border-box' }}>
+                            <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '15px 20px', display: 'flex', flexDirection: 'column', gap: '8px', boxSizing: 'border-box' }}>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                     {ships.length === 0 ? (
                                         <div style={{ color: colors.textMuted, textAlign: 'center', padding: '20px', background: colors.bgCard, borderRadius: '8px', border: `1px solid ${colors.border}` }}>
@@ -4794,7 +5180,7 @@ export default function App() {
                                                     cursor: 'pointer',
                                                     transition: 'all 0.15s',
                                                     border: `1px solid ${colors.border}`,
-                                                    marginBottom: sidebarViewMode === 'compact' ? '2px' : '8px'
+                                                    marginBottom: sidebarViewMode === 'compact' ? '1px' : '4px'
                                                 }}
                                                 onClick={() => {
                                                     setHoveredMmsi(String(ship.mmsi));
@@ -4914,25 +5300,31 @@ export default function App() {
 
             <VesselDatabaseModal
                 isOpen={isDatabaseModalOpen}
-                onClose={() => setIsDatabaseModalOpen(false)}
+                onClose={() => {
+                    setIsDatabaseModalOpen(false);
+                    setEditingMmsi(null);
+                    setEditBuffer(null);
+                }}
                 onSelectVessel={(ship: any) => {
-                    // Stay open per user request
-                    // setIsDatabaseModalOpen(false);
-                    // Check if ship is in current active ships
                     const active = ships.find((s: any) => String(s.mmsi) === String(ship.mmsi));
                     if (active && active.lat && active.lon) {
                         setSelectedShipMmsi(String(active.mmsi));
                         if (mapRef.current) {
                             mapRef.current.flyTo([active.lat, active.lon], 14);
                         }
-                    } else {
-                        // If not active, we just close the modal. 
-                        // Maybe in future we can show historical track.
                     }
                 }}
                 colors={colors}
                 dbSearchTerm={dbSearchTerm}
                 setDbSearchTerm={setDbSearchTerm}
+                dbFilterType={dbFilterType}
+                setDbFilterType={setDbFilterType}
+                dbFilterSource={dbFilterSource}
+                setDbFilterSource={setDbFilterSource}
+                editingMmsi={editingMmsi}
+                setEditingMmsi={setEditingMmsi}
+                editBuffer={editBuffer}
+                setEditBuffer={setEditBuffer}
                 databaseShips={databaseShips}
                 fetchMore={() => fetchDatabaseShips(false)}
                 hasMore={dbHasMore}
@@ -4940,6 +5332,7 @@ export default function App() {
                 dbSort={dbSort}
                 setDbSort={setDbSort}
                 dbTotal={dbTotal}
+                onRefresh={() => fetchDatabaseShips(true)}
             />
 
             {mqttSettings.vessel_detail_view === 'sidebar' ? (

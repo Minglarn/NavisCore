@@ -1131,7 +1131,7 @@ async def get_ships():
         return res
 
 @app.get("/api/database")
-async def get_database(q: str = None, limit: int = 50, offset: int = 0, sort: str = "last_seen", order: str = "desc"):
+async def get_database(q: str = None, ship_type: int = None, source: str = None, limit: int = 50, offset: int = 0, sort: str = "last_seen", order: str = "desc"):
     # Security check for sort and order to avoid SQL injection
     allowed_sorts = ["mmsi", "name", "type", "message_count", "registration_count", "last_seen", "length", "width"]
     if sort not in allowed_sorts:
@@ -1141,27 +1141,36 @@ async def get_database(q: str = None, limit: int = 50, offset: int = 0, sort: st
 
     async with db_session() as db:
         db.row_factory = aiosqlite.Row
-        query = "SELECT * FROM ships"
+        
+        # Build filter conditions
+        conditions = []
         params = []
+        
         if q:
-            query += " WHERE mmsi LIKE ? OR name LIKE ?"
+            conditions.append("(mmsi LIKE ? OR name LIKE ?)")
             params.extend([f"%{q}%", f"%{q}%"])
         
-        query += f" ORDER BY {sort} {order} LIMIT ? OFFSET ?"
-        params.extend([limit, offset])
-        
-        # Get total count for the query
-        count_query = "SELECT COUNT(*) FROM ships"
-        count_params = []
-        if q:
-            count_query += " WHERE mmsi LIKE ? OR name LIKE ?"
-            count_params.extend([f"%{q}%", f"%{q}%"])
+        if ship_type is not None:
+            conditions.append("type = ?")
+            params.append(ship_type)
             
-        async with db.execute(count_query, tuple(count_params)) as cursor:
+        if source and source != 'all':
+            conditions.append("source = ?")
+            params.append(source.lower())
+            
+        where_clause = f" WHERE {' AND '.join(conditions)}" if conditions else ""
+        
+        # Get total count first
+        count_query = f"SELECT COUNT(*) FROM ships{where_clause}"
+        async with db.execute(count_query, tuple(params)) as cursor:
             total_row = await cursor.fetchone()
             total = total_row[0] if total_row else 0
 
-        async with db.execute(query, tuple(params)) as cursor:
+        # Now get the actual data
+        query = f"SELECT * FROM ships{where_clause} ORDER BY {sort} {order} LIMIT ? OFFSET ?"
+        data_params = params + [limit, offset]
+        
+        async with db.execute(query, tuple(data_params)) as cursor:
             res = []
             for row in await cursor.fetchall():
                 d = dict(row)
@@ -1181,6 +1190,8 @@ async def get_database(q: str = None, limit: int = 50, offset: int = 0, sort: st
 
                 res.append(d)
             return {"ships": res, "total": total}
+
+
 
 @app.post("/api/ships/{mmsi}/image")
 async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
@@ -1287,6 +1298,22 @@ async def update_ship_details(mmsi: str, details: dict):
                 })
         
         await broadcast(broadcast_data)
+        return {"status": "success"}
+    except Exception as e:
+        logger.error(f"Error updating ship details for {mmsi}: {e}")
+        return {"error": str(e)}
+
+@app.delete("/api/ships/{mmsi}")
+async def delete_ship(mmsi: int):
+    try:
+        async with db_session() as db:
+            await db.execute("DELETE FROM ships WHERE mmsi = ?", (mmsi,))
+            await db.execute("DELETE FROM ship_history WHERE mmsi = ?", (mmsi,))
+            await db.commit()
+        return {"status": "success", "message": f"Vessel {mmsi} deleted from archive"}
+    except Exception as e:
+        logger.error(f"Error deleting ship {mmsi}: {e}")
+        return {"error": str(e)}
         logger.info(f"Successfully updated and broadcasted details for {mmsi}")
         
         return {"success": True}
