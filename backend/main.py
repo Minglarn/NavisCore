@@ -104,10 +104,22 @@ class StatsCollector:
 
     def get_hourly_snapshot(self):
         # Convert shiptype IDs to labels for the payload
+        # Initialize all possible labels to 0 as requested by the user
         shiptype_dist = {}
+        for i in range(100):
+            label = get_ship_type_name(i)
+            if label not in shiptype_dist:
+                shiptype_dist[label] = 0
+                
         for sid, mmsis in self.hourly_shiptypes.items():
-            label = get_ship_type_name(sid)
-            shiptype_dist[label] = shiptype_dist.get(label, 0) + len(mmsis)
+            try:
+                label = get_ship_type_name(sid)
+                # Overwrite the 0 with the actual count (or add if multiple IDs map to same label)
+                # We add the length because we only process each sid once, but multiple sids 
+                # might resolve to the same label (e.g. 56 and 57 both resolve to "Spare - Local Vessel").
+                # However, shiptype_dist[label] already has 0, so adding works perfectly.
+                shiptype_dist[label] += len(mmsis)
+            except: pass
             
         return {
             "messages_received": self.hourly_messages,
