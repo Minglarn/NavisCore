@@ -429,6 +429,7 @@ async def try_minglarn_image(mmsi: str) -> bool:
                 async with db_session() as db:
                     await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
                     await db.commit()
+                await broadcast({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
                 return True
     except Exception as e: logger.error(f"[Enrichment] Minglarn fetch error for {mmsi}: {e}")
     return False
@@ -445,6 +446,7 @@ async def try_marinetraffic_image(mmsi: str) -> bool:
                 async with db_session() as db:
                     await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
                     await db.commit()
+                await broadcast({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
                 return True
     except Exception as e: logger.error(f"[Enrichment] MarineTraffic error for {mmsi}: {str(e)}")
     return False
@@ -469,7 +471,8 @@ async def enrich_ship_data(mmsi: str):
             async with db_session() as db:
                 await db.execute('UPDATE ships SET image_url = ?, image_fetched_at = CURRENT_TIMESTAMP WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
                 await db.commit()
-            return
+            await broadcast({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
+            return True
 
         async with db_session() as db:
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, image_fetched_at, last_seen) VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)', (mmsi,))
@@ -493,6 +496,7 @@ async def enrich_ship_data(mmsi: str):
                         async with db_session() as db:
                             await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
                             await db.commit()
+                        await broadcast({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
                         has_image = True
             if not has_image:
                 if not await try_minglarn_image(mmsi):
