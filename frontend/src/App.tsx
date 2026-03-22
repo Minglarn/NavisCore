@@ -2816,17 +2816,17 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                                     />
                                                 </div>
                                                 <div className="form-group-premium">
-                                                    <label>Wait for Name before 'new' payload</label>
-                                                    <Toggle
-                                                        checked={settings.mqtt_pub_wait_for_name === 'true'}
-                                                        onChange={val => setSettings({ ...settings, mqtt_pub_wait_for_name: String(val) })}
-                                                    />
-                                                </div>
-                                                <div className="form-group-premium">
                                                     <label>Forward AisStream</label>
                                                     <Toggle
                                                         checked={settings.mqtt_pub_forward_aisstream === 'true'}
                                                         onChange={val => setSettings({ ...settings, mqtt_pub_forward_aisstream: String(val) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium">
+                                                    <label>Wait for Name before 'new' payload</label>
+                                                    <Toggle
+                                                        checked={settings.mqtt_pub_wait_for_name === 'true'}
+                                                        onChange={val => setSettings({ ...settings, mqtt_pub_wait_for_name: String(val) })}
                                                     />
                                                 </div>
                                             </div>
