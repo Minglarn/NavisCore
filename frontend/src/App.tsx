@@ -4656,15 +4656,12 @@ export default function App() {
                                             setHoveredMmsi(null);
                                         },
                                         click: (e) => {
+                                            // Only open if hover card is visible (as requested)
+                                            if (hoveredMmsi !== mmsiStr) return;
                                             // If we have a tooltip open, clear it when clicking (opening popup)
                                             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
                                             setHoveredMmsi(null);
                                             setSelectedShipMmsi(mmsiStr);
-                                        },
-                                        dblclick: (e) => {
-                                            // Explicitly for double click as requested
-                                            if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-                                            setHoveredMmsi(null);
                                         },
                                         contextmenu: (e) => {
                                             setContextMenu({
@@ -4685,7 +4682,7 @@ export default function App() {
                                         )}
 
                                         {/* Hover Card (Endast synlig om hovrad) */}
-                                        {hoveredMmsi === mmsiStr && (
+                                        {hoveredMmsi === mmsiStr && selectedShipMmsi !== mmsiStr && (
                                             <Tooltip
                                                 key={`hover-tip-${mmsiStr}`}
                                                 permanent
