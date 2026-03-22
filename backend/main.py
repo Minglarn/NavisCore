@@ -815,12 +815,17 @@ async def process_ais_data(data: dict):
                                     pub_payload["propagation"] = "normal"
 
                             if event_type == "new":
+                                new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
                                 img_bytes = get_image_bytes(mmsi_str)
                                 if img_bytes:
-                                    new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
                                     mqtt_pub_queue.put_nowait((new_topic, img_bytes))
-                                    # Wait 1s before sending the object details as requested
-                                    await asyncio.sleep(1)
+                                else:
+                                    # Trigger a "new" event even if image is missing, using a small JSON
+                                    # Home Assistant usually ignores this if it expects an image, but the order is kept.
+                                    mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
+                                
+                                # Wait 2s before sending the object details as requested
+                                await asyncio.sleep(2)
                             
                             mqtt_pub_queue.put_nowait(pub_payload)
                             if event_type == "new":
