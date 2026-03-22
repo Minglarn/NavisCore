@@ -79,26 +79,26 @@ function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?
         return '#ff0000';
     }
 
-    if (isMeteo) return '#44aaff'; // Weather (Light Blue)
-    if (isAton || mmsiStr.startsWith('99')) return '#ff00ff'; // AtoN (Magenta)
-    if (mmsiStr.startsWith('00')) return '#555555'; // Base Station
+    if (isMeteo) return '#bae6fd'; // Weather (Very Light Blue)
+    if (isAton || mmsiStr.startsWith('99')) return '#d946ef'; // AtoN (Magenta)
+    if (mmsiStr.startsWith('00')) return '#64748b'; // Base Station (Slate)
     if (!type && type !== 0) return '#a0a0a0'; // Unknown
 
-    if (type >= 20 && type <= 29) return '#ffffff'; // WIG (White)
-    if (type === 30) return '#f68b1f'; // Fishing (Orange)
-    if (type >= 31 && type <= 32 || type == 52) return '#008080'; // Towing/Tug (Teal)
-    if (type === 33) return '#8b4513'; // Dredging (Brown)
-    if (type === 34) return '#4682b4'; // Diving (SteelBlue)
-    if (type === 35 || type === 55) return '#4b0082'; // Military/Law Enf (Indigo)
-    if (type >= 36 && type <= 37) return '#d500f9'; // Pleasure/Sailing (Purple)
-    if (type >= 40 && type <= 49) return '#ffff00'; // HSC (Yellow)
-    if (type === 50) return '#add8e6'; // Pilot (LightBlue)
-    if (type === 51 || type === 9) return '#ff1493'; // SAR (DeepPink)
+    if (type >= 20 && type <= 29) return '#f8fafc'; // WIG (White)
+    if (type === 30) return '#f97316'; // Fishing (Orange)
+    if (type >= 31 && type <= 32 || type == 52) return '#06b6d4'; // Tugs & Towing (Cyan)
+    if (type === 33) return '#b45309'; // Dredging (Brown/Amber)
+    if (type === 34) return '#0ea5e9'; // Diving (Sky Blue)
+    if (type === 35 || type === 55) return '#4338ca'; // Military/Law Enf (Indigo)
+    if (type >= 36 && type <= 37) return '#a855f7'; // Pleasure/Sailing (Purple)
+    if (type >= 40 && type <= 49) return '#eab308'; // HSC (Yellow)
+    if (type === 50) return '#7dd3fc'; // Pilot (Light Blue)
+    if (type === 51 || type === 9) return '#f43f5e'; // SAR (Pink-Red)
     if (type >= 53 && type <= 54) return '#2e8b57'; // Port/Anti-pollution (SeaGreen)
-    if (type === 58) return '#ff69b4'; // Medical (HotPink)
-    if (type >= 60 && type <= 69) return '#0000ff'; // Passenger (Blue)
-    if (type === 70 || type === 79 || (type >= 71 && type <= 78)) return '#10b981'; // Cargo (Green)
-    if (type >= 80 && type <= 89) return '#ff0000'; // Tanker (Red)
+    if (type === 58) return '#ec4899'; // Medical (Pink)
+    if (type >= 60 && type <= 69) return '#3b82f6'; // Passenger (Blue)
+    if (type === 70 || type === 79 || (type >= 71 && type <= 78)) return '#22c55e'; // Cargo (Green)
+    if (type >= 80 && type <= 89) return '#ef4444'; // Tanker (Red)
 
     return '#a0a0a0'; // Other Type
 }
