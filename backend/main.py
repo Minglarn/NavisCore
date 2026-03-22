@@ -924,7 +924,6 @@ async def mqtt_publisher_worker():
                             payload = json.dumps(item)
                         
                         await client.publish(topic, payload=payload)
-                        logger.info(f"MQTT Publish: {topic} -> {str(payload)[:100]}...")
                     except Exception as e:
                         logger.error(f"MQTT Publish error: {e}")
                         # Put back in queue if it failed? Maybe not to avoid infinite loops
