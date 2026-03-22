@@ -210,6 +210,7 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_only_new": os.getenv("MQTT_PUB_ONLY_NEW", "false").lower(),
         "mqtt_pub_new_topic": os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected"),
         "mqtt_pub_forward_sdr": "true",
+        "mqtt_pub_forward_udp": "true",
         "mqtt_pub_forward_aisstream": "false",
         "new_vessel_threshold": "5",
         "new_vessel_timeout_h": "24"
@@ -723,6 +724,8 @@ async def process_ais_data(data: dict):
                     should_forward = False
                     if (source == "local" or source == "sdr") and forward_sdr:
                         should_forward = True
+                    elif source == "udp" and settings.get("mqtt_pub_forward_udp", "true") == "true":
+                        should_forward = True
                     elif source == "aisstream" and forward_stream:
                         should_forward = True
                         
@@ -1069,6 +1072,7 @@ async def startup_event():
             ('mqtt_pub_pass', os.getenv("MQTT_PUB_PASS", os.getenv("MQTT_PASS", ""))),
             ('mqtt_pub_only_new', os.getenv("MQTT_PUB_ONLY_NEW", "false").lower()),
             ('mqtt_pub_new_topic', os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected")),
+            ('mqtt_pub_forward_udp', 'true'),
             ('new_vessel_threshold', '5')
         ]:
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
@@ -1313,6 +1317,26 @@ async def delete_ship(mmsi: int):
         return {"status": "success", "message": f"Vessel {mmsi} deleted from archive"}
     except Exception as e:
         logger.error(f"Error deleting ship {mmsi}: {e}")
+        return {"error": str(e)}
+
+@app.post("/api/reset_db")
+async def reset_db():
+    try:
+        async with db_session() as db:
+            tables = ["ships", "ship_history", "daily_stats", "daily_mmsi", 
+                      "hourly_stats", "minute_stats", "minute_mmsi", 
+                      "coverage_sectors", "sector_history"]
+            for table in tables:
+                await db.execute(f"DELETE FROM {table}")
+            await db.commit()
+        
+        stats_collector.reset_hourly()
+        stats_collector.daily_new_vessels = 0
+        await broadcast({"type": "db_reset"})
+        logger.info("Database reset triggered by user. All tables cleared, images preserved.")
+        return {"status": "success", "message": "Database has been reset"}
+    except Exception as e:
+        logger.error(f"Error resetting database: {e}")
         return {"error": str(e)}
         logger.info(f"Successfully updated and broadcasted details for {mmsi}")
         

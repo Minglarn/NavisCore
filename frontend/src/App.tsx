@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save, Trash2 } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -2809,6 +2809,13 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                                     />
                                                 </div>
                                                 <div className="form-group-premium">
+                                                    <label>Forward UDP</label>
+                                                    <Toggle
+                                                        checked={settings.mqtt_pub_forward_udp === 'true'}
+                                                        onChange={val => setSettings({ ...settings, mqtt_pub_forward_udp: String(val) })}
+                                                    />
+                                                </div>
+                                                <div className="form-group-premium">
                                                     <label>Forward AisStream</label>
                                                     <Toggle
                                                         checked={settings.mqtt_pub_forward_aisstream === 'true'}
@@ -3016,42 +3023,88 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                         </div>
                                     </div>
 
-                                    <div className="settings-card" style={{ border: '1px solid rgba(255, 68, 68, 0.2)' }}>
-                                        <div className="settings-card-title" style={{ color: '#ff4444' }}><AlertTriangle size={14} /> Danger Zone</div>
-                                        <p style={{ color: colors.textMuted, fontSize: '0.9rem', marginBottom: '20px' }}>
-                                            Resetting coverage data will permanently remove all historical range sectors and statistics. This action cannot be undone.
-                                        </p>
-                                        <button
-                                            className="styled-button"
-                                            style={{
-                                                width: '100%',
-                                                color: '#ff4444',
-                                                borderColor: '#ff4444',
-                                                padding: '12px',
-                                                fontWeight: 'bold',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center',
-                                                gap: '8px',
-                                                background: 'rgba(255, 68, 68, 0.05)'
-                                            }}
-                                            onClick={async () => {
-                                                if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
-                                                    try {
-                                                        const isDev = window.location.port === '5173';
-                                                        const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
-                                                        await fetch(fetchPath, { method: 'POST' });
-                                                        alert('Statistics reset!');
-                                                        window.location.reload();
-                                                    } catch (e) {
-                                                        alert('An error occurred.');
+                                     <div className="settings-card" style={{ border: '1px solid rgba(255, 68, 68, 0.2)' }}>
+                                         <div className="settings-card-title" style={{ color: '#ff4444' }}><AlertTriangle size={14} /> Danger Zone</div>
+                                         
+                                         <div style={{ marginBottom: '20px' }}>
+                                            <label style={{ color: '#ff4444', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Coverage Statistics</label>
+                                            <p style={{ color: colors.textMuted, fontSize: '0.85rem', marginBottom: '10px' }}>
+                                                Resetting coverage data will permanently remove all historical range sectors and statistics.
+                                            </p>
+                                            <button
+                                                className="styled-button"
+                                                style={{
+                                                    width: '100%',
+                                                    color: '#ff4444',
+                                                    borderColor: '#ff4444',
+                                                    padding: '10px',
+                                                    fontWeight: 'bold',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    background: 'rgba(255, 68, 68, 0.05)'
+                                                }}
+                                                onClick={async () => {
+                                                    if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
+                                                        try {
+                                                            const isDev = window.location.port === '5173';
+                                                            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
+                                                            await fetch(fetchPath, { method: 'POST' });
+                                                            alert('Statistics reset!');
+                                                            window.location.reload();
+                                                        } catch (e) {
+                                                            alert('An error occurred.');
+                                                        }
                                                     }
-                                                }
-                                            }}
-                                        >
-                                            <X size={18} /> Reset All Coverage Data
-                                        </button>
-                                    </div>
+                                                }}
+                                            >
+                                                <X size={18} /> Reset All Coverage Data
+                                            </button>
+                                         </div>
+
+                                         <div style={{ paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <label style={{ color: '#ff4444', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Full Database Reset</label>
+                                            <p style={{ color: colors.textMuted, fontSize: '0.85rem', marginBottom: '10px' }}>
+                                                Clears all ships, history, and statistics. <strong>Vessel images will be preserved.</strong>
+                                            </p>
+                                            <button
+                                                className="styled-button"
+                                                style={{
+                                                    width: '100%',
+                                                    color: '#fff',
+                                                    borderColor: '#ff2222',
+                                                    background: 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)',
+                                                    padding: '12px',
+                                                    fontWeight: '900',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    boxShadow: '0 4px 15px rgba(255,0,0,0.2)'
+                                                }}
+                                                onClick={async () => {
+                                                    if (window.confirm('⚠️ CRITICAL ACTION: Are you sure you want to wipe the entire database? This cannot be undone. Images will be kept.')) {
+                                                        try {
+                                                            const isDev = window.location.port === '5173';
+                                                            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/reset_db' : '/api/reset_db';
+                                                            const res = await fetch(fetchPath, { method: 'POST' });
+                                                            if (res.ok) {
+                                                                alert('Database wiped successfully! Preserving images.');
+                                                                window.location.reload();
+                                                            } else {
+                                                                alert('Error: ' + (await res.text()));
+                                                            }
+                                                        } catch (e) {
+                                                            alert('An error occurred: ' + e);
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 size={18} /> WIPE DATABASE (KEEP IMAGES)
+                                            </button>
+                                         </div>
+                                     </div>
                                 </div>
                             )}
 
@@ -3847,6 +3900,14 @@ export default function App() {
                 setStatus('Status: ' + data.message);
             } else if (data.type === 'mqtt_status') {
                 setMqttConnected(data.connected);
+            } else if (data.type === 'db_reset') {
+                setShips([]);
+                setNmeaLogs([]);
+                setDatabaseShips([]);
+                setLastUpdatedShip(null);
+                setCoverageSectors([]);
+                setStatus('Database Reset Locally');
+                setTimeout(() => setStatus('Connected to NavisCore'), 3000);
             } else if (data.type === 'nmea') {
                 setNmeaLogs(prev => [{ ...data, id: Date.now() + Math.random() }, ...prev].slice(0, 200));
             } else if (data.type === 'coverage_update') {
