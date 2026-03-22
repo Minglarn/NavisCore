@@ -214,6 +214,7 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_forward_sdr": "true",
         "mqtt_pub_forward_udp": "true",
         "mqtt_pub_forward_aisstream": "false",
+        "mqtt_pub_wait_for_name": "false",
         "new_vessel_threshold": "5",
         "new_vessel_timeout_h": "24"
     }
@@ -545,7 +546,7 @@ async def process_ais_data(data: dict):
             settings = await get_all_settings(db)
             
             # 1. Determine Event Type (New, Re-acquired, or Update)
-            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton, mqtt_new_sent FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 row = await cursor.fetchone()
             
             is_new_v = row is None
@@ -556,6 +557,7 @@ async def process_ais_data(data: dict):
             if row:
                 last_known_lat, last_known_lon = row[1], row[2]
                 db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = bool(row[3]), bool(row[4]), bool(row[5]), bool(row[6])
+                db_mqtt_new_sent = bool(row[7])
                 try:
                     last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
                     # Use explicit New Vessel Timeout (hours) instead of just ship_timeout
@@ -601,7 +603,9 @@ async def process_ais_data(data: dict):
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count, registration_count, session_start) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0, 1, CURRENT_TIMESTAMP)', (mmsi_str, ship_name, data.get("callsign")))
             
             flds = ["last_seen = CURRENT_TIMESTAMP"]
-            if reset_count: flds.append("previous_seen = last_seen, message_count = 1, registration_count = registration_count + 1, session_start = CURRENT_TIMESTAMP")
+            if reset_count: 
+                flds.append("previous_seen = last_seen, message_count = 1, registration_count = registration_count + 1, session_start = CURRENT_TIMESTAMP, mqtt_new_sent = 0")
+                db_mqtt_new_sent = False
             else: flds.append("message_count = message_count + 1")
             
             vals = []
@@ -651,7 +655,7 @@ async def process_ais_data(data: dict):
             except Exception: pass
             
             # Read back missing data
-            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude, registration_count, session_start FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude, registration_count, session_start, mqtt_new_sent FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 r = await cursor.fetchone()
                 if r:
                     ship_data["imageUrl"] = r[0] or "/images/0.jpg"
@@ -686,6 +690,7 @@ async def process_ais_data(data: dict):
                     ship_data["wind_speed"], ship_data["wind_gust"], ship_data["wind_direction"] = r[26], r[27], r[28]
                     ship_data["water_level"], ship_data["air_temp"], ship_data["air_pressure"] = r[29], r[30], r[31]
                     ship_data["altitude"] = r[32]
+                    ship_data["mqtt_new_sent"] = bool(r[35])
             
             if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
                 try:
@@ -736,9 +741,22 @@ async def process_ais_data(data: dict):
                         
                     if should_forward:
                         event_type = "new" if is_new_v or reset_count else "update"
+                        wait_for_name = settings.get("mqtt_pub_wait_for_name", "false") == "true"
                         only_new = settings.get("mqtt_pub_only_new") == "true"
                         
-                        if not only_new or event_type == "new":
+                        # Special Logic: Wait for name if enabled
+                        if wait_for_name and event_type == "new" and not ship_data.get("name"):
+                            # Skip sending "new" for now as name is missing
+                            should_trigger_new = False
+                        elif wait_for_name and event_type == "update" and ship_data.get("name") and not ship_data.get("mqtt_new_sent"):
+                                # Name finally arrived and we haven't sent "new" yet
+                                should_trigger_new = True
+                                event_type = "new" # Upgrade this update to a "new" event for MQTT
+                        else:
+                            # Normal logic
+                            should_trigger_new = (event_type == "new")
+
+                        if not only_new or should_trigger_new:
                             pub_payload = {
                                 "mmsi": mmsi_str,
                                 "name": ship_data.get("name"),
@@ -805,6 +823,9 @@ async def process_ais_data(data: dict):
                                     await asyncio.sleep(1)
                             
                             mqtt_pub_queue.put_nowait(pub_payload)
+                            if event_type == "new":
+                                await db.execute("UPDATE ships SET mqtt_new_sent = 1 WHERE mmsi = ?", (mmsi_str,))
+                                await db.commit()
                 except Exception as e:
                     logger.error(f"Error queuing MQTT pub message: {e}")
 
@@ -1057,7 +1078,7 @@ async def startup_event():
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
         await db.execute('CREATE TABLE IF NOT EXISTS ships (mmsi TEXT PRIMARY KEY, imo TEXT, name TEXT, callsign TEXT, type INTEGER, image_url TEXT, image_fetched_at DATETIME, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP, session_start DATETIME DEFAULT CURRENT_TIMESTAMP)')
-        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "is_sar BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER", "session_start DATETIME"]:
+        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "is_sar BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER", "session_start DATETIME", "mqtt_new_sent BOOLEAN DEFAULT 0"]:
             try: await db.execute(f"ALTER TABLE ships ADD COLUMN {c}")
             except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')
@@ -1078,6 +1099,7 @@ async def startup_event():
             ('mqtt_pub_pass', os.getenv("MQTT_PUB_PASS", os.getenv("MQTT_PASS", ""))),
             ('mqtt_pub_only_new', os.getenv("MQTT_PUB_ONLY_NEW", "false").lower()),
             ('mqtt_pub_new_topic', os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected")),
+            ('mqtt_pub_wait_for_name', 'false'),
             ('mqtt_pub_forward_udp', 'true'),
             ('new_vessel_threshold', '5')
         ]:
