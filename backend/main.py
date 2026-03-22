@@ -217,7 +217,8 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_forward_aisstream": "false",
         "mqtt_pub_wait_for_name": "false",
         "new_vessel_threshold": "5",
-        "new_vessel_timeout_h": "24"
+        "new_vessel_timeout_h": "24",
+        "purge_days": "365"
     }
     for k, v in defaults.items():
         if k not in settings:
@@ -1052,19 +1053,42 @@ async def mock_mode_loop():
 async def purge_job():
     while True:
         try:
+            settings = await get_all_settings()
+            purge_days = int(settings.get("purge_days", "365"))
+            
             async with db_session() as db:
-                async with db.execute("SELECT mmsi, image_url FROM ships WHERE last_seen < datetime('now', '-30 days')") as cursor:
-                    for row in await cursor.fetchall():
-                        if row[1]:
-                            p = os.path.join(IMAGES_DIR, row[1].split('/')[-1])
-                            if os.path.exists(p): os.remove(p)
-                await db.execute("DELETE FROM ships WHERE last_seen < datetime('now', '-30 days')")
+                # Find ships to be purged to delete their images first
+                query = f"SELECT mmsi, image_url FROM ships WHERE last_seen < datetime('now', '-{purge_days} days')"
+                async with db.execute(query) as cursor:
+                    rows = await cursor.fetchall()
+                    for row in rows:
+                        mmsi, image_url = row
+                        if image_url and image_url != "/images/0.jpg":
+                            # Extract filename from URL (handles ?t= timestamps too)
+                            filename = image_url.split('/')[-1].split('?')[0]
+                            p = os.path.join(IMAGES_DIR, filename)
+                            if os.path.exists(p):
+                                try:
+                                    os.remove(p)
+                                    logger.info(f"[Purge] Deleted image for purged vessel {mmsi}: {filename}")
+                                except Exception as img_err:
+                                    logger.error(f"[Purge] Failed to delete image {p}: {img_err}")
+                
+                # Delete the ships from database
+                await db.execute(f"DELETE FROM ships WHERE last_seen < datetime('now', '-{purge_days} days')")
+                
+                # Clean up other historical data
                 await db.execute("DELETE FROM daily_mmsi WHERE date < date('now', '-7 days')")
                 await db.execute("DELETE FROM minute_stats WHERE time_min < datetime('now', '-24 hours')")
                 await db.execute("DELETE FROM minute_mmsi WHERE time_min < datetime('now', '-24 hours')")
                 await db.execute("DELETE FROM sector_history WHERE timestamp < ?", (int((datetime.now() - timedelta(hours=24)).timestamp() * 1000),))
                 await db.commit()
-        except Exception as e: logger.error(f"[Purge] Error: {e}")
+                if len(rows) > 0:
+                    logger.info(f"[Purge] Successfully purged {len(rows)} vessels older than {purge_days} days.")
+        except Exception as e: 
+            logger.error(f"[Purge] Error: {e}")
+        
+        # Run once every 24 hours
         await asyncio.sleep(86400)
 
 async def coverage_24h_reset_job():

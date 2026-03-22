@@ -2614,6 +2614,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
         { id: 'coverage', label: 'Coverage', icon: <Activity size={18} />, title: 'Coverage & Statistics', desc: 'Monitor system range and reset historical performance data.' },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} />, title: 'SDR Hardware Tuning', desc: 'Fine-tune your RTL-SDR frequency and gain settings (requires restart).' },
         { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} />, title: 'Hybrid Data Sources', desc: 'Configure AisStream.io integration and local NMEA UDP ingest.' },
+        { id: 'data', label: 'Databas & Bilder', icon: <Database size={18} />, title: 'Databas- & Bildhantering', desc: 'Hantera lagrad data, rensa historik och konfigurera automatisk gallring.' },
     ];
 
     const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
@@ -3029,89 +3030,6 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                             />
                                         </div>
                                     </div>
-
-                                     <div className="settings-card" style={{ border: '1px solid rgba(255, 68, 68, 0.2)' }}>
-                                         <div className="settings-card-title" style={{ color: '#ff4444' }}><AlertTriangle size={14} /> Danger Zone</div>
-                                         
-                                         <div style={{ marginBottom: '20px' }}>
-                                            <label style={{ color: '#ff4444', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Coverage Statistics</label>
-                                            <p style={{ color: colors.textMuted, fontSize: '0.85rem', marginBottom: '10px' }}>
-                                                Resetting coverage data will permanently remove all historical range sectors and statistics.
-                                            </p>
-                                            <button
-                                                className="styled-button"
-                                                style={{
-                                                    width: '100%',
-                                                    color: '#ff4444',
-                                                    borderColor: '#ff4444',
-                                                    padding: '10px',
-                                                    fontWeight: 'bold',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '8px',
-                                                    background: 'rgba(255, 68, 68, 0.05)'
-                                                }}
-                                                onClick={async () => {
-                                                    if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
-                                                        try {
-                                                            const isDev = window.location.port === '5173';
-                                                            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
-                                                            await fetch(fetchPath, { method: 'POST' });
-                                                            alert('Statistics reset!');
-                                                            window.location.reload();
-                                                        } catch (e) {
-                                                            alert('An error occurred.');
-                                                        }
-                                                    }
-                                                }}
-                                            >
-                                                <X size={18} /> Reset All Coverage Data
-                                            </button>
-                                         </div>
-
-                                         <div style={{ paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                            <label style={{ color: '#ff4444', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Full Database Reset</label>
-                                            <p style={{ color: colors.textMuted, fontSize: '0.85rem', marginBottom: '10px' }}>
-                                                Clears all ships, history, and statistics. <strong>Vessel images will be preserved.</strong>
-                                            </p>
-                                            <button
-                                                className="styled-button"
-                                                style={{
-                                                    width: '100%',
-                                                    color: '#fff',
-                                                    borderColor: '#ff2222',
-                                                    background: 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)',
-                                                    padding: '12px',
-                                                    fontWeight: '900',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    gap: '8px',
-                                                    boxShadow: '0 4px 15px rgba(255,0,0,0.2)'
-                                                }}
-                                                onClick={async () => {
-                                                    if (window.confirm('⚠️ CRITICAL ACTION: Are you sure you want to wipe the entire database? This cannot be undone. Images will be kept.')) {
-                                                        try {
-                                                            const isDev = window.location.port === '5173';
-                                                            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/reset_db' : '/api/reset_db';
-                                                            const res = await fetch(fetchPath, { method: 'POST' });
-                                                            if (res.ok) {
-                                                                alert('Database wiped successfully! Preserving images.');
-                                                                window.location.reload();
-                                                            } else {
-                                                                alert('Error: ' + (await res.text()));
-                                                            }
-                                                        } catch (e) {
-                                                            alert('An error occurred: ' + e);
-                                                        }
-                                                    }
-                                                }}
-                                            >
-                                                <Trash2 size={18} /> WIPE DATABASE (KEEP IMAGES)
-                                            </button>
-                                         </div>
-                                     </div>
                                 </div>
                             )}
 
@@ -3251,6 +3169,119 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                             />
                                         </div>
                                     </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'data' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Calendar size={14} /> Automatisk Rensning (Purge)</div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Rensa fartyg efter antal dagar</label>
+                                                <div className="description">Fartyg och deras tillhörande bilder raderas permanent efter detta antal dagar (räknat från 'Last Seen').</div>
+                                            </div>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <input
+                                                    type="number"
+                                                    className="input-premium"
+                                                    style={{ width: '100px' }}
+                                                    min="7"
+                                                    max="3650"
+                                                    value={settings.purge_days || '365'}
+                                                    onChange={e => setSettings({ ...settings, purge_days: e.target.value })}
+                                                />
+                                                <span style={{ fontSize: '0.9rem', color: colors.textMuted }}>dagar</span>
+                                            </div>
+                                        </div>
+                                        <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(68,170,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <Info size={16} color="#44aaff" />
+                                            <span style={{ fontSize: '0.8rem', color: colors.textMuted }}>Standardvärdet är 365 dagar (1 år). Bilder raderas endast om de laddats upp specifikt för det aktuella fartyget.</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card" style={{ border: '1px solid rgba(255, 68, 68, 0.2)' }}>
+                                         <div className="settings-card-title" style={{ color: '#ff4444' }}><AlertTriangle size={14} /> Danger Zone</div>
+                                         
+                                         <div style={{ marginBottom: '20px' }}>
+                                            <label style={{ color: '#ff4444', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Coverage Statistics</label>
+                                            <p style={{ color: colors.textMuted, fontSize: '0.85rem', marginBottom: '10px' }}>
+                                                Resetting coverage data will permanently remove all historical range sectors and statistics.
+                                            </p>
+                                            <button
+                                                className="styled-button"
+                                                style={{
+                                                    width: '100%',
+                                                    color: '#ff4444',
+                                                    borderColor: '#ff4444',
+                                                    padding: '10px',
+                                                    fontWeight: 'bold',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    background: 'rgba(255, 68, 68, 0.05)'
+                                                }}
+                                                onClick={async () => {
+                                                    if (window.confirm('Are you sure you want to reset all coverage statistics?')) {
+                                                        try {
+                                                            const isDev = window.location.port === '5173';
+                                                            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/coverage/reset' : '/api/coverage/reset';
+                                                            await fetch(fetchPath, { method: 'POST' });
+                                                            alert('Statistics reset!');
+                                                            window.location.reload();
+                                                        } catch (e) {
+                                                            alert('An error occurred.');
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                <X size={18} /> Reset All Coverage Data
+                                            </button>
+                                         </div>
+
+                                         <div style={{ paddingTop: '20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                            <label style={{ color: '#ff4444', fontWeight: 'bold', display: 'block', marginBottom: '5px' }}>Full Database Reset</label>
+                                            <p style={{ color: colors.textMuted, fontSize: '0.85rem', marginBottom: '10px' }}>
+                                                Clears all ships, history, and statistics. <strong>Vessel images will be preserved.</strong>
+                                            </p>
+                                            <button
+                                                className="styled-button"
+                                                style={{
+                                                    width: '100%',
+                                                    color: '#fff',
+                                                    borderColor: '#ff2222',
+                                                    background: 'linear-gradient(135deg, #ff4444 0%, #cc0000 100%)',
+                                                    padding: '12px',
+                                                    fontWeight: '900',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '8px',
+                                                    boxShadow: '0 4px 15px rgba(255,0,0,0.2)'
+                                                }}
+                                                onClick={async () => {
+                                                    if (window.confirm('⚠️ CRITICAL ACTION: Are you sure you want to wipe the entire database? This cannot be undone. Images will be kept.')) {
+                                                        try {
+                                                            const isDev = window.location.port === '5173';
+                                                            const fetchPath = isDev ? 'http://127.0.0.1:8080/api/reset_db' : '/api/reset_db';
+                                                            const res = await fetch(fetchPath, { method: 'POST' });
+                                                            if (res.ok) {
+                                                                alert('Database wiped successfully! Preserving images.');
+                                                                window.location.reload();
+                                                            } else {
+                                                                alert('Error: ' + (await res.text()));
+                                                            }
+                                                        } catch (e) {
+                                                            alert('An error occurred: ' + e);
+                                                        }
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 size={18} /> WIPE DATABASE (KEEP IMAGES)
+                                            </button>
+                                         </div>
+                                     </div>
                                 </div>
                             )}
                         </div>
