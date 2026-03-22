@@ -33,6 +33,8 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger("NavisCore")
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 app = FastAPI()
 
@@ -593,6 +595,9 @@ async def process_ais_data(data: dict):
                 ship_data["lat"], ship_data["lon"] = last_known_lat, last_known_lon
 
             # 3. Update Database
+            if is_new_v:
+                logger.info(f"New Vessel {mmsi_str} ({ship_name or 'Unknown'}) detected! Source: {source}")
+            
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, name, callsign, last_seen, message_count, registration_count, session_start) VALUES (?, ?, ?, CURRENT_TIMESTAMP, 0, 1, CURRENT_TIMESTAMP)', (mmsi_str, ship_name, data.get("callsign")))
             
             flds = ["last_seen = CURRENT_TIMESTAMP"]
@@ -898,6 +903,7 @@ async def mqtt_publisher_worker():
                             payload = json.dumps(item)
                         
                         await client.publish(topic, payload=payload)
+                        logger.info(f"MQTT Publish: {topic} -> {str(payload)[:100]}...")
                     except Exception as e:
                         logger.error(f"MQTT Publish error: {e}")
                         # Put back in queue if it failed? Maybe not to avoid infinite loops
@@ -1460,4 +1466,4 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=PORT, log_level=LOG_LEVEL.lower())
+    uvicorn.run("main:app", host="0.0.0.0", port=PORT, log_level=LOG_LEVEL.lower(), access_log=False)
