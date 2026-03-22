@@ -2614,7 +2614,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
         { id: 'coverage', label: 'Coverage', icon: <Activity size={18} />, title: 'Coverage & Statistics', desc: 'Monitor system range and reset historical performance data.' },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} />, title: 'SDR Hardware Tuning', desc: 'Fine-tune your RTL-SDR frequency and gain settings (requires restart).' },
         { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} />, title: 'Hybrid Data Sources', desc: 'Configure AisStream.io integration and local NMEA UDP ingest.' },
-        { id: 'data', label: 'Databas & Bilder', icon: <Database size={18} />, title: 'Databas- & Bildhantering', desc: 'Hantera lagrad data, rensa historik och konfigurera automatisk gallring.' },
+        { id: 'data', label: 'Database & Images', icon: <Database size={18} />, title: 'Database & Image Management', desc: 'Manage stored data, clear history and configure automatic purging rules.' },
     ];
 
     const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
@@ -3175,11 +3175,11 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             {activeTab === 'data' && (
                                 <div className="settings-grid">
                                     <div className="settings-card">
-                                        <div className="settings-card-title"><Calendar size={14} /> Automatisk Rensning (Purge)</div>
+                                        <div className="settings-card-title"><Calendar size={14} /> Automatic Purge</div>
                                         <div className="form-group-premium">
                                             <div>
-                                                <label>Rensa fartyg efter antal dagar</label>
-                                                <div className="description">Fartyg och deras tillhörande bilder raderas permanent efter detta antal dagar (räknat från 'Last Seen').</div>
+                                                <label>Purge vessels after number of days</label>
+                                                <div className="description">Vessels and their associated images are permanently deleted after this many days (counted from 'Last Seen').</div>
                                             </div>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                                 <input
@@ -3191,12 +3191,12 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                                     value={settings.purge_days || '365'}
                                                     onChange={e => setSettings({ ...settings, purge_days: e.target.value })}
                                                 />
-                                                <span style={{ fontSize: '0.9rem', color: colors.textMuted }}>dagar</span>
+                                                <span style={{ fontSize: '0.9rem', color: colors.textMuted }}>days</span>
                                             </div>
                                         </div>
                                         <div style={{ marginTop: '15px', padding: '12px', background: 'rgba(68,170,255,0.05)', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <Info size={16} color="#44aaff" />
-                                            <span style={{ fontSize: '0.8rem', color: colors.textMuted }}>Standardvärdet är 365 dagar (1 år). Bilder raderas endast om de laddats upp specifikt för det aktuella fartyget.</span>
+                                            <span style={{ fontSize: '0.8rem', color: colors.textMuted }}>Default value is 365 days (1 year). Images are only deleted if they were uploaded specifically for that vessel.</span>
                                         </div>
                                     </div>
 

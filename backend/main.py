@@ -463,12 +463,29 @@ async def enrich_ship_data(mmsi: str):
     active_lookups.add(mmsi)
     try:
         async with db_session() as db:
-            async with db.execute('SELECT image_fetched_at, image_url, manual_image FROM ships WHERE mmsi = ?', (mmsi,)) as cursor:
+            async with db.execute('SELECT image_fetched_at, image_url, manual_image, is_meteo, is_aton, is_base_station, name FROM ships WHERE mmsi = ?', (mmsi,)) as cursor:
                 row = await cursor.fetchone()
-                if row and row[2]: active_lookups.remove(mmsi); return
-                if row and row[0]:
-                    fetch_date = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
-                    if row[1] and row[1] != "/images/0.jpg":
+                if not row: active_lookups.remove(mmsi); return # Not in DB yet
+                
+                image_fetched_at, image_url, manual_image, is_meteo, is_aton, is_base_station, name = row
+                
+                # Skip enrichment for non-vessel types
+                if is_meteo or is_aton or is_base_station or not name or name.strip() == "":
+                    logger.debug(f"[Enrich] Skipping {mmsi} (Non-vessel or no name)")
+                    active_lookups.remove(mmsi)
+                    return
+
+                # Even stricter check on name
+                name_upper = name.upper()
+                if any(x in name_upper for x in ["METEO", "WEATHER", "BASE STATION", "ATON"]):
+                    logger.info(f"[Enrich] Skipping {mmsi} based on name analysis: {name}")
+                    active_lookups.remove(mmsi)
+                    return
+
+                if manual_image: active_lookups.remove(mmsi); return
+                if image_fetched_at:
+                    fetch_date = datetime.strptime(image_fetched_at, "%Y-%m-%d %H:%M:%S")
+                    if image_url and image_url != "/images/0.jpg":
                         if (datetime.now() - fetch_date).days < 30: active_lookups.remove(mmsi); return
                     else:
                         if (datetime.now() - fetch_date).days < 1: active_lookups.remove(mmsi); return
@@ -571,20 +588,30 @@ async def process_ais_data(data: dict):
 
             # 2. Prepare ship data dictionary
             is_meteo = data.get("is_meteo", False) or msg_type in [4, 8] or db_is_meteo
-            if mmsi_str not in queued_mmsis: queued_mmsis.add(mmsi_str); enrichment_queue.put_nowait(mmsi_str)
+            is_aton = data.get("is_aton", False) or db_is_aton
+            is_base_station = data.get("is_base_station", False)
+            
+            # STRICT RULE: Only AIS Type 5 (Static Class A) or Type 24 (Static Class B) 
+            # should trigger an image enrichment request.
+            if msg_type in [5, 24] and mmsi_str not in queued_mmsis:
+                # Extra check: don't even queue if it's already identified as non-vessel
+                if not (is_meteo or is_aton or is_base_station):
+                    queued_mmsis.add(mmsi_str)
+                    enrichment_queue.put_nowait(mmsi_str)
             
             ship_data = {
                 "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
                 "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype") or (9 if msg_type == 9 else None),
                 "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
-                "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": data.get("is_aton", False) or db_is_aton,
+                "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": is_aton,
                 "is_sar": data.get("is_sar", False) or msg_type == 9 or db_is_sar, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
                 "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
                 "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False) or db_virtual_aton, "is_advanced_binary": data.get("is_advanced_binary", False),
                 "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
                 "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
                 "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
-                "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure")
+                "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure"),
+                "is_base_station": is_base_station, "is_vessel": data.get("is_vessel", True)
             }
 
             if ship_data.get("is_advanced_binary") and not ship_data.get("status_text"):
@@ -616,7 +643,7 @@ async def process_ais_data(data: dict):
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(v)
             
-            for f, k in [("is_meteo", "is_meteo"), ("is_emergency", "is_emergency"), ("virtual_aton", "virtual_aton"), ("is_advanced_binary", "is_advanced_binary"), ("dac", "dac"), ("fid", "fid"), ("raw_payload", "raw_payload")]:
+            for f, k in [("is_meteo", "is_meteo"), ("is_emergency", "is_emergency"), ("virtual_aton", "virtual_aton"), ("is_advanced_binary", "is_advanced_binary"), ("dac", "dac"), ("fid", "fid"), ("raw_payload", "raw_payload"), ("is_base_station", "is_base_station"), ("is_vessel", "is_vessel")]:
                 v = ship_data.get(k)
                 if v is not None: flds.append(f"{f} = ?"); vals.append(1 if v is True else (0 if v is False else v))
             
@@ -657,7 +684,7 @@ async def process_ais_data(data: dict):
             except Exception: pass
             
             # Read back missing data
-            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude, registration_count, session_start, mqtt_new_sent FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT image_url, name, type, status_text, country_code, length, width, destination, draught, message_count, eta, rot, imo, callsign, previous_seen, manual_image, latitude, longitude, is_meteo, is_emergency, emergency_type, virtual_aton, is_advanced_binary, dac, fid, raw_payload, wind_speed, wind_gust, wind_direction, water_level, air_temp, air_pressure, altitude, registration_count, session_start, mqtt_new_sent, is_base_station, is_vessel FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 r = await cursor.fetchone()
                 if r:
                     ship_data["imageUrl"] = r[0] or "/images/0.jpg"
@@ -693,6 +720,8 @@ async def process_ais_data(data: dict):
                     ship_data["water_level"], ship_data["air_temp"], ship_data["air_pressure"] = r[29], r[30], r[31]
                     ship_data["altitude"] = r[32]
                     ship_data["mqtt_new_sent"] = bool(r[35])
+                    ship_data["is_base_station"] = bool(r[36])
+                    ship_data["is_vessel"] = bool(r[37])
             
             if not ship_data.get("ship_type_text") and ship_data.get("shiptype") is not None:
                 try:
@@ -1107,7 +1136,7 @@ async def startup_event():
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
         await db.execute('CREATE TABLE IF NOT EXISTS ships (mmsi TEXT PRIMARY KEY, imo TEXT, name TEXT, callsign TEXT, type INTEGER, image_url TEXT, image_fetched_at DATETIME, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP, session_start DATETIME DEFAULT CURRENT_TIMESTAMP)')
-        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "is_sar BOOLEAN DEFAULT 0", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER", "session_start DATETIME", "mqtt_new_sent BOOLEAN DEFAULT 0"]:
+        for c in ["previous_seen DATETIME", "manual_image BOOLEAN DEFAULT 0", "is_meteo BOOLEAN DEFAULT 0", "is_aton BOOLEAN DEFAULT 0", "is_sar BOOLEAN DEFAULT 0", "is_base_station BOOLEAN DEFAULT 0", "is_vessel BOOLEAN DEFAULT 1", "aton_type INTEGER", "aton_type_text TEXT", "is_emergency BOOLEAN DEFAULT 0", "emergency_type TEXT", "virtual_aton BOOLEAN DEFAULT 0", "is_advanced_binary BOOLEAN DEFAULT 0", "dac INTEGER", "fid INTEGER", "raw_payload TEXT", "heading REAL", "length REAL", "width REAL", "message_count INTEGER DEFAULT 0", "registration_count INTEGER DEFAULT 1", "eta TEXT", "rot REAL", "status_text TEXT", "country_code TEXT", "destination TEXT", "draught REAL", "latitude REAL", "longitude REAL", "sog REAL", "cog REAL", "source TEXT DEFAULT 'local'", "wind_speed REAL", "wind_gust REAL", "wind_direction REAL", "water_level REAL", "air_temp REAL", "air_pressure REAL", "altitude INTEGER", "session_start DATETIME", "mqtt_new_sent BOOLEAN DEFAULT 0"]:
             try: await db.execute(f"ALTER TABLE ships ADD COLUMN {c}")
             except Exception: pass
         await db.execute('CREATE TABLE IF NOT EXISTS ship_history (mmsi TEXT, latitude REAL, longitude REAL, timestamp INTEGER)')

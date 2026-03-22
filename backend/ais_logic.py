@@ -277,6 +277,8 @@ def _decode_type_4_11(bitstr: str, data: dict):
     data["lon"] = lon
     data["lat"] = lat
     data["is_meteo"] = True
+    data["is_base_station"] = True
+    data["is_vessel"] = False
 
 
 def _decode_type_5(bitstr: str, data: dict):
@@ -355,12 +357,12 @@ def _decode_type_8(bitstr: str, data: dict):
         if wind_dir > 360 or wind_speed > 120.0:
             return
 
-        data["lon"] = lon
         data["lat"] = lat
         data["wind_speed"] = wind_speed
         data["wind_gust"] = wind_gust
         data["wind_direction"] = wind_dir
         data["is_meteo"] = True
+        data["is_vessel"] = False
         data["name"] = f"METEO WEATHER {data['mmsi']}"
 
     # Swedish weather report (DAC 265, FI 01)
@@ -405,6 +407,7 @@ def _decode_type_8(bitstr: str, data: dict):
         data["water_level"] = water_level
         data["air_temp"] = air_temp
         data["is_meteo"] = True
+        data["is_vessel"] = False
         data["name"] = station_name if station_name else f"VIVA WEATHER {data['mmsi']}"
 
 
