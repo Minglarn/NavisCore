@@ -756,6 +756,22 @@ async def process_ais_data(data: dict):
 
             await db.commit()
             
+            # --- Distance & False Tropo Filter ---
+            dist_nm = 0
+            origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
+            if origin_lat and origin_lon and lat is not None and lon is not None:
+                try:
+                    dist_km = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
+                    dist_nm = dist_km * 0.539957
+                    ship_data["dist_to_station_nm"] = round(dist_nm, 2)
+                except: pass
+
+            # Filter False Tropo: objects > 200nm away with only 1 message
+            if dist_nm > 200 and ship_data.get("message_count", 0) < 2:
+                logger.info(f"False Tropo candidate suppressed: {mmsi_str} at {dist_nm:.1f}nm (Messages: {ship_data.get('message_count')})")
+                await db.commit()
+                return
+
             # --- MQTT Publisher Logic ---
             if settings.get("mqtt_pub_enabled") == "true":
                 try:
@@ -830,20 +846,14 @@ async def process_ais_data(data: dict):
                                 "source": source,
                                 "event_type": event_type,
                                 "timestamp": ship_data.get("timestamp"),
-                                "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None
+                                "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None,
+                                "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None
                             }
-                            origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
-                            if origin_lat and origin_lon and lat is not None and lon is not None:
-                                try:
-                                    dist_km = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
-                                    pub_payload["dist_to_station_km"] = round(dist_km, 2)
-                                    pub_payload["dist_to_station_nm"] = round(dist_km * 0.539957, 2)
-                                    # Signal Propagation classification
-                                    if dist_km > 185.2: pub_payload["propagation"] = "tropo_ducting"
-                                    elif 74.08 < dist_km < 148.16: pub_payload["propagation"] = "enhanced_range"
-                                    else: pub_payload["propagation"] = "normal"
-                                except: 
-                                    pub_payload["propagation"] = "normal"
+                            
+                            # Signal Propagation classification
+                            if dist_nm > 200: pub_payload["propagation"] = "tropo_ducting"
+                            elif 40 < dist_nm < 80: pub_payload["propagation"] = "enhanced_range"
+                            else: pub_payload["propagation"] = "normal"
 
                             if event_type == "new":
                                 async with mqtt_new_vessel_lock:

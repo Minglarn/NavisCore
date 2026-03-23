@@ -324,7 +324,7 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     return emoji;
 }
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean) {
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean, isDark?: boolean) {
     const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
     const isAircraft = type === 9;
     const color = getShipColor(mmsi, type, isMeteo, isAton, isEmergency);
@@ -336,32 +336,47 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     const baseHitArea = 24;
     const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
-    if (isMeteo) {
+    if (isAton) {
+        // AtoN Icon: Lighthouse for fixed structures (1, 3, 5-20), Buoy for floating (21-31)
+        const isFloating = atonType && atonType >= 21 && atonType <= 31;
+        const size = (isFloating ? 24 : 32) * shipScale;
+        if (isFloating) {
+            // High-quality Buoy Icon
+            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="${emergencyClass}">
+                     <filter id="buoy-shadow" x="-20%" y="-20%" width="140%" height="140%">
+                       <feGaussianBlur in="SourceAlpha" stdDeviation="0.5" />
+                       <feOffset dx="0.5" dy="0.5" result="offsetblur" />
+                       <feComponentTransfer><feFuncA type="linear" slope="0.5"/></feComponentTransfer>
+                       <feMerge><feMergeNode /><feMergeNode in="SourceGraphic" /></feMerge>
+                     </filter>
+                     <path d="M12,4 L15,8 L16,18 L8,18 L9,8 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.2" ${strokeDash} filter="url(#buoy-shadow)" />
+                     <path d="M6,18 L18,18" stroke="${borderColor}" stroke-width="2.5" stroke-linecap="round" />
+                     <path d="M7,19 L17,19" stroke="${isDark ? '#444' : '#ccc'}" stroke-width="1" stroke-linecap="round" />
+                     <circle cx="12" cy="4" r="2.5" fill="yellow" stroke="${borderColor}" stroke-width="0.5" class="svg-pulse" style="filter: drop-shadow(0 0 3px yellow);" />
+                   </svg>`;
+        } else {
+            // High-quality Lighthouse Icon
+            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="${emergencyClass}">
+                     <defs>
+                       <linearGradient id="beam" x1="0%" y1="50%" x2="100%" y2="50%">
+                         <stop offset="0%" style="stop-color:yellow;stop-opacity:0.6" />
+                         <stop offset="100%" style="stop-color:yellow;stop-opacity:0" />
+                       </linearGradient>
+                     </defs>
+                     <path d="M9,22 L15,22 L13,6 L11,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.2" ${strokeDash} />
+                     <rect x="10" y="4" width="4" height="3" fill="#333" stroke="${borderColor}" stroke-width="0.8" />
+                     <path d="M12,2 L12,4" stroke="yellow" stroke-width="1.5" stroke-linecap="round" />
+                     <circle cx="12" cy="5.5" r="1.5" fill="white" class="svg-pulse" />
+                     <path d="M12,5.5 L20,3 L20,8 Z" fill="url(#beam)" class="svg-rotate-slow" style="transform-origin: 12px 5.5px;" />
+                   </svg>`;
+        }
+    } else if (isMeteo) {
         // Weather Icon (Vindstrut/Wind sock)
         const size = 28 * shipScale;
         svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24">
                  <path d="M12,2 L12,22 M12,2 L21,5 L21,9 L12,12 M12,5 L19,6.2 L19,7.8 L12,9" fill="${color}" stroke="${borderColor}" stroke-width="1.5" stroke-linecap="round" />
                  <circle cx="12" cy="2" r="1.5" fill="${borderColor}" />
                </svg>`;
-    } else if (isAton) {
-        // AtoN Icon: Lighthouse for fixed structures (1, 3, 5-20), Buoy for floating (21-31)
-        const isFloating = atonType && atonType >= 21 && atonType <= 31;
-        const size = (isFloating ? 24 : 28) * shipScale;
-        if (isFloating) {
-            // Buoy
-            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="${emergencyClass}">
-                     <path d="M12,2 L14,6 L16,18 L8,18 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" ${strokeDash} />
-                     <path d="M6,18 L18,18" stroke="${borderColor}" stroke-width="2" stroke-linecap="round" />
-                     <circle cx="12" cy="4" r="2" fill="yellow" stroke="${borderColor}" stroke-width="0.5" class="svg-pulse" />
-                   </svg>`;
-        } else {
-            // Lighthouse / Fixed Structure
-            svg = `<svg width="${size}" height="${size}" viewBox="0 0 24 24" class="${emergencyClass}">
-                     <path d="M8,22 L16,22 L14,6 L10,6 Z" fill="${color}" stroke="${borderColor}" stroke-width="1.5" ${strokeDash} />
-                     <rect x="9" y="4" width="6" height="4" fill="#333" stroke="${borderColor}" stroke-width="1" />
-                     <path d="M7,6 L4,4 M17,6 L20,4 M12,2 L12,4" stroke="yellow" stroke-width="2" stroke-linecap="round" class="svg-pulse" />
-                   </svg>`;
-        }
     } else if (isAircraft) {
         const rotation = cog !== undefined ? cog : 0;
         const size = 24 * shipScale;
@@ -1007,6 +1022,41 @@ function calculateDestinationPoint(lat: number, lon: number, distance: number, b
     return [toDeg(lat2), toDeg(lon2)];
 }
 
+const RangeRings = React.memo(({ originLat, originLon, isDark }: { originLat: number, originLon: number, isDark: boolean }) => {
+    const rings = [5, 10, 15, 20, 30, 40, 50, 60];
+    const ringColor = isDark ? '#44aaff' : '#0066cc';
+    
+    return (
+        <>
+            {rings.map(nm => (
+                <Circle 
+                    key={`ring-${nm}`}
+                    center={[originLat, originLon]} 
+                    radius={nm * 1852} 
+                    pathOptions={{ color: ringColor, weight: 1.5, fill: false, opacity: 0.4 }}
+                    interactive={false}
+                />
+            ))}
+            {rings.flatMap(nm => [0, 180].map(bearing => {
+                const labelPos = calculateDestinationPoint(originLat, originLon, nm * 1.852, bearing);
+                return (
+                    <Marker 
+                        key={`label-${nm}-${bearing}`}
+                        position={labelPos as L.LatLngExpression}
+                        interactive={false}
+                        icon={L.divIcon({
+                            className: '',
+                            html: `<div style="color: ${ringColor}; font-size: 11px; font-weight: 800; white-space: nowrap; transform: translate(-50%, -50%); text-shadow: -1px -1px 0 ${isDark ? '#000' : '#fff'}, 1px -1px 0 ${isDark ? '#000' : '#fff'}, -1px 1px 0 ${isDark ? '#000' : '#fff'}, 1px 1px 0 ${isDark ? '#000' : '#fff'};">${nm}nm</div>`,
+                            iconSize: [0, 0],
+                            iconAnchor: [0, 0]
+                        })}
+                    />
+                );
+            }))}
+        </>
+    );
+});
+
 function ChartCard({ title, children, colors }: any) {
     return (
         <div style={{ 
@@ -1184,7 +1234,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
         labels: historyFiltered.map((h: any) => h.date.split('-').slice(1).join('/')),
         datasets: [{
             label: 'Station Max Range (nm)',
-            data: historyFiltered.map((h: any) => (h.max_range_km * 0.539957).toFixed(1)),
+            data: historyFiltered.map((h: any) => (Number(h.max_range_km || 0) * 0.539957).toFixed(1)),
             borderColor: '#ff00ff',
             backgroundColor: 'rgba(255, 0, 255, 0.1)',
             fill: true,
@@ -2227,16 +2277,25 @@ function VesselEditModal({ ship, isOpen, onClose, onSave, onDelete, colors, isDa
                                 onChange={handleImageUpload}
                             />
                             
-                            {localImage ? (
+                            {localImage && !(ship.is_aton || String(ship.mmsi).startsWith('99')) ? (
                                 <img 
                                     src={localImage} 
                                     alt="Preview" 
                                     style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: uploading ? 0.4 : 1 }} 
                                 />
                             ) : (
-                                <div style={{ textAlign: 'center', color: colors.textMuted, padding: '20px' }}>
-                                    <Ship size={40} style={{ marginBottom: '10px', opacity: 0.5 }} />
-                                    <div style={{ fontSize: '0.8rem' }}>Click to upload image</div>
+                                <div style={{ textAlign: 'center', color: colors.textMuted, padding: '20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    {ship.is_aton ? (
+                                        <>
+                                            <Navigation size={60} color={isDark ? '#44aaff' : '#00838f'} />
+                                            <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>AtoN Symbol</div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Ship size={40} style={{ marginBottom: '10px', opacity: 0.5 }} />
+                                            <div style={{ fontSize: '0.8rem' }}>Click to upload image</div>
+                                        </>
+                                    )}
                                 </div>
                             )}
                             
@@ -2317,7 +2376,7 @@ function VesselEditModal({ ship, isOpen, onClose, onSave, onDelete, colors, isDa
 }
 
 
-function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any) {
+function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings, isDark }: any) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploading, setUploading] = useState(false);
     const [localImage, setLocalImage] = useState<string | null>(null);
@@ -2337,7 +2396,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
     ];
 
     const navBlocks = [
-        { label: 'Position', value: `${ship.lat.toFixed(3)}, ${ship.lon.toFixed(3)}` },
+        { label: 'Position', value: `${ship.lat?.toFixed(3) ?? '--'}, ${ship.lon?.toFixed(3) ?? '--'}` },
         { label: 'Speed (SOG)', value: formatSpeed(ship.sog, mqttSettings.units) },
         { label: 'Course (COG)', value: ship.cog != null ? `${ship.cog.toFixed(0)}°` : '--' },
         { label: 'Heading', value: ship.heading != null ? `${ship.heading}°` : '--' },
@@ -2405,7 +2464,7 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                         }}
                     />
                     
-                    {localImage && localImage !== "/images/0.jpg" ? (
+                    {localImage && localImage !== "/images/0.jpg" && !(ship.is_aton || String(ship.mmsi).startsWith('99')) ? (
                         <div 
                             title="Klicka för att ladda upp egen bild"
                             onClick={() => fileInputRef.current?.click()}
@@ -2424,11 +2483,33 @@ function VesselDetailModal({ isOpen, onClose, ship, colors, mqttSettings }: any)
                         />
                     ) : (
                         <div 
-                            title="Click to upload custom image"
-                            onClick={() => fileInputRef.current?.click()}
-                            style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#666', gap: '10px', cursor: 'pointer', opacity: uploading ? 0.5 : 1, transition: 'opacity 0.2s' }}>
-                            <Ship size={80} strokeWidth={1} />
-                            <span style={{ fontSize: '0.9rem' }}>{uploading ? 'Uploading...' : 'Click to upload custom image'}</span>
+                            title={(ship.is_aton || String(ship.mmsi).startsWith('99')) ? "Aids to Navigation" : "Click to upload custom image"}
+                            onClick={(ship.is_aton || String(ship.mmsi).startsWith('99')) ? undefined : () => fileInputRef.current?.click()}
+                            style={{ 
+                                width: '100%', 
+                                height: '100%', 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                color: isDark ? '#44aaff' : '#00838f', 
+                                gap: '15px', 
+                                cursor: (ship.is_aton || String(ship.mmsi).startsWith('99')) ? 'default' : 'pointer', 
+                                opacity: uploading ? 0.5 : 1, 
+                                transition: 'opacity 0.2s' 
+                            }}>
+                            {(ship.is_aton || String(ship.mmsi).startsWith('99')) ? (
+                                <>
+                                    <Navigation size={120} strokeWidth={1} />
+                                    <span style={{ fontSize: '1.4rem', fontWeight: 700 }}>Aids to Navigation</span>
+                                    {ship.is_meteo && <span style={{ fontSize: '1rem', color: colors.textMuted }}>Meteorological Station</span>}
+                                </>
+                            ) : (
+                                <>
+                                    <Ship size={80} strokeWidth={1} />
+                                    <span style={{ fontSize: '0.9rem', color: '#666' }}>{uploading ? 'Uploading...' : 'Click to upload custom image'}</span>
+                                </>
+                            )}
                         </div>
                     )}
                     
@@ -3774,6 +3855,10 @@ export default function App() {
                         if (savedTrailColor !== null) overrides.trail_color = savedTrailColor;
                         if (savedTrailSize !== null) overrides.trail_size = savedTrailSize;
                         if (savedTrailOpacity !== null) overrides.trail_opacity = savedTrailOpacity;
+                        
+                        const savedTheme = localStorage.getItem('naviscore_theme');
+                        if (savedTheme !== null) overrides.map_style = savedTheme;
+                        
                         return overrides;
                     })()
                 }));
@@ -4607,18 +4692,11 @@ export default function App() {
                                                 />
                                             )}
 
-                                            {[5, 10, 15, 20, 30, 40, 50, 60].map(nm => (
-                                                <Circle 
-                                                    key={`ring-${nm}`}
-                                                    center={[originLat, originLon]} 
-                                                    radius={nm * 1852} 
-                                                    pathOptions={{ color: '#0066cc', weight: 2, fill: false, opacity: 0.5, dashArray: '5 5' }}
-                                                >
-                                                    <Tooltip sticky direction="top" opacity={0.7}>
-                                                        {nm} nm
-                                                    </Tooltip>
-                                                </Circle>
-                                            ))}
+                                            <RangeRings 
+                                                originLat={originLat} 
+                                                originLon={originLon} 
+                                                isDark={isDark} 
+                                            />
                                         </>
                                     )}
                                 </>
@@ -4669,7 +4747,8 @@ export default function App() {
                                     s.aton_type,
                                     s.is_emergency,
                                     s.virtual_aton,
-                                    isNew
+                                    isNew,
+                                    isDark
                                 );
 
                                 return (
@@ -4722,7 +4801,7 @@ export default function App() {
                                                 opacity={0.98}
                                                 className="custom-tooltip"
                                             >
-                                                {s.is_meteo ? (
+                                                {s.is_meteo && !s.is_aton ? (
                                                     <div style={{
                                                         display: 'flex', flexDirection: 'column',
                                                         borderRadius: '8px', overflow: 'hidden',
@@ -4775,64 +4854,102 @@ export default function App() {
                                                         color: colors.textMain,
                                                         boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
                                                         border: `1px solid ${colors.border}`,
-                                                        width: '280px',
+                                                        minWidth: '280px', width: (s.is_aton || mmsiStr.startsWith('99')) ? 'auto' : '280px', maxWidth: '450px',
                                                         overflow: 'hidden',
                                                         fontFamily: 'system-ui, -apple-system, sans-serif'
                                                     }}>
-                                                        {/* Top: Vessel Image */}
-                                                        <div style={{ position: 'relative', width: '100%', height: '160px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
-                                                            {s.imageUrl ? (
-                                                                <img
-                                                                    src={s.imageUrl}
-                                                                    onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
-                                                                    alt={s.name}
-                                                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                                                                />
+                                                        {/* Top: Vessel Image (Hidden for AtoNs) */}
+                                                        {!(s.is_aton || mmsiStr.startsWith('99')) && (
+                                                            <div style={{ position: 'relative', width: '100%', height: '160px', background: '#0a0a0a', borderBottom: `1px solid ${colors.border}` }}>
+                                                                {s.imageUrl ? (
+                                                                    <img
+                                                                        src={s.imageUrl}
+                                                                        onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }}
+                                                                        alt={s.name}
+                                                                        style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                                                    />
+                                                                ) : (
+                                                                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, flexDirection: 'column', gap: '8px' }}>
+                                                                        <Ship size={32} />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Header: Flag, Name (MMSI), Speed/Fixed Aid */}
+                                                         {/* Header: Flag, Name (MMSI), Speed/Fixed Aid */}
+                                                         <div style={{ padding: (s.is_aton || mmsiStr.startsWith('99')) ? '10px 15px' : '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
+                                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+                                                                 <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
+                                                                 <strong style={{ 
+                                                                     fontSize: (s.is_aton || mmsiStr.startsWith('99')) ? '1rem' : '0.9rem', 
+                                                                     fontWeight: 800, 
+                                                                     whiteSpace: 'nowrap',
+                                                                     textOverflow: (s.is_aton || mmsiStr.startsWith('99')) ? 'initial' : 'ellipsis',
+                                                                     overflow: (s.is_aton || mmsiStr.startsWith('99')) ? 'initial' : 'hidden'
+                                                                 }}>
+                                                                     {s.name || 'Unknown'} 
+                                                                 </strong>
+                                                             </div>
+                                                             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
+                                                                 {!(s.is_aton || mmsiStr.startsWith('99')) ? (
+                                                                     <>
+                                                                         <span style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900, lineHeight: 1 }}>
+                                                                             {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
+                                                                         </span>
+                                                                         <span style={{ color: '#10b981', fontWeight: 900, fontSize: '0.95rem', whiteSpace: 'nowrap' }}>
+                                                                              {formatSpeed(s.sog, mqttSettings.units)}
+                                                                         </span>
+                                                                     </>
+                                                                 ) : null}
+                                                             </div>
+                                                         </div>
+
+                                                        {/* Content Grid */}
+                                                        <div style={{ background: 'rgba(0,0,0,0.05)', borderTop: `1px solid ${colors.border}` }}>
+                                                            {/* Compact Position Info for AtoNs */}
+                                                            {(s.is_aton || mmsiStr.startsWith('99')) ? (
+                                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', padding: '10px 0', gap: '0' }}>
+                                                                     <div style={{ textAlign: 'center', borderRight: `1px solid ${colors.border}` }}>
+                                                                         <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Dist</div>
+                                                                         <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
+                                                                         <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#44aaff' }}>{formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}</div>
+                                                                     </div>
+                                                                     <div style={{ textAlign: 'center', borderRight: `1px solid ${colors.border}` }}>
+                                                                         <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Brg</div>
+                                                                         <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
+                                                                         <div style={{ fontSize: '0.8rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
+                                                                             <Navigation size={8} style={{ transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, color: colors.textMuted }} />
+                                                                             {calculateBearing(originLat, originLon, s.lat, s.lon)?.toFixed(0) ?? '0'}°
+                                                                         </div>
+                                                                     </div>
+                                                                     <div style={{ textAlign: 'center' }}>
+                                                                         <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Seen</div>
+                                                                         <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
+                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>{getTimeAgo(s.timestamp)}</div>
+                                                                     </div>
+                                                                 </div>
                                                             ) : (
-                                                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-                                                                    <Ship size={32} />
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
+                                                            {/* Status - Hidden for AtoNs */}
+                                                            {!(s.is_aton || mmsiStr.startsWith('99')) && (
+                                                                <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}>
+                                                                    <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Status</div>
+                                                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', lineHeight: '1.1', whiteSpace: 'normal' }}>
+                                                                        {s.status_text || 'Underway'}
+                                                                    </div>
                                                                 </div>
                                                             )}
-                                                        </div>
-
-                                                        {/* Header: Flag, Name, Speed */}
-                                                        <div style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
-                                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-                                                                <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
-                                                                <strong style={{ fontSize: '0.95rem', fontWeight: 800, whiteSpace: 'nowrap', textOverflow: 'ellipsis', overflow: 'hidden' }}>
-                                                                    {s.name || mmsiStr}
-                                                                </strong>
-                                                            </div>
-                                                            <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-                                                                <span style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold', lineHeight: 1 }}>
-                                                                    {(s.shiptype === 9 || s.is_sar) ? 'Airspeed' : 'SOG'}
-                                                                </span>
-                                                                <span style={{ color: '#10b981', fontWeight: 900, fontSize: '1rem', whiteSpace: 'nowrap' }}>
-                                                                    {formatSpeed(s.sog, mqttSettings.units)}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Grid: Status, Type, Distance, Bearing */}
-                                                        <div style={{ 
-                                                            display: 'grid', 
-                                                            gridTemplateColumns: '1fr 1fr', 
-                                                            borderTop: `1px solid ${colors.border}`,
-                                                            background: 'rgba(0,0,0,0.05)'
-                                                        }}>
-                                                            {/* Status */}
-                                                            <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}>
-                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Status</div>
-                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', lineHeight: '1.1', whiteSpace: 'normal' }}>
-                                                                    {s.status_text || 'Underway'}
-                                                                </div>
-                                                            </div>
 
                                                             {/* Type */}
-                                                            <div style={{ padding: '6px 12px', borderBottom: `1px solid ${colors.border}` }}>
+                                                            <div style={{ 
+                                                                padding: '6px 12px', 
+                                                                borderBottom: `1px solid ${colors.border}`,
+                                                                gridColumn: (s.is_aton || mmsiStr.startsWith('99')) ? 'span 2' : 'auto'
+                                                            }}>
                                                                 <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Type</div>
                                                                 <div style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                    {s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'Unknown')}
+                                                                    {s.virtual_aton ? 'Virtual AtoN' : (s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : ((s.is_aton || mmsiStr.startsWith('99')) ? 'Fixed Aid' : 'Unknown')))}
                                                                 </div>
                                                             </div>
 
@@ -4855,26 +4972,65 @@ export default function App() {
                                                                             color: colors.textMuted
                                                                         }} 
                                                                     />
-                                                                {calculateBearing(originLat, originLon, s.lat, s.lon).toFixed(0)}°
+                                                                {calculateBearing(originLat, originLon, s.lat, s.lon)?.toFixed(0) ?? '0'}°
                                                             </div>
                                                         </div>
 
-                                                        {/* Last Seen */}
-                                                        <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderTop: `1px solid ${colors.border}` }}>
-                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Last Seen</div>
-                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>
-                                                                {getTimeAgo(s.timestamp)}
-                                                            </div>
+                                                                     {/* Last Seen & MMSI combined */}
+                                                                     <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}`, borderRight: `1px solid ${colors.border}` }}>
+                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Last Seen</div>
+                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>{getTimeAgo(s.timestamp)}</div>
+                                                                     </div>
+                                                                     <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}` }}>
+                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
+                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>{mmsiStr}</div>
+                                                                     </div>
+                                                                    </div>
+                                                            )}
                                                         </div>
 
-                                                        {/* MMSI / Source */}
-                                                        <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}` }}>
-                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
-                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>
-                                                                {mmsiStr}
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                        {/* Weather Data for AtoNs if available */}
+                                                        {(s.is_aton || mmsiStr.startsWith('99')) && (s.wind_speed !== undefined || s.air_temp !== undefined) && (
+                                                             <div style={{ 
+                                                                 padding: '10px 0',
+                                                                 background: isDark ? 'rgba(68, 170, 255, 0.08)' : 'rgba(0, 131, 143, 0.08)',
+                                                                 borderTop: `1px solid ${colors.border}`,
+                                                                 display: 'flex',
+                                                                 justifyContent: 'space-around',
+                                                                 alignItems: 'center'
+                                                             }}>
+                                                                 {s.wind_speed !== undefined && (
+                                                                     <div style={{ textAlign: 'center', flex: 1, borderRight: `1px solid ${colors.border}` }}>
+                                                                         <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Wind</div>
+                                                                         <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
+                                                                         <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#44aaff' }}>{s.wind_speed} <span style={{ fontSize: '0.6rem', fontWeight: 400 }}>m/s</span></div>
+                                                                         {s.wind_direction !== undefined && <div style={{ fontSize: '0.6rem', opacity: 0.7 }}>{s.wind_direction}°</div>}
+                                                                     </div>
+                                                                 )}
+                                                                 {s.air_temp !== undefined && (
+                                                                     <div style={{ textAlign: 'center', flex: 1, borderRight: s.air_pressure !== undefined ? `1px solid ${colors.border}` : 'none' }}>
+                                                                         <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Temp</div>
+                                                                         <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
+                                                                         <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#ffab40' }}>{s.air_temp}°C</div>
+                                                                     </div>
+                                                                 )}
+                                                                 {s.air_pressure !== undefined && (
+                                                                     <div style={{ textAlign: 'center', flex: 1 }}>
+                                                                         <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Baro</div>
+                                                                         <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
+                                                                         <div style={{ fontSize: '0.9rem', fontWeight: 900, color: colors.textMain }}>{s.air_pressure?.toFixed(0) ?? '--'} <span style={{ fontSize: '0.6rem', fontWeight: 400 }}>hPa</span></div>
+                                                                     </div>
+                                                                 )}
+                                                             </div>
+                                                         )}
+
+                                                         {/* Footer Info for AtoNs */}
+                                                         {(s.is_aton || mmsiStr.startsWith('99')) && (
+                                                             <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}` }}>
+                                                                 <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
+                                                                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>{mmsiStr}</div>
+                                                             </div>
+                                                         )}
 
                                                         {/* Special Indicators (Tropo, Emergency, Altitude) */}
                                                         {((s.shiptype === 9 || s.is_sar) && s.altitude !== undefined) || s.is_emergency || (haversineDistance(originLat, originLon, s.lat, s.lon) > 74.08) ? (
@@ -4944,15 +5100,22 @@ export default function App() {
                                                 <div style={{ display: 'flex', flexDirection: 'row', background: 'var(--bg-card)' }}>
                                                     {/* LEFT: Image */}
                                                     <div style={{ width: '220px', minWidth: '220px', height: '160px', position: 'relative', borderRight: `1px solid ${colors.border}` }}>
-                                                        {s.imageUrl ? (
+                                                        {s.imageUrl && !(s.is_aton || mmsiStr.startsWith('99')) ? (
                                                             <div style={{ width: '100%', height: '100%', backgroundImage: `url(${s.imageUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
                                                                 <div style={{ position: 'absolute', bottom: '5px', left: '8px', color: '#fff', fontSize: '0.75rem', fontWeight: 'bold', textShadow: '1px 1px 2px rgba(0,0,0,0.8)' }}>
                                                                     NavisCore
                                                                 </div>
                                                             </div>
                                                         ) : (
-                                                            <div style={{ width: '100%', height: '100%', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-                                                                No image
+                                                            <div style={{ width: '100%', height: '100%', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', color: colors.textMuted, flexDirection: 'column', gap: '8px' }}>
+                                                                {(s.is_aton || mmsiStr.startsWith('99')) ? (
+                                                                    <>
+                                                                        <Navigation size={64} color={isDark ? '#44aaff' : '#00838f'} />
+                                                                        <span style={{ fontSize: '1rem', fontWeight: 600 }}>Aids to Navigation</span>
+                                                                    </>
+                                                                ) : (
+                                                                    'No image'
+                                                                )}
                                                             </div>
                                                         )}
                                                     </div>
@@ -5446,6 +5609,7 @@ export default function App() {
                     ship={ships.find((s: any) => String(s.mmsi) === selectedShipMmsi)}
                     colors={colors}
                     mqttSettings={mqttSettings}
+                    isDark={isDark}
                 />
             )}
 
