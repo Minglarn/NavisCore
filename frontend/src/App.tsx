@@ -4642,6 +4642,9 @@ export default function App() {
                             zoom={(() => { try { const z = parseInt(localStorage.getItem('naviscore_zoom') || ''); return isNaN(z) ? 10 : z; } catch { return 10; } })()} 
                             style={{ height: '100%', width: '100%', background: colors.bgMain }} 
                             zoomControl={false}
+                            zoomSnap={0.5}
+                            zoomDelta={0.5}
+                            wheelPxPerZoomLevel={120}
                         >
                             <CenterButton originLat={originLat} originLon={originLon} />
                             <ZoomTracker setZoom={setCurrentZoom} />
@@ -4762,15 +4765,15 @@ export default function App() {
 
                                 // Smart Label Logic:
                                 // 1. Emergency: Always show name
-                                // 2. Zoom >= 13: Show all names (clustering handles density)
-                                // 3. Zoom 11-12: Show every 3rd ship
-                                // 4. Zoom < 11: Show every 10th ship 
+                                // 2. Zoom >= 10: Show all names
+                                // 3. Zoom 8-9: Show every 2nd ship
+                                // 4. Zoom < 8: Show every 4th ship 
                                 let shouldShowName = false;
                                 if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
                                     if (s.is_emergency) shouldShowName = true;
-                                    else if (currentZoom >= 13) shouldShowName = true;
-                                    else if (currentZoom >= 11 && idx % 3 === 0) shouldShowName = true;
-                                    else if (currentZoom < 11 && idx % 10 === 0) shouldShowName = true;
+                                    else if (currentZoom >= 10) shouldShowName = true;
+                                    else if (currentZoom >= 8 && idx % 2 === 0) shouldShowName = true;
+                                    else if (currentZoom < 8 && idx % 4 === 0) shouldShowName = true;
                                 }
 
                                 const cog = s.course ?? s.cog;
