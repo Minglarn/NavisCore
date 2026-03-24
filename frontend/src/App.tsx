@@ -4452,6 +4452,7 @@ export default function App() {
     }
 
     const showRangeRings = mqttSettings.show_range_rings === 'true';
+    const occupiedLabelGrids = new Set<string>();
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', background: colors.bgMain, color: colors.textMain, overflow: 'hidden' }}>
@@ -4756,20 +4757,20 @@ export default function App() {
                                                 />
                                             )}
 
-                                            <RangeRings 
-                                                originLat={originLat} 
-                                                originLon={originLon} 
-                                                isDark={isDark} 
+                                            <RangeRings
+                                                originLat={originLat}
+                                                originLon={originLon}
+                                                isDark={isDark}
                                             />
                                         </>
                                     )}
                                 </>
                             )}
 
-                            <MarkerClusterGroup 
+                            <MarkerClusterGroup
                                 key={`cluster-group-${mqttSettings.cluster_break_zoom || '11'}`}
-                                chunkedLoading={true} 
-                                maxClusterRadius={40} 
+                                chunkedLoading={true}
+                                maxClusterRadius={40}
                                 spiderfyOnMaxZoom={true}
                                 disableClusteringAtZoom={parseInt(mqttSettings.cluster_break_zoom || '11')}
                                 showCoverageOnHover={false}
@@ -4777,45 +4778,40 @@ export default function App() {
                                 iconCreateFunction={createClusterCustomIcon}
                             >
                             {mapShips.map((s: any, idx: number) => {
-                                const mmsiStr = String(s.mmsi);
-                                const now = Date.now();
-                                const threshold = parseInt(mqttSettings.new_vessel_threshold || '5');
-                                const isNew = s.session_start && (now - s.session_start < threshold * 60000);
-                                
-                                if (!s.lat || !s.lon) return null;
+                                 const mmsiStr = String(s.mmsi);
+                                 const now = Date.now();
+                                 const threshold = parseInt(mqttSettings.new_vessel_threshold || '5');
+                                 const isNew = s.session_start && (now - s.session_start < threshold * 60000);
 
-                                // Smart Label Logic:
-                                // 1. Emergency: Always show name
-                                // 2. Zoom >= 10: Show all names
-                                // 3. Zoom 8-9: Show every 2nd ship
-                                // 4. Zoom < 8: Show every 4th ship 
-                                let shouldShowName = false;
-                                if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
-                                    if (s.is_emergency) {
-                                        shouldShowName = true;
-                                    } else {
-                                        const density = parseInt(mqttSettings.label_density || '3');
-                                        if (density >= 5) {
-                                            shouldShowName = true;
-                                        } else if (density >= 4) {
-                                            if (currentZoom >= 8) shouldShowName = true;
-                                            else if (idx % 2 === 0) shouldShowName = true;
-                                        } else if (density >= 3) {
-                                            if (currentZoom >= 10) shouldShowName = true;
-                                            else if (currentZoom >= 8 && idx % 2 === 0) shouldShowName = true;
-                                            else if (idx % 4 === 0) shouldShowName = true;
-                                        } else if (density >= 2) {
-                                            if (currentZoom >= 12) shouldShowName = true;
-                                            else if (currentZoom >= 10 && idx % 3 === 0) shouldShowName = true;
-                                            else if (idx % 6 === 0) shouldShowName = true;
-                                        } else {
-                                            // Aggressive (Density 1)
-                                            if (currentZoom >= 14) shouldShowName = true;
-                                            else if (currentZoom >= 12 && idx % 4 === 0) shouldShowName = true;
-                                            else if (idx % 10 === 0) shouldShowName = true;
-                                        }
-                                    }
-                                }
+                                 if (!s.lat || !s.lon) return null;
+
+                                 // Spatial Grid Decluttering:
+                                 let shouldShowName = false;
+                                 if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
+                                     if (s.is_emergency) {
+                                         shouldShowName = true;
+                                     } else {
+                                         const density = parseInt(mqttSettings.label_density || '3');
+                                         if (density >= 5) {
+                                             shouldShowName = true;
+                                         } else {
+                                             // Approx pixels per degree at this zoom
+                                             const pixelsPerDegree = (256 * Math.pow(2, currentZoom)) / 360;
+                                             // Grid size based on density level (1: 500px, 2: 300px, 3: 150px, 4: 70px)
+                                             const gridSize = [0, 500, 300, 150, 70, 1][density];
+                                             
+                                             const gridX = Math.floor(s.lon * pixelsPerDegree / gridSize);
+                                             const gridY = Math.floor(s.lat * pixelsPerDegree / gridSize);
+                                             const gridKey = `${gridX}|${gridY}`;
+                                             
+                                             if (!occupiedLabelGrids.has(gridKey)) {
+                                                 shouldShowName = true;
+                                                 occupiedLabelGrids.add(gridKey);
+                                             }
+                                         }
+                                     }
+                                 }
+
 
                                 const cog = s.course ?? s.cog;
                                 const icon = ShipIcon(
