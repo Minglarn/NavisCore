@@ -3830,6 +3830,46 @@ export default function App() {
         }).length;
     }, [mapShips]);
 
+    const [isHudExpanded, setIsHudExpanded] = useState(() => localStorage.getItem('naviscore_hud_expanded') !== 'false');
+    useEffect(() => { localStorage.setItem('naviscore_hud_expanded', String(isHudExpanded)); }, [isHudExpanded]);
+
+    const vesselStatistics = useMemo(() => {
+        const statusCounts: Record<string, number> = {};
+        const typeCounts: Record<string, { count: number, color: string }> = {};
+        const typeLabels: Record<string, string> = {
+            cargo: 'Cargo', tanker: 'Tanker', passenger: 'Passenger', fishing: 'Fishing',
+            pleasure: 'Pleasure', tug: 'Tug', highspeed: 'HSC', military: 'Military',
+            pilot_sar: 'Pilot/SAR', special: 'Special', wig: 'WIG', aton: 'AtoN',
+            meteo: 'Meteo', base_station: 'Base Stn', other: 'Other'
+        };
+        const typeColors: Record<string, string> = {
+            cargo: '#22c55e', tanker: '#ef4444', passenger: '#3b82f6', fishing: '#f97316',
+            pleasure: '#a855f7', tug: '#06b6d4', highspeed: '#eab308', military: '#4338ca',
+            pilot_sar: '#f43f5e', special: '#2e8b57', wig: '#f8fafc', aton: '#d946ef',
+            meteo: '#bae6fd', base_station: '#64748b', other: '#a0a0a0'
+        };
+
+        for (const s of mapShips) {
+            // Status counts (only for actual vessels)
+            const cat = getShipFilterCategory(s);
+            if (cat !== 'aton' && cat !== 'base_station' && cat !== 'meteo') {
+                const st = s.status_text || (s.sog > 0.5 ? 'Under way' : 'Unknown');
+                statusCounts[st] = (statusCounts[st] || 0) + 1;
+            }
+
+            // Type counts (all objects)
+            const label = typeLabels[cat] || 'Other';
+            if (!typeCounts[label]) typeCounts[label] = { count: 0, color: typeColors[cat] || '#a0a0a0' };
+            typeCounts[label].count++;
+        }
+
+        // Sort both by count descending
+        const sortedStatus = Object.entries(statusCounts).sort((a, b) => b[1] - a[1]);
+        const sortedTypes = Object.entries(typeCounts).sort((a, b) => b[1].count - a[1].count);
+
+        return { statusCounts: sortedStatus, typeCounts: sortedTypes, total: mapShips.length };
+    }, [mapShips]);
+
     // Fetch settings on mount
     useEffect(() => {
         const isDev = window.location.port === '5173';
@@ -5245,6 +5285,113 @@ export default function App() {
                             <ZoomControl position="bottomleft" />
                         </MapContainer>
                     )}
+
+                    {/* Vessel Status HUD */}
+                    {isSettingsLoaded && (
+                        <div
+                            id="vessel-status-hud"
+                            style={{
+                                position: 'absolute',
+                                top: '12px',
+                                left: '50px',
+                                zIndex: 1000,
+                                background: isDark ? 'rgba(10, 10, 20, 0.85)' : 'rgba(255, 255, 255, 0.9)',
+                                backdropFilter: 'blur(12px)',
+                                WebkitBackdropFilter: 'blur(12px)',
+                                borderRadius: isHudExpanded ? '12px' : '8px',
+                                border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)'}`,
+                                boxShadow: isDark ? '0 4px 20px rgba(0,0,0,0.5)' : '0 4px 20px rgba(0,0,0,0.1)',
+                                color: colors.textMain,
+                                fontSize: '0.75rem',
+                                minWidth: isHudExpanded ? '200px' : 'auto',
+                                maxWidth: '280px',
+                                transition: 'all 0.25s ease',
+                                overflow: 'hidden',
+                                userSelect: 'none'
+                            }}
+                        >
+                            {/* HUD Header - always visible */}
+                            <div
+                                onClick={() => setIsHudExpanded(!isHudExpanded)}
+                                style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    padding: isHudExpanded ? '8px 12px' : '6px 10px',
+                                    cursor: 'pointer',
+                                    gap: '8px',
+                                    borderBottom: isHudExpanded ? `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}` : 'none',
+                                    transition: 'all 0.2s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)'}
+                                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <Activity size={13} color={isDark ? '#44aaff' : '#0066cc'} />
+                                    <span style={{ fontWeight: 800, fontSize: '0.7rem', letterSpacing: '0.5px', textTransform: 'uppercase', color: isDark ? '#44aaff' : '#0066cc' }}>
+                                        Status
+                                    </span>
+                                    <span style={{
+                                        background: isDark ? 'rgba(68,170,255,0.15)' : 'rgba(0,102,204,0.1)',
+                                        color: isDark ? '#44aaff' : '#0066cc',
+                                        padding: '1px 6px',
+                                        borderRadius: '10px',
+                                        fontSize: '0.65rem',
+                                        fontWeight: 800
+                                    }}>
+                                        {vesselStatistics.total}
+                                    </span>
+                                </div>
+                                <ChevronDown size={12} style={{ color: colors.textMuted, transform: isHudExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+                            </div>
+
+                            {/* HUD Content - collapsible */}
+                            {isHudExpanded && (
+                                <div style={{ padding: '6px 12px 10px 12px' }}>
+                                    {/* Nav Status Section */}
+                                    {vesselStatistics.statusCounts.length > 0 && (
+                                        <div style={{ marginBottom: '8px' }}>
+                                            <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: colors.textMuted, marginBottom: '4px' }}>Nav Status</div>
+                                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                                                {vesselStatistics.statusCounts.map(([status, count]) => (
+                                                    <div key={status} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '2px 0' }}>
+                                                        <span style={{ color: colors.textMain, fontSize: '0.72rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>{status}</span>
+                                                        <span style={{ fontWeight: 700, fontSize: '0.72rem', color: isDark ? '#44aaff' : '#0066cc', minWidth: '20px', textAlign: 'right' }}>{count}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Divider */}
+                                    <div style={{ height: '1px', background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', margin: '4px 0 6px 0' }} />
+
+                                    {/* Type Section */}
+                                    <div>
+                                        <div style={{ fontSize: '0.6rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '1px', color: colors.textMuted, marginBottom: '4px' }}>By Type</div>
+                                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px' }}>
+                                            {vesselStatistics.typeCounts.map(([label, data]) => (
+                                                <div key={label} style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: '4px',
+                                                    background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                                                    padding: '2px 7px',
+                                                    borderRadius: '4px',
+                                                    fontSize: '0.68rem'
+                                                }}>
+                                                    <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: data.color, flexShrink: 0 }} />
+                                                    <span style={{ color: colors.textMain, fontWeight: 500 }}>{label}</span>
+                                                    <span style={{ fontWeight: 800, color: isDark ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)' }}>{data.count}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                 </div>
 
                 {/* Expandable Right Sidebar */}
