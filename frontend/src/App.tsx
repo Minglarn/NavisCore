@@ -3003,6 +3003,26 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                                                         onChange={val => setSettings({ ...settings, show_names_on_map: String(val) })}
                                                     />
                                                 </div>
+                                                <div className="form-group-premium vertical" style={{ marginTop: '5px' }}>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%' }}>
+                                                        <label>Vessel Name Density</label>
+                                                        <span style={{ fontSize: '0.85rem', color: '#44aaff', fontWeight: 600 }}>Level {settings.label_density || '3'}</span>
+                                                    </div>
+                                                    <input 
+                                                        type="range" 
+                                                        min="1" 
+                                                        max="5" 
+                                                        step="1" 
+                                                        value={settings.label_density || '3'} 
+                                                        onChange={e => setSettings({ ...settings, label_density: e.target.value })} 
+                                                        style={{ width: '100%' }} 
+                                                    />
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.65rem', color: colors.textMuted, marginTop: '4px' }}>
+                                                        <span>Aggressive</span>
+                                                        <span>Balanced</span>
+                                                        <span>Show All</span>
+                                                    </div>
+                                                </div>
                                                 <div className="form-group-premium vertical">
                                                     <label>UI Theme</label>
                                                     <select className="select-premium" style={{ width: '100%' }} value={settings.map_style} onChange={e => setSettings({ ...settings, map_style: e.target.value })}>
@@ -3639,7 +3659,8 @@ export default function App() {
             aisstream_sw_lon: '15.5',
             aisstream_ne_lat: '60.0',
             aisstream_ne_lon: '21.0',
-            new_vessel_threshold: '5'
+            new_vessel_threshold: '5',
+            label_density: '3'
         };
     });
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -4770,10 +4791,30 @@ export default function App() {
                                 // 4. Zoom < 8: Show every 4th ship 
                                 let shouldShowName = false;
                                 if (mqttSettings.show_names_on_map === 'true' && !s.is_meteo) {
-                                    if (s.is_emergency) shouldShowName = true;
-                                    else if (currentZoom >= 10) shouldShowName = true;
-                                    else if (currentZoom >= 8 && idx % 2 === 0) shouldShowName = true;
-                                    else if (currentZoom < 8 && idx % 4 === 0) shouldShowName = true;
+                                    if (s.is_emergency) {
+                                        shouldShowName = true;
+                                    } else {
+                                        const density = parseInt(mqttSettings.label_density || '3');
+                                        if (density >= 5) {
+                                            shouldShowName = true;
+                                        } else if (density >= 4) {
+                                            if (currentZoom >= 8) shouldShowName = true;
+                                            else if (idx % 2 === 0) shouldShowName = true;
+                                        } else if (density >= 3) {
+                                            if (currentZoom >= 10) shouldShowName = true;
+                                            else if (currentZoom >= 8 && idx % 2 === 0) shouldShowName = true;
+                                            else if (idx % 4 === 0) shouldShowName = true;
+                                        } else if (density >= 2) {
+                                            if (currentZoom >= 12) shouldShowName = true;
+                                            else if (currentZoom >= 10 && idx % 3 === 0) shouldShowName = true;
+                                            else if (idx % 6 === 0) shouldShowName = true;
+                                        } else {
+                                            // Aggressive (Density 1)
+                                            if (currentZoom >= 14) shouldShowName = true;
+                                            else if (currentZoom >= 12 && idx % 4 === 0) shouldShowName = true;
+                                            else if (idx % 10 === 0) shouldShowName = true;
+                                        }
+                                    }
                                 }
 
                                 const cog = s.course ?? s.cog;

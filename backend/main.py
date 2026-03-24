@@ -757,13 +757,14 @@ async def process_ais_data(data: dict):
             await db.commit()
             
             # --- Distance & False Tropo Filter ---
-            dist_nm = 0
+            dist_nm, dist_km = 0, 0
             origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
             if origin_lat and origin_lon and lat is not None and lon is not None:
                 try:
                     dist_km = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
                     dist_nm = dist_km * 0.539957
                     ship_data["dist_to_station_nm"] = round(dist_nm, 2)
+                    ship_data["dist_to_station_km"] = round(dist_km, 2)
                 except: pass
 
             # Filter False Tropo: objects > 200nm away with only 1 message
@@ -847,7 +848,8 @@ async def process_ais_data(data: dict):
                                 "event_type": event_type,
                                 "timestamp": ship_data.get("timestamp"),
                                 "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None,
-                                "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None
+                                "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None,
+                                "dist_to_station_km": round(dist_km, 2) if dist_km > 0 else None
                             }
                             
                             # Signal Propagation classification
