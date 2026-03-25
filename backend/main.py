@@ -889,38 +889,54 @@ async def process_ais_data(data: dict):
 
                             if event_type == "new":
                                 async with mqtt_new_vessel_lock:
-                                    # Re-check if another process sent the "new" alert while we were waiting for the lock
-                                    async with db.execute("SELECT mqtt_new_sent FROM ships WHERE mmsi = ?", (mmsi_str,)) as cursor:
-                                        row_recheck = await cursor.fetchone()
-                                        if row_recheck and bool(row_recheck[0]):
-                                            # Already sent by another thread, downgrade to update and apply dedupe
-                                            event_type = "update"
-                                            now_ts = time.time()
-                                            fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
-                                            if mmsi_str in mqtt_last_sent:
-                                                if mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and (now_ts - mqtt_last_sent[mmsi_str]["timestamp"]) < 30:
-                                                    should_send_mqtt = False
-                                            if should_send_mqtt:
-                                                mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
-                                                mqtt_pub_queue.put_nowait(pub_payload)
-                                        else:
-                                            # Still new! Proceed with "new detected" sequence
-                                            new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
-                                            img_bytes = get_image_bytes(mmsi_str)
-                                            if img_bytes:
-                                                mqtt_pub_queue.put_nowait((new_topic, img_bytes))
-                                            else:
-                                                mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
+                                    # Fingerprint for dedupe check
+                                    fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
+                                    now_ts = time.time()
+                                    
+                                    # Re-check Memory Cache FIRST (for pending race conditions during sleep)
+                                    is_already_handled = False
+                                    if mmsi_str in mqtt_last_sent:
+                                        if mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and (now_ts - mqtt_last_sent[mmsi_str]["timestamp"]) < 60:
+                                            is_already_handled = True
                                             
-                                            # Wait 5s before sending the object details as requested
-                                            await asyncio.sleep(5)
-                                            
+                                    # Re-check DB if not in memory
+                                    if not is_already_handled:
+                                        async with db.execute("SELECT mqtt_new_sent FROM ships WHERE mmsi = ?", (mmsi_str,)) as cursor:
+                                            row_recheck = await cursor.fetchone()
+                                            if row_recheck and bool(row_recheck[0]):
+                                                is_already_handled = True
+
+                                    if is_already_handled:
+                                        # Already sent or in progress by another thread, downgrade to update and apply dedupe
+                                        event_type = "update"
+                                        if mmsi_str in mqtt_last_sent:
+                                            if mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and (now_ts - mqtt_last_sent[mmsi_str]["timestamp"]) < 30:
+                                                should_send_mqtt = False
+                                        if should_send_mqtt:
+                                            mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
                                             mqtt_pub_queue.put_nowait(pub_payload)
-                                            mqtt_last_sent[mmsi_str] = {"timestamp": time.time(), "fingerprint": f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"}
-                                            await db.execute("UPDATE ships SET mqtt_new_sent = 1 WHERE mmsi = ?", (mmsi_str,))
-                                            await db.commit()
+                                    else:
+                                        # Still new! 
+                                        # IMPORTANT: Update memory cache BEFORE the sleep to block other threads
+                                        mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
+                                        
+                                        new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
+                                        img_bytes = get_image_bytes(mmsi_str)
+                                        if img_bytes:
+                                            mqtt_pub_queue.put_nowait((new_topic, img_bytes))
+                                        else:
+                                            mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
+                                        
+                                        # Wait 5s before sending the object details as requested
+                                        await asyncio.sleep(5)
+                                        
+                                        mqtt_pub_queue.put_nowait(pub_payload)
+                                        # Update DB after sleep
+                                        await db.execute("UPDATE ships SET mqtt_new_sent = 1 WHERE mmsi = ?", (mmsi_str,))
+                                        await db.commit()
                             elif should_send_mqtt:
                                 mqtt_pub_queue.put_nowait(pub_payload)
+
 
 
 
