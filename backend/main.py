@@ -569,7 +569,7 @@ async def process_ais_data(data: dict):
             settings = await get_all_settings(db)
             
             # 1. Determine Event Type (New, Re-acquired, or Update)
-            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton, mqtt_new_sent FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton, mqtt_new_sent, ais_channel FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 row = await cursor.fetchone()
             
             is_new_v = row is None
@@ -581,6 +581,7 @@ async def process_ais_data(data: dict):
                 last_known_lat, last_known_lon = row[1], row[2]
                 db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = bool(row[3]), bool(row[4]), bool(row[5]), bool(row[6])
                 db_mqtt_new_sent = bool(row[7])
+                db_ais_channel = row[8]
                 try:
                     last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
                     # Use explicit New Vessel Timeout (hours) instead of just ship_timeout
@@ -615,8 +616,24 @@ async def process_ais_data(data: dict):
                 "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
                 "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
                 "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure"),
-                "is_base_station": is_base_station, "is_vessel": data.get("is_vessel", True), "ais_channel": data.get("ais_channel")
+                "is_base_station": is_base_station, "is_vessel": data.get("is_vessel", True)
             }
+
+            # AIS Channel Accumulation
+            new_channel = data.get("ais_channel")
+            if new_channel:
+                if row and not reset_count:
+                    # Accumulate unique channels
+                    existing = db_ais_channel.split("+") if db_ais_channel else []
+                    channels = set(existing)
+                    channels.add(new_channel)
+                    ship_data["ais_channel"] = "+".join(sorted(list(channels)))
+                else:
+                    # New vessel or reset session
+                    ship_data["ais_channel"] = new_channel
+            elif row and not reset_count:
+                # Keep existing if current message doesn't specify channel
+                ship_data["ais_channel"] = db_ais_channel
 
             if ship_data.get("is_advanced_binary") and not ship_data.get("status_text"):
                 dac, fid = ship_data.get("dac"), ship_data.get("fid")
@@ -819,6 +836,7 @@ async def process_ais_data(data: dict):
                                 "imo": ship_data.get("imo"),
                                 "callsign": ship_data.get("callsign"),
                                 "country_code": ship_data.get("country_code"),
+                                "ais_channel": ship_data.get("ais_channel"),
                                 # Movement & Position
                                 "sog": ship_data.get("sog"),
                                 "cog": ship_data.get("cog"),

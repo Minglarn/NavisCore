@@ -324,8 +324,30 @@ function getFlagEmoji(mmsiStr?: string, countryCode?: string) {
     return emoji;
 }
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean, isDark?: boolean) {
-    const isMoving = sog !== undefined && sog > 0.5 && cog !== undefined;
+const LiveTimeAgo = ({ timestamp, colors, style = {} }: { timestamp: number, colors: any, style?: React.CSSProperties }) => {
+    const [now, setNow] = useState(Date.now());
+    
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 10000);
+        return () => clearInterval(interval);
+    }, [timestamp]);
+
+    const diff = Math.max(0, now - timestamp);
+    const seconds = Math.floor(diff / 1000);
+    
+    if (seconds < 5) return <span style={{ color: '#10b981', fontWeight: 'bold', ...style }}>Now</span>;
+    
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    
+    if (m >= 60) return <span style={style}>{Math.floor(m / 60)}h {m % 60}m</span>;
+    
+    return <span style={style}>{m > 0 ? `${m}m ` : ''}{s}s</span>;
+};
+
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean, isDark?: boolean, statusText?: string) {
+    const isStationaryStatus = statusText && (statusText.toLowerCase().includes('anchor') || statusText.toLowerCase().includes('moored'));
+    const isMoving = sog !== undefined && sog > 1.0 && cog !== undefined && !isStationaryStatus;
     const isAircraft = type === 9;
     const color = getShipColor(mmsi, type, isMeteo, isAton, isEmergency);
     const borderColor = '#000000';
@@ -422,6 +444,24 @@ const extraStyles = `
     color: #fff;
     font-weight: bold;
 }
+
+/* Pulse Highlight for Selected Ship */
+@keyframes ship-pulse-anim {
+    0% { transform: scale(1); opacity: 1; stroke-width: 2px; }
+    50% { transform: scale(1.5); opacity: 0.5; stroke-width: 4px; }
+    100% { transform: scale(2); opacity: 0; stroke-width: 1px; }
+}
+.ship-selection-pulse {
+    animation: ship-pulse-anim 1.5s infinite;
+    pointer-events: none;
+}
+
+.sidebar-selected-item {
+    background: rgba(68, 170, 255, 0.15) !important;
+    border-color: #44aaff !important;
+    box-shadow: 0 0 10px rgba(68, 170, 255, 0.2);
+}
+
 .marker-cluster-medium {
     background-color: rgba(255, 171, 64, 0.4);
 }
@@ -3808,22 +3848,18 @@ export default function App() {
     }, [ships, mqttSettings.show_aisstream_on_map]);
 
     const sidebarShips = useMemo(() => {
-        return ships.filter(s => {
+        const filtered = ships.filter(s => {
             const nameUpper = (s.name || "").toUpperCase();
             const mmsiStr = String(s.mmsi || "");
             const showAisStream = String(mqttSettings.show_aisstream_on_map) !== 'false';
             
-            // Internet vessel filtering (Always obey map setting for consistency or let sidebar show it?)
-            // Usually if it's not on map, maybe it shouldn't be in sidebar? Let's keep consistent with map for now.
             if (!showAisStream && (s.source === 'aisstream')) return false;
 
-            // Search Filter
             if (searchTerm) {
                 const term = searchTerm.toUpperCase();
                 if (!nameUpper.includes(term) && !mmsiStr.includes(term)) return false;
             }
 
-            // Source Filter
             if (!filterSource.includes('all')) {
                 const source = s.source || 'sdr';
                 const isMatched = (filterSource.includes('sdr') && (source === 'sdr' || source === 'local')) ||
@@ -3831,7 +3867,6 @@ export default function App() {
                 if (!isMatched) return false;
             }
 
-            // Ship Type Filter
             if (!filterShipType.includes('all')) {
                 const category = getShipFilterCategory(s);
                 if (!filterShipType.includes(category)) return false;
@@ -3839,7 +3874,38 @@ export default function App() {
 
             return true;
         });
-    }, [ships, mqttSettings.show_aisstream_on_map, searchTerm, filterSource, filterShipType]);
+
+        // Add distance and sort here for performance and live-update consistency
+        return filtered
+            .map(s => {
+                const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
+                    ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
+                    : Infinity;
+                return { ...s, distance: dist };
+            })
+            .sort((a, b) => {
+                let valA = a[sortConfig.key];
+                let valB = b[sortConfig.key];
+
+                if (sortConfig.key === 'last_seen') {
+                    valA = a.timestamp || 0;
+                    valB = b.timestamp || 0;
+                } else if (sortConfig.key === 'name') {
+                    valA = (a.name || a.mmsi || '').toString().toLowerCase();
+                    valB = (b.name || b.mmsi || '').toString().toLowerCase();
+                } else if (typeof valA === 'string') {
+                    valA = valA.toLowerCase();
+                    if (typeof valB === 'string') valB = valB.toLowerCase();
+                }
+
+                if (valA === undefined || valA === null) valA = sortConfig.direction === 'asc' ? Infinity : -Infinity;
+                if (valB === undefined || valB === null) valB = sortConfig.direction === 'asc' ? Infinity : -Infinity;
+
+                if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                return 0;
+            });
+    }, [ships, mqttSettings.show_aisstream_on_map, mqttSettings.origin_lat, mqttSettings.origin_lon, searchTerm, filterSource, filterShipType, sortConfig]);
 
     const sidebarShipsCount = useMemo(() => sidebarShips.length, [sidebarShips]);
     
@@ -4828,7 +4894,8 @@ export default function App() {
                                     s.is_emergency,
                                     s.virtual_aton,
                                     isNew,
-                                    isDark
+                                    isDark,
+                                    s.status_text
                                 );
 
                                 return (
@@ -5005,7 +5072,9 @@ export default function App() {
                                                                      <div style={{ textAlign: 'center' }}>
                                                                          <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Seen</div>
                                                                          <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
-                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>{getTimeAgo(s.timestamp)}</div>
+                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>
+                                                                            <LiveTimeAgo timestamp={s.timestamp} colors={colors} />
+                                                                         </div>
                                                                      </div>
                                                                  </div>
                                                             ) : (
@@ -5055,7 +5124,7 @@ export default function App() {
                                                                         </div>
                                                                         <div style={{ padding: '6px 12px' }}>
                                                                             <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Channel</div>
-                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: (s.ais_channel === 'C' || s.ais_channel === 'D') ? '#ffab40' : colors.textMain }}>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: (s.ais_channel?.includes('C') || s.ais_channel?.includes('D')) ? '#ffab40' : colors.textMain }}>
                                                                                 {s.ais_channel || '--'}
                                                                             </div>
                                                                         </div>
@@ -5064,7 +5133,9 @@ export default function App() {
                                                                     {/* Row 3: Last Seen & MMSI (2 columns) */}
                                                                     <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}` }}>
                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Last Seen</div>
-                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>{getTimeAgo(s.timestamp)}</div>
+                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>
+                                                                            <LiveTimeAgo timestamp={s.timestamp} colors={colors} />
+                                                                        </div>
                                                                     </div>
                                                                     <div style={{ padding: '6px 12px' }}>
                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
@@ -5285,6 +5356,27 @@ export default function App() {
                                 );
                             })}
                             </MarkerClusterGroup>
+
+                            {/* Selection Highlight Circle */}
+                            {(() => {
+                                const selected = ships.find(s => String(s.mmsi) === selectedShipMmsi);
+                                if (selected && selected.lat && selected.lon) {
+                                    return (
+                                        <Circle 
+                                            center={[selected.lat, selected.lon]} 
+                                            radius={200} 
+                                            pathOptions={{ 
+                                                color: '#44aaff', 
+                                                fillColor: '#44aaff', 
+                                                fillOpacity: 0.1, 
+                                                weight: 2,
+                                                className: 'ship-selection-pulse'
+                                            }} 
+                                        />
+                                    );
+                                }
+                                return null;
+                            })()}
 
                             {/* Ship History Trails */}
                             {ships.map((s: any) => {
@@ -5598,132 +5690,119 @@ export default function App() {
                                             No objects on the radar yet...
                                         </div>
                                     ) : sidebarShips
-                                        .map(s => {
-                                            const dist = (s.lat && s.lon && mqttSettings.origin_lat && mqttSettings.origin_lon)
-                                                ? haversineDistance(s.lat, s.lon, parseFloat(mqttSettings.origin_lat), parseFloat(mqttSettings.origin_lon))
-                                                : Infinity;
-                                            return { ...s, distance: dist };
-                                        })
-                                        .sort((a, b) => {
-                                            let valA = a[sortConfig.key];
-                                            let valB = b[sortConfig.key];
-
-                                            if (sortConfig.key === 'name') {
-                                                valA = (a.name || a.mmsi || '').toString().toLowerCase();
-                                                valB = (b.name || b.mmsi || '').toString().toLowerCase();
-                                            } else {
-                                                // Specific handling for strings
-                                                if (typeof valA === 'string') valA = valA.toLowerCase();
-                                                if (typeof valB === 'string') valB = valB.toLowerCase();
-                                            }
-
-                                            // Fallbacks for undefined
-                                            if (valA === undefined) valA = sortConfig.direction === 'asc' ? Infinity : -Infinity;
-                                            if (valB === undefined) valB = sortConfig.direction === 'asc' ? Infinity : -Infinity;
-
-                                            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
-                                            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
-                                            return 0;
-                                        })
-                                        .map((ship: any, idx: number) => (
-                                            <div key={ship.mmsi}
-                                                className={showFlash && flashedMmsis.has(String(ship.mmsi)) ? 'ship-flash' : ''}
-                                                style={{
-                                                    padding: sidebarViewMode === 'compact' ? '6px 10px' : '10px',
-                                                    background: idx % 2 === 0 ? colors.bgCard : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'),
-                                                    borderRadius: sidebarViewMode === 'compact' ? '4px' : '8px',
-                                                    borderLeft: sidebarViewMode === 'compact' ? `3px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}` : `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}`,
-                                                    display: 'flex',
-                                                    gap: sidebarViewMode === 'compact' ? '10px' : '15px',
-                                                    alignItems: 'center',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.15s',
-                                                    border: `1px solid ${colors.border}`,
-                                                    marginBottom: sidebarViewMode === 'compact' ? '1px' : '4px'
-                                                }}
-                                                onClick={() => {
-                                                    setHoveredMmsi(String(ship.mmsi));
-                                                    setSelectedShipMmsi(String(ship.mmsi));
-                                                }}
-                                                onContextMenu={(e) => {
-                                                    e.preventDefault();
-                                                    setContextMenu({
-                                                        x: e.clientX,
-                                                        y: e.clientY,
-                                                        mmsi: String(ship.mmsi)
-                                                    });
-                                                }}
-                                                onMouseEnter={e => {
-                                                    e.currentTarget.style.transform = 'translateX(-4px)';
-                                                    e.currentTarget.style.borderTopColor = '#44aaff';
-                                                    e.currentTarget.style.borderRightColor = '#44aaff';
-                                                    e.currentTarget.style.borderBottomColor = '#44aaff';
-                                                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
-                                                }}
-                                                onMouseLeave={e => {
-                                                    e.currentTarget.style.transform = 'translateX(0)';
-                                                    e.currentTarget.style.borderTopColor = colors.border;
-                                                    e.currentTarget.style.borderRightColor = colors.border;
-                                                    e.currentTarget.style.borderBottomColor = colors.border;
-                                                    e.currentTarget.style.boxShadow = 'none';
-                                                }}
-                                            >
-                                                {/* Thumbnail or Icon (Only in Detail Mode) */}
-                                                {sidebarViewMode === 'detail' && (
-                                                    <div style={{ width: '60px', minWidth: '60px', height: '45px', borderRadius: '4px', overflow: 'hidden', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.border}` }}>
-                                                        {ship.imageUrl ? (
-                                                            <img src={ship.imageUrl} alt={ship.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }} />
-                                                        ) : (
-                                                            <Ship size={20} color={getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)} />
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                {/* Info Section */}
-                                                <div style={{ flex: 1, minWidth: 0 }}>
-                                                    <div style={{
-                                                        fontWeight: 700,
-                                                        fontSize: sidebarViewMode === 'compact' ? '0.85rem' : '0.9rem',
-                                                        color: 'var(--text-main)',
+                                        .map((ship: any, idx: number) => {
+                                            const isSelected = String(ship.mmsi) === selectedShipMmsi;
+                                            return (
+                                                <div key={ship.mmsi}
+                                                    className={`${showFlash && flashedMmsis.has(String(ship.mmsi)) ? 'ship-flash' : ''} ${isSelected ? 'sidebar-selected-item' : ''}`}
+                                                    style={{
+                                                        padding: sidebarViewMode === 'compact' ? '6px 10px' : '10px',
+                                                        background: isSelected ? 'rgba(68,170,255,0.1)' : (idx % 2 === 0 ? colors.bgCard : (isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)')),
+                                                        borderRadius: sidebarViewMode === 'compact' ? '4px' : '8px',
+                                                        borderLeft: sidebarViewMode === 'compact' ? `3px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}` : `5px solid ${getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency)}`,
                                                         display: 'flex',
+                                                        gap: sidebarViewMode === 'compact' ? '10px' : '15px',
                                                         alignItems: 'center',
-                                                        gap: '6px',
-                                                        marginBottom: '1px'
-                                                    }}>
-                                                        <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
-                                                        <span style={{
-                                                            whiteSpace: 'nowrap',
-                                                            overflow: 'hidden',
-                                                            textOverflow: 'ellipsis'
-                                                        }}>
-                                                            {ship.name || ship.mmsi}
-                                                            {sidebarViewMode === 'compact' && ship.name && (
-                                                                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>
-                                                                    ({ship.mmsi})
-                                                                </span>
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.15s',
+                                                        border: isSelected ? '1px solid #44aaff' : `1px solid ${colors.border}`,
+                                                        marginBottom: sidebarViewMode === 'compact' ? '1px' : '4px',
+                                                        position: 'relative'
+                                                    }}
+                                                    onClick={() => {
+                                                        setHoveredMmsi(String(ship.mmsi));
+                                                        setSelectedShipMmsi(String(ship.mmsi));
+                                                        if (mapRef.current && ship.lat && ship.lon) {
+                                                            mapRef.current.flyTo([ship.lat, ship.lon], 14, { animate: true, duration: 1 });
+                                                        }
+                                                    }}
+                                                    onContextMenu={(e) => {
+                                                        e.preventDefault();
+                                                        setContextMenu({
+                                                            x: e.clientX,
+                                                            y: e.clientY,
+                                                            mmsi: String(ship.mmsi)
+                                                        });
+                                                    }}
+                                                    onMouseEnter={e => {
+                                                        if (!isSelected) {
+                                                            e.currentTarget.style.transform = 'translateX(-4px)';
+                                                            e.currentTarget.style.borderTopColor = '#44aaff';
+                                                            e.currentTarget.style.borderRightColor = '#44aaff';
+                                                            e.currentTarget.style.borderBottomColor = '#44aaff';
+                                                            e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.2)';
+                                                        }
+                                                    }}
+                                                    onMouseLeave={e => {
+                                                        if (!isSelected) {
+                                                            e.currentTarget.style.transform = 'translateX(0)';
+                                                            e.currentTarget.style.borderTopColor = colors.border;
+                                                            e.currentTarget.style.borderRightColor = colors.border;
+                                                            e.currentTarget.style.borderBottomColor = colors.border;
+                                                            e.currentTarget.style.boxShadow = 'none';
+                                                        }
+                                                    }}
+                                                >
+                                                    {/* Thumbnail or Icon (Only in Detail Mode) */}
+                                                    {sidebarViewMode === 'detail' && (
+                                                        <div style={{ width: '60px', minWidth: '60px', height: '45px', borderRadius: '4px', overflow: 'hidden', background: colors.bgMain, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${colors.border}` }}>
+                                                            {ship.imageUrl ? (
+                                                                <img src={ship.imageUrl} alt={ship.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.target as HTMLImageElement).src = "/images/0.jpg"; }} />
+                                                            ) : (
+                                                                <Ship size={20} color={getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type)} />
                                                             )}
-                                                        </span>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Info Section */}
+                                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                                        <div style={{
+                                                            fontWeight: 700,
+                                                            fontSize: sidebarViewMode === 'compact' ? '0.85rem' : '0.9rem',
+                                                            color: 'var(--text-main)',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '6px',
+                                                            marginBottom: '1px'
+                                                        }}>
+                                                            <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
+                                                            <span style={{
+                                                                whiteSpace: 'nowrap',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                flex: 1
+                                                            }}>
+                                                                {ship.name || ship.mmsi}
+                                                                {sidebarViewMode === 'compact' && ship.name && (
+                                                                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 'normal', marginLeft: '6px' }}>
+                                                                        ({ship.mmsi})
+                                                                    </span>
+                                                                )}
+                                                            </span>
+                                                            <span style={{ marginLeft: 'auto', fontSize: '0.7rem', color: colors.accent, fontWeight: 700, whiteSpace: 'nowrap', paddingLeft: '10px' }}>
+                                                                 <LiveTimeAgo timestamp={ship.timestamp} colors={colors} />
+                                                            </span>
+                                                        </div>
+                                                        <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
+                                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: sidebarViewMode === 'compact' ? '120px' : 'none' }}>
+                                                                {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text, ship.is_meteo)}
+                                                            </span>
+                                                            {ship.status_text && (
+                                                                <>
+                                                                    <span style={{ opacity: 0.5 }}>•</span>
+                                                                    <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.status_text}</span>
+                                                                </>
+                                                            )}
+                                                            <span style={{ opacity: 0.5 }}>•</span>
+                                                            <span style={{ color: '#44aaff', fontWeight: 600 }}>
+                                                                <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distance:</span>
+                                                                {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}
+                                                            </span>
+                                                            <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(16, 185, 129, 0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#10b981', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(16, 185, 129, 0.2)'}` }}>
+                                                                {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
+                                                            </span>
+                                                        </div>
                                                     </div>
-                                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'flex', flexWrap: 'wrap', gap: '4px 8px', alignItems: 'center' }}>
-                                                        <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: sidebarViewMode === 'compact' ? '120px' : 'none' }}>
-                                                            {getShipTypeName(String(ship.mmsi), ship.shiptype, ship.ship_type_text, ship.is_meteo)}
-                                                        </span>
-                                                        {ship.status_text && (
-                                                            <>
-                                                                <span style={{ opacity: 0.5 }}>•</span>
-                                                                <span style={{ color: '#44aaff', fontWeight: 600 }}>{ship.status_text}</span>
-                                                            </>
-                                                        )}
-                                                        <span style={{ opacity: 0.5 }}>•</span>
-                                                        <span style={{ color: '#44aaff', fontWeight: 600 }}>
-                                                            <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distance:</span>
-                                                            {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}
-                                                        </span>
-                                                        <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(16, 185, 129, 0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#10b981', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(16, 185, 129, 0.2)'}` }}>
-                                                            {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
-                                                        </span>
-                                                    </div>
-                                                </div>
 
                                                 {/* Speed/Direction */}
                                                 <div style={{ textAlign: 'right', minWidth: '65px' }}>
@@ -5736,7 +5815,8 @@ export default function App() {
                                                     </div>
                                                 </div>
                                             </div>
-                                        ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         </div>
