@@ -896,7 +896,13 @@ async def process_ais_data(data: dict):
                                     # Re-check Memory Cache FIRST (for pending race conditions during sleep)
                                     is_already_handled = False
                                     if mmsi_str in mqtt_last_sent:
-                                        if mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and (now_ts - mqtt_last_sent[mmsi_str]["timestamp"]) < 60:
+                                        # During discovery (first 10s), we are MORE aggressive with MMSI-only dedupe
+                                        # to avoid a burst of (Position+Static) from multiple streams.
+                                        time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
+                                        if time_since < 10:
+                                            # If already handled or pending in last 10s, downgrade or suppress
+                                            is_already_handled = True
+                                        elif mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30:
                                             is_already_handled = True
                                             
                                     # Re-check DB if not in memory
@@ -909,9 +915,14 @@ async def process_ais_data(data: dict):
                                     if is_already_handled:
                                         # Already sent or in progress by another thread, downgrade to update and apply dedupe
                                         event_type = "update"
+                                        pub_payload["event_type"] = "update" # CRITICAL FIX: Ensure payload reflects change
+                                        
                                         if mmsi_str in mqtt_last_sent:
-                                            if mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and (now_ts - mqtt_last_sent[mmsi_str]["timestamp"]) < 30:
+                                            time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
+                                            # If it's the exact same fingerprint or within the 10s discovery lockout, skip
+                                            if time_since < 10 or (mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30):
                                                 should_send_mqtt = False
+                                                
                                         if should_send_mqtt:
                                             mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
                                             mqtt_pub_queue.put_nowait(pub_payload)
@@ -936,6 +947,7 @@ async def process_ais_data(data: dict):
                                         await db.commit()
                             elif should_send_mqtt:
                                 mqtt_pub_queue.put_nowait(pub_payload)
+
 
 
 
