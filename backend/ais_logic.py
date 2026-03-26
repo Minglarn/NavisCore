@@ -768,7 +768,7 @@ class AisStreamManager:
             return
 
         if total_fragments == 1:
-            self._decode_payload(payload, [sentence])
+            self._decode_payload(payload, [sentence], channel=channel)
         else:
             key = (sequence_id, channel)
             if key not in self.buffer:
@@ -791,7 +791,7 @@ class AisStreamManager:
                     full_sentences.append(self.buffer[key]["sentences"].get(i, ""))
 
                 del self.buffer[key]
-                self._decode_payload(full_payload, full_sentences)
+                self._decode_payload(full_payload, full_sentences, channel=channel)
 
     def _cleanup(self):
         now = time.time()
@@ -804,7 +804,7 @@ class AisStreamManager:
         for k in expired_24:
             del self.type24_buffer[k]
 
-    def _decode_payload(self, payload: str, sentences: list = None):
+    def _decode_payload(self, payload: str, sentences: list = None, channel: str = None):
         bitstr = "".join([to_6_bit_string(c) for c in payload])
 
         if len(bitstr) < 38:
@@ -832,7 +832,8 @@ class AisStreamManager:
             "type": msg_type,
             "nmea": sentences[0] if sentences and len(sentences) == 1 else sentences,
             "is_emergency": is_emergency,
-            "emergency_type": emergency_type
+            "emergency_type": emergency_type,
+            "ais_channel": channel
         }
 
         # Type 24: Class B CS Static Data Report (Part A + B pairing)

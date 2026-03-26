@@ -4957,7 +4957,6 @@ export default function App() {
                                                         )}
 
                                                         {/* Header: Flag, Name (MMSI), Speed/Fixed Aid */}
-                                                         {/* Header: Flag, Name (MMSI), Speed/Fixed Aid */}
                                                          <div style={{ padding: (s.is_aton || mmsiStr.startsWith('99')) ? '10px 15px' : '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
                                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                                                                  <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
@@ -5011,66 +5010,72 @@ export default function App() {
                                                                  </div>
                                                             ) : (
                                                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-                                                            {/* Status - Hidden for AtoNs */}
-                                                            {!(s.is_aton || mmsiStr.startsWith('99')) && (
-                                                                <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}>
-                                                                    <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Status</div>
-                                                                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', lineHeight: '1.1', whiteSpace: 'normal' }}>
-                                                                        {s.status_text || 'Underway'}
+                                                                    {/* Status - Hidden for AtoNs */}
+                                                                    {!(s.is_aton || mmsiStr.startsWith('99')) && (
+                                                                        <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, borderBottom: `1px solid ${colors.border}` }}>
+                                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Status</div>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff', lineHeight: '1.1', whiteSpace: 'normal' }}>
+                                                                                {s.status_text || 'Underway'}
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+
+                                                                    {/* Type */}
+                                                                    <div style={{ 
+                                                                        padding: '6px 12px', 
+                                                                        borderBottom: `1px solid ${colors.border}`,
+                                                                        gridColumn: (s.is_aton || mmsiStr.startsWith('99')) ? 'span 2' : 'auto'
+                                                                    }}>
+                                                                        <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Type</div>
+                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                            {s.virtual_aton ? 'Virtual AtoN' : (s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : ((s.is_aton || mmsiStr.startsWith('99')) ? 'Fixed Aid' : 'Unknown')))}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Row 2: Dist, Brg, Channel (3 columns) */}
+                                                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gridColumn: 'span 2', borderBottom: `1px solid ${colors.border}` }}>
+                                                                        <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}` }}>
+                                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Dist</div>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff' }}>
+                                                                                {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}`, display: 'flex', flexDirection: 'column' }}>
+                                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Brg</div>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                                                                <Navigation 
+                                                                                    size={10} 
+                                                                                    style={{ 
+                                                                                        transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, 
+                                                                                        color: colors.textMuted
+                                                                                    }} 
+                                                                                />
+                                                                                {calculateBearing(originLat, originLon, s.lat, s.lon)?.toFixed(0) ?? '0'}°
+                                                                            </div>
+                                                                        </div>
+                                                                        <div style={{ padding: '6px 12px' }}>
+                                                                            <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Channel</div>
+                                                                            <div style={{ fontSize: '0.75rem', fontWeight: 700, color: (s.ais_channel === 'C' || s.ais_channel === 'D') ? '#ffab40' : colors.textMain }}>
+                                                                                {s.ais_channel || '--'}
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+
+                                                                    {/* Row 3: Last Seen & MMSI (2 columns) */}
+                                                                    <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}` }}>
+                                                                        <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Last Seen</div>
+                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>{getTimeAgo(s.timestamp)}</div>
+                                                                    </div>
+                                                                    <div style={{ padding: '6px 12px' }}>
+                                                                        <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
+                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>{mmsiStr}</div>
                                                                     </div>
                                                                 </div>
-                                                            )}
-
-                                                            {/* Type */}
-                                                            <div style={{ 
-                                                                padding: '6px 12px', 
-                                                                borderBottom: `1px solid ${colors.border}`,
-                                                                gridColumn: (s.is_aton || mmsiStr.startsWith('99')) ? 'span 2' : 'auto'
-                                                            }}>
-                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Type</div>
-                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                                    {s.virtual_aton ? 'Virtual AtoN' : (s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : ((s.is_aton || mmsiStr.startsWith('99')) ? 'Fixed Aid' : 'Unknown')))}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Distance */}
-                                                            <div style={{ padding: '6px 12px', borderRight: `1px solid ${colors.border}` }}>
-                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Dist</div>
-                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#44aaff' }}>
-                                                                    {formatDistance(haversineDistance(originLat, originLon, s.lat, s.lon), mqttSettings.units)}
-                                                                </div>
-                                                            </div>
-
-                                                            {/* Bearing */}
-                                                            <div style={{ padding: '6px 12px', display: 'flex', flexDirection: 'column' }}>
-                                                                <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Brg</div>
-                                                                <div style={{ fontSize: '0.75rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <Navigation 
-                                                                        size={10} 
-                                                                        style={{ 
-                                                                            transform: `rotate(${calculateBearing(originLat, originLon, s.lat, s.lon)}deg)`, 
-                                                                            color: colors.textMuted
-                                                                        }} 
-                                                                    />
-                                                                {calculateBearing(originLat, originLon, s.lat, s.lon)?.toFixed(0) ?? '0'}°
-                                                            </div>
-                                                        </div>
-
-                                                                     {/* Last Seen & MMSI combined */}
-                                                                     <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}`, borderRight: `1px solid ${colors.border}` }}>
-                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Last Seen</div>
-                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.accent }}>{getTimeAgo(s.timestamp)}</div>
-                                                                     </div>
-                                                                     <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}` }}>
-                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
-                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>{mmsiStr}</div>
-                                                                     </div>
-                                                                    </div>
                                                             )}
                                                         </div>
 
                                                         {/* Weather Data for AtoNs if available */}
-                                                        {(s.is_aton || mmsiStr.startsWith('99')) && (s.wind_speed !== undefined || s.air_temp !== undefined) && (
+                                                        {(s.is_aton || mmsiStr.startsWith('99')) && (s.wind_speed !== undefined || s.air_temp !== undefined || s.air_pressure !== undefined) && (
                                                              <div style={{ 
                                                                  padding: '10px 0',
                                                                  background: isDark ? 'rgba(68, 170, 255, 0.08)' : 'rgba(0, 131, 143, 0.08)',
@@ -5080,7 +5085,7 @@ export default function App() {
                                                                  alignItems: 'center'
                                                              }}>
                                                                  {s.wind_speed !== undefined && (
-                                                                     <div style={{ textAlign: 'center', flex: 1, borderRight: `1px solid ${colors.border}` }}>
+                                                                     <div style={{ textAlign: 'center', flex: 1, borderRight: (s.air_temp !== undefined || s.air_pressure !== undefined) ? `1px solid ${colors.border}` : 'none' }}>
                                                                          <div style={{ fontSize: '0.55rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 900 }}>Wind</div>
                                                                          <div style={{ height: '1px', background: colors.border, width: '15px', margin: '4px auto' }} />
                                                                          <div style={{ fontSize: '0.9rem', fontWeight: 900, color: '#44aaff' }}>{s.wind_speed} <span style={{ fontSize: '0.6rem', fontWeight: 400 }}>m/s</span></div>
@@ -5106,11 +5111,19 @@ export default function App() {
 
                                                          {/* Footer Info for AtoNs */}
                                                          {(s.is_aton || mmsiStr.startsWith('99')) && (
-                                                             <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}` }}>
-                                                                 <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
-                                                                 <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>{mmsiStr}</div>
-                                                             </div>
-                                                         )}
+                                                              <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}`, display: 'flex', gap: '20px' }}>
+                                                                  <div>
+                                                                      <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>MMSI</div>
+                                                                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted }}>{mmsiStr}</div>
+                                                                  </div>
+                                                                  <div>
+                                                                      <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Channel</div>
+                                                                      <div style={{ fontSize: '0.75rem', fontWeight: 700, color: (s.ais_channel === 'C' || s.ais_channel === 'D') ? '#ffab40' : colors.textMain }}>
+                                                                          {s.ais_channel || '--'}
+                                                                      </div>
+                                                                  </div>
+                                                              </div>
+                                                          )}
 
                                                         {/* Special Indicators (Tropo, Emergency, Altitude) */}
                                                         {((s.shiptype === 9 || s.is_sar) && s.altitude !== undefined) || s.is_emergency || (haversineDistance(originLat, originLon, s.lat, s.lon) > 74.08) ? (
