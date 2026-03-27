@@ -581,19 +581,21 @@ async def process_ais_data(data: dict):
             settings = await get_all_settings(db)
             
             # 1. Determine Event Type (New, Re-acquired, or Update)
-            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton, mqtt_new_sent, ais_channel FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+            async with db.execute('SELECT last_seen, latitude, longitude, is_meteo, is_aton, is_sar, virtual_aton, mqtt_new_sent, ais_channel, type FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                 row = await cursor.fetchone()
             
             is_new_v = row is None
             reset_count = False
             last_known_lat, last_known_lon = None, None
             db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = False, False, False, False
+            db_type = None
             
             if row:
                 last_known_lat, last_known_lon = row[1], row[2]
                 db_is_meteo, db_is_aton, db_is_sar, db_virtual_aton = bool(row[3]), bool(row[4]), bool(row[5]), bool(row[6])
                 db_mqtt_new_sent = bool(row[7])
                 db_ais_channel = row[8]
+                db_type = row[9]
                 try:
                     last_seen_dt = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S")
                     # Use explicit New Vessel Timeout (hours) instead of just ship_timeout
@@ -616,12 +618,39 @@ async def process_ais_data(data: dict):
                     queued_mmsis.add(mmsi_str)
                     enrichment_queue.put_nowait(mmsi_str)
             
+            # SAR/Aircraft logic: 111-MID-xxx is standard for SAR Aircraft.
+            # 2xx-7xx are standard for Ships.
+            is_sar_mmsi = mmsi_str.startswith("111")
+            is_currently_sar = data.get("is_sar", False) or msg_type == 9
+            
+            # If it's a maritime MMSI but was marked as SAR, and THIS message is not SAR,
+            # we should NOT carry over db_is_sar if it contradicts the current data.
+            final_is_sar = is_currently_sar
+            if not is_currently_sar and db_is_sar:
+                # If we have a maritime MMSI (2xx-7xx), trust current data over a sticky DB state.
+                if not is_sar_mmsi:
+                    logger.debug(f"Vessel {mmsi_str} (Maritime MMSI) is NOT sending SAR data. Resetting is_sar.")
+                    final_is_sar = False
+                else:
+                    final_is_sar = True # Keep it if it's a real SAR MMSI
+            
+            # Shiptype logic: If we have 9 (SAR Aircraft) but it's a maritime MMSI and we don't have a newer type,
+            # we should avoid setting it to 9 permanently unless it's a current SAR message.
+            current_shiptype = data.get("ship_type") or data.get("shiptype")
+            if not current_shiptype:
+                if msg_type == 9:
+                    current_shiptype = 9
+                elif db_type == 9 and not final_is_sar and not is_sar_mmsi:
+                    # Demote type 9 to 0 if it was sticky but we determined fartyget is not SAR
+                    logger.info(f"Resetting shiptype for {mmsi_str} from 9 to 0 (Not SAR).")
+                    current_shiptype = 0
+            
             ship_data = {
                 "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
-                "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": data.get("ship_type") or data.get("shiptype") or (9 if msg_type == 9 else None),
+                "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": current_shiptype,
                 "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
                 "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": is_aton,
-                "is_sar": data.get("is_sar", False) or msg_type == 9 or db_is_sar, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
+                "is_sar": final_is_sar, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
                 "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
                 "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False) or db_virtual_aton, "is_advanced_binary": data.get("is_advanced_binary", False),
                 "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
