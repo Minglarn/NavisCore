@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save, Trash2 } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save, Trash2, Bell } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -41,7 +41,7 @@ function CenterButton({ originLat, originLon }: { originLat: number, originLon: 
     const map = useMap();
     if (isNaN(originLat) || isNaN(originLon)) return null;
     return (
-        <div style={{
+        <div className="center-station-btn" style={{
             position: 'absolute', bottom: '100px', left: '10px', zIndex: 1000
         }}>
             <button
@@ -3747,6 +3747,9 @@ export default function App() {
 
     const [isStatsModalOpen, setIsStatsModalOpen] = useState(false);
     const [isNmeaModalOpen, setIsNmeaModalOpen] = useState(false);
+    const [safetyAlerts, setSafetyAlerts] = useState<any[]>([]);
+    const [safetyPanelOpen, setSafetyPanelOpen] = useState(false);
+    const [safetyToast, setSafetyToast] = useState<any>(null);
     const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
     const [databaseShips, setDatabaseShips] = useState<any[]>([]);
     const [dbSearchTerm, setDbSearchTerm] = useState('');
@@ -4161,6 +4164,15 @@ export default function App() {
             })
             .catch(console.error);
 
+        // Load persisted safety alerts from DB on page load
+        const alertsPath = isDev ? 'http://127.0.0.1:8080/api/safety-alerts' : '/api/safety-alerts';
+        fetch(alertsPath)
+            .then(r => r.json())
+            .then((data: any[]) => {
+                if (Array.isArray(data)) setSafetyAlerts(data);
+            })
+            .catch(console.error);
+
         const ws = new WebSocket(wsUrl);
             ws.onopen = () => setStatus('Connected to NavisCore');
             ws.onmessage = (event: MessageEvent) => {
@@ -4200,6 +4212,10 @@ export default function App() {
                 setTimeout(() => setStatus('Connected to NavisCore'), 3000);
             } else if (data.type === 'nmea') {
                 setNmeaLogs(prev => [{ ...data, id: Date.now() + Math.random() }, ...prev].slice(0, 200));
+            } else if (data.type === 'safety_alert') {
+                setSafetyAlerts(prev => [{ ...data, timestamp_ms: data.timestamp, dismissed: 0 }, ...prev]);
+                setSafetyToast(data);
+                setTimeout(() => setSafetyToast(null), 8000);
             } else if (data.type === 'coverage_update') {
                 setCoverageSectors(prev => {
                     const idx = prev.findIndex((s: any) => s.sector_id === data.sector_id);
@@ -4702,6 +4718,27 @@ export default function App() {
                             title="NMEA Info"
                         >
                             <Terminal size={22} />
+                        </button>
+                        <button
+                            onClick={() => setSafetyPanelOpen(!safetyPanelOpen)}
+                            style={{ background: safetyPanelOpen ? (isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)') : 'transparent', border: 'none', color: safetyAlerts.filter(a => !a.dismissed).length > 0 ? '#f59e0b' : colors.textMain, cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'background 0.2s', position: 'relative' }}
+                            onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)'}
+                            onMouseLeave={e => { if (!safetyPanelOpen) e.currentTarget.style.background = 'transparent' }}
+                            title="Safety Alerts"
+                        >
+                            <Bell size={22} />
+                            {safetyAlerts.filter(a => !a.dismissed).length > 0 && (
+                                <span style={{
+                                    position: 'absolute', top: '2px', right: '2px',
+                                    background: '#ef4444', color: '#fff',
+                                    fontSize: '0.6rem', fontWeight: 800,
+                                    width: '16px', height: '16px', borderRadius: '50%',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    lineHeight: 1
+                                }}>
+                                    {safetyAlerts.filter(a => !a.dismissed).length}
+                                </span>
+                            )}
                         </button>
                         <button
                             onClick={() => setIsDatabaseModalOpen(true)}
@@ -5946,7 +5983,169 @@ export default function App() {
                 colors={colors}
             />
 
-            {contextMenu && (
+            {/* Safety Alerts Panel */}
+            {safetyPanelOpen && (
+                <div style={{
+                    position: 'fixed', top: 0, right: 0, bottom: 0,
+                    width: '480px', maxWidth: '100vw',
+                    background: isDark ? 'rgba(12, 12, 22, 0.98)' : 'rgba(250, 250, 252, 0.98)',
+                    backdropFilter: 'blur(16px)',
+                    borderLeft: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`,
+                    boxShadow: '-8px 0 30px rgba(0,0,0,0.3)',
+                    zIndex: 20000,
+                    display: 'flex', flexDirection: 'column',
+                    fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
+                    animation: 'slideInRight 0.3s ease-out'
+                }}>
+                    {/* Panel Header */}
+                    <div style={{
+                        padding: '16px 20px',
+                        borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`,
+                        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <AlertTriangle size={20} color="#f59e0b" />
+                            <span style={{ fontSize: '1rem', fontWeight: 700, color: colors.textMain }}>
+                                Safety Alerts
+                            </span>
+                            <span style={{
+                                fontSize: '0.7rem', fontWeight: 700,
+                                background: safetyAlerts.filter(a => !a.dismissed).length > 0 ? '#ef4444' : isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                                color: safetyAlerts.filter(a => !a.dismissed).length > 0 ? '#fff' : colors.textMuted,
+                                padding: '2px 8px', borderRadius: '10px'
+                            }}>
+                                {safetyAlerts.filter(a => !a.dismissed).length}
+                            </span>
+                        </div>
+                        <button
+                            onClick={() => setSafetyPanelOpen(false)}
+                            style={{ background: 'transparent', border: 'none', color: colors.textMuted, cursor: 'pointer', padding: '4px' }}
+                        >
+                            <X size={20} />
+                        </button>
+                    </div>
+
+                    {/* Alert List */}
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
+                        {safetyAlerts.filter(a => !a.dismissed).length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '40px 20px', color: colors.textMuted, opacity: 0.6 }}>
+                                <Bell size={32} style={{ marginBottom: '12px', opacity: 0.4 }} />
+                                <div style={{ fontSize: '0.85rem' }}>No active safety alerts</div>
+                            </div>
+                        ) : (
+                            safetyAlerts.filter(a => !a.dismissed).map((alert, i) => (
+                                <div key={alert.id || i} style={{
+                                    margin: '4px 12px',
+                                    padding: '12px 16px',
+                                    background: isDark ? 'rgba(245, 158, 11, 0.06)' : 'rgba(245, 158, 11, 0.05)',
+                                    border: `1px solid ${isDark ? 'rgba(245, 158, 11, 0.2)' : 'rgba(245, 158, 11, 0.15)'}`,
+                                    borderRadius: '10px',
+                                    borderLeft: '3px solid #f59e0b'
+                                }}>
+                                    {/* Alert header row */}
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <span style={{
+                                                fontSize: '0.65rem', fontWeight: 800,
+                                                background: alert.is_broadcast ? '#ef4444' : '#f59e0b',
+                                                color: '#fff', padding: '2px 7px', borderRadius: '4px',
+                                                textTransform: 'uppercase'
+                                            }}>
+                                                {alert.is_broadcast ? 'Broadcast' : 'Addressed'}
+                                            </span>
+                                            <span style={{
+                                                fontSize: '0.68rem', fontWeight: 700,
+                                                color: isDark ? '#44aaff' : '#007080',
+                                                background: isDark ? 'rgba(68,170,255,0.1)' : 'rgba(0,112,128,0.08)',
+                                                padding: '2px 7px', borderRadius: '4px'
+                                            }}>
+                                                Type {alert.msg_type} • {getAisMsgTypeName(alert.msg_type)}
+                                            </span>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                const isDev = window.location.port === '5173';
+                                                const base = isDev ? 'http://127.0.0.1:8080' : '';
+                                                if (alert.id) {
+                                                    await fetch(`${base}/api/safety-alerts/${alert.id}/dismiss`, { method: 'POST' });
+                                                }
+                                                setSafetyAlerts(prev => prev.map(a => a === alert ? { ...a, dismissed: 1 } : a));
+                                            }}
+                                            style={{
+                                                background: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                                                border: 'none', color: colors.textMuted, cursor: 'pointer',
+                                                padding: '4px 10px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 600
+                                            }}
+                                            title="Dismiss alert"
+                                        >
+                                            Dismiss
+                                        </button>
+                                    </div>
+
+                                    {/* MMSI info */}
+                                    <div style={{ fontSize: '0.78rem', color: colors.textMuted, marginBottom: '6px', display: 'flex', gap: '12px' }}>
+                                        <span><strong>From:</strong> {alert.mmsi}</span>
+                                        {alert.dest_mmsi && <span><strong>To:</strong> {alert.dest_mmsi}</span>}
+                                    </div>
+
+                                    {/* Message text */}
+                                    <div style={{
+                                        fontSize: '0.82rem', fontWeight: 500, color: colors.textMain,
+                                        padding: '8px 10px',
+                                        background: isDark ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.03)',
+                                        borderRadius: '6px',
+                                        fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                                        wordBreak: 'break-all',
+                                        marginBottom: '6px'
+                                    }}>
+                                        {alert.text || '(no text)'}
+                                    </div>
+
+                                    {/* Timestamp */}
+                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.7 }}>
+                                        {alert.timestamp_ms ? new Date(alert.timestamp_ms).toLocaleString() : alert.timestamp || '—'}
+                                    </div>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Safety Alert Toast */}
+            {safetyToast && (
+                <div style={{
+                    position: 'fixed', top: '80px', right: '20px',
+                    background: isDark ? 'rgba(30, 20, 10, 0.95)' : 'rgba(255, 250, 240, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: `1px solid ${isDark ? 'rgba(245, 158, 11, 0.4)' : 'rgba(245, 158, 11, 0.3)'}`,
+                    borderLeft: '4px solid #f59e0b',
+                    borderRadius: '10px',
+                    padding: '14px 18px',
+                    maxWidth: '380px',
+                    zIndex: 30000,
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+                    animation: 'slideInRight 0.4s ease-out',
+                    fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif"
+                }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' }}>
+                        <AlertTriangle size={16} color="#f59e0b" />
+                        <span style={{ fontSize: '0.78rem', fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase' }}>
+                            {safetyToast.is_broadcast ? 'Safety Broadcast' : 'Safety Alert'}
+                        </span>
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: colors.textMuted, marginBottom: '4px' }}>
+                        From: {safetyToast.mmsi} {safetyToast.dest_mmsi ? `→ ${safetyToast.dest_mmsi}` : ''}
+                    </div>
+                    <div style={{
+                        fontSize: '0.8rem', fontWeight: 500, color: colors.textMain,
+                        fontFamily: "'JetBrains Mono', monospace",
+                        wordBreak: 'break-all'
+                    }}>
+                        {safetyToast.text ? safetyToast.text.substring(0, 120) : '(no text)'}
+                    </div>
+                </div>
+            )}            {contextMenu && (
                 <ContextMenu
                     x={contextMenu.x}
                     y={contextMenu.y}

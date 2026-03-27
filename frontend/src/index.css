@@ -43,3 +43,16 @@ html,
 .custom-tooltip::before {
     display: none !important;
 }
+
+/* 
+ * Map Controls Offset
+ * Offset bottom-left controls to clear the bottom console bar (approx 52px + cushion)
+ */
+.leaflet-bottom.leaflet-left {
+    margin-bottom: 58px !important;
+}
+
+/* Adjust the custom center-on-station button to sit above the zoom controls */
+.center-station-btn {
+    bottom: 140px !important;
+}

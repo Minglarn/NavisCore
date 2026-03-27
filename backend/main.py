@@ -558,7 +558,19 @@ async def process_ais_data(data: dict):
     else: local_vessels[mmsi_str] = time.time()
 
     if data.get("is_safety"):
-        safety_msg = {"type": "safety_alert", "mmsi": mmsi_str, "text": data.get("safety_text", ""), "is_broadcast": data.get("is_broadcast_alert", False), "timestamp": int(datetime.now().timestamp() * 1000)}
+        safety_msg = {"type": "safety_alert", "mmsi": mmsi_str, "text": data.get("safety_text", ""), "dest_mmsi": str(data.get("dest_mmsi", "")) if data.get("dest_mmsi") else None, "is_broadcast": data.get("is_broadcast_alert", False), "msg_type": data.get("type", 0), "timestamp": int(datetime.now().timestamp() * 1000)}
+        # Persist to database
+        try:
+            async with db_session() as db:
+                await db.execute('INSERT INTO safety_alerts (mmsi, dest_mmsi, text, is_broadcast, msg_type) VALUES (?, ?, ?, ?, ?)',
+                    (mmsi_str, safety_msg.get("dest_mmsi"), safety_msg["text"], 1 if safety_msg["is_broadcast"] else 0, safety_msg.get("msg_type", 0)))
+                await db.commit()
+                # Get the inserted ID for the WS payload
+                async with db.execute('SELECT last_insert_rowid()') as cursor:
+                    row = await cursor.fetchone()
+                    if row: safety_msg["id"] = row[0]
+        except Exception as e:
+            logger.error(f"Error saving safety alert: {e}")
         for ws in list(connected_clients):
             try: await ws.send_json(safety_msg)
             except Exception: pass
@@ -1282,6 +1294,7 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS minute_mmsi (time_min TEXT, mmsi TEXT, PRIMARY KEY (time_min, mmsi))')
         await db.execute('CREATE TABLE IF NOT EXISTS sector_history (sector_id INTEGER, distance_km REAL, timestamp INTEGER)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_sector_history_ts ON sector_history (timestamp)')
+        await db.execute('CREATE TABLE IF NOT EXISTS safety_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, mmsi TEXT NOT NULL, dest_mmsi TEXT, text TEXT, is_broadcast BOOLEAN DEFAULT 0, msg_type INTEGER, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, dismissed BOOLEAN DEFAULT 0)')
         await db.commit()
     asyncio.create_task(start_udp_listener())
     restart_mqtt()
@@ -1390,7 +1403,26 @@ async def get_database(q: str = None, ship_type: int = None, source: str = None,
                 res.append(d)
             return {"ships": res, "total": total}
 
+@app.get("/api/safety-alerts")
+async def get_safety_alerts():
+    async with db_session() as db:
+        db.row_factory = aiosqlite.Row
+        r = await db.execute('SELECT * FROM safety_alerts WHERE dismissed = 0 ORDER BY timestamp DESC LIMIT 100')
+        alerts = []
+        for row in await r.fetchall():
+            d = dict(row)
+            if d.get("timestamp"):
+                try: d["timestamp_ms"] = int(datetime.strptime(d["timestamp"], "%Y-%m-%d %H:%M:%S").timestamp() * 1000)
+                except Exception: d["timestamp_ms"] = int(time.time() * 1000)
+            alerts.append(d)
+        return alerts
 
+@app.post("/api/safety-alerts/{alert_id}/dismiss")
+async def dismiss_safety_alert(alert_id: int):
+    async with db_session() as db:
+        await db.execute('UPDATE safety_alerts SET dismissed = 1 WHERE id = ?', (alert_id,))
+        await db.commit()
+    return {"success": True}
 
 @app.post("/api/ships/{mmsi}/image")
 async def upload_ship_image(mmsi: str, file: UploadFile = File(...)):
