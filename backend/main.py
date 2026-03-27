@@ -616,7 +616,8 @@ async def process_ais_data(data: dict):
                 "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
                 "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),
                 "water_level": data.get("water_level"), "air_temp": data.get("air_temp"), "air_pressure": data.get("air_pressure"),
-                "is_base_station": is_base_station, "is_vessel": data.get("is_vessel", True)
+                "is_base_station": is_base_station, "is_vessel": data.get("is_vessel", True),
+                "msg_type": msg_type
             }
 
             # AIS Channel Accumulation

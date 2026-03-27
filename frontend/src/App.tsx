@@ -71,6 +71,41 @@ L.Icon.Default.mergeOptions({
     shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
+const AIS_MSG_TYPE_NAMES: Record<number, string> = {
+    1: 'Scheduled Position Report',
+    2: 'Assigned Position Report',
+    3: 'Special Position Report',
+    4: 'Base Station Report',
+    5: 'Static and Voyage Data',
+    6: 'Binary Addressed Message',
+    7: 'Binary Acknowledge',
+    8: 'Binary Broadcast Message',
+    9: 'SAR Aircraft Position Report',
+    10: 'UTC and Date Inquiry',
+    11: 'UTC and Date Response',
+    12: 'Addressed Safety Message',
+    13: 'Safety Acknowledge',
+    14: 'Safety Broadcast Message',
+    15: 'Interrogation',
+    16: 'Assignment Mode Command',
+    17: 'DGNSS Broadcast Binary Message',
+    18: 'Standard Class B Position Report',
+    19: 'Extended Class B Position Report',
+    20: 'Data Link Management',
+    21: 'Aid to Navigation (AtoN)',
+    22: 'Channel Management',
+    23: 'Group Assignment Command',
+    24: 'Static Data Report',
+    25: 'Single Slot Binary Message',
+    26: 'Multiple Slot Binary Message',
+    27: 'Long Range Position Report'
+};
+
+function getAisMsgTypeName(type?: number): string {
+    if (type == null) return 'Unknown';
+    return AIS_MSG_TYPE_NAMES[type] || `Unknown (${type})`;
+}
+
 function getShipColor(mmsiStr: string, type?: number, isMeteo?: boolean, isAton?: boolean, isEmergency?: boolean) {
     if (isEmergency) return '#ff0000'; // Emergency (Bright Red)
     
@@ -3732,6 +3767,8 @@ export default function App() {
     const [lastUdpTime, setLastUdpTime] = useState(0);
     const [lastStreamTime, setLastStreamTime] = useState(0);
     const [lastUpdatedShip, setLastUpdatedShip] = useState<any>(null);
+    const [eventLog, setEventLog] = useState<any[]>([]);
+    const [consoleExpanded, setConsoleExpanded] = useState(false);
 
     const [isResizing, setIsResizing] = useState(false);
     const isResizingRef = useRef(isResizing);
@@ -4135,11 +4172,14 @@ export default function App() {
                 else if (data.source === 'aisstream') setLastStreamTime(nowTime);
 
                 if (data.mmsi && (data.name || data.mmsi)) {
-                    setLastUpdatedShip({
+                    const entry = {
                         name: data.name || `MMSI ${data.mmsi}`,
                         mmsi: data.mmsi,
-                        time: nowTime
-                    });
+                        time: nowTime,
+                        msgType: data.msg_type
+                    };
+                    setLastUpdatedShip(entry);
+                    setEventLog(prev => [entry, ...prev].slice(0, 50));
                 }
             
             // Allow weather objects
@@ -5945,35 +5985,128 @@ export default function App() {
                 />
             )}
 
-            {/* Mini Console (Ticker) at the bottom */}
+            {/* Bottom Console Bar */}
             {lastUpdatedShip && (
                 <div style={{
                     position: 'fixed',
-                    bottom: '20px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    background: isDark ? 'rgba(15, 15, 26, 0.9)' : 'rgba(255, 255, 255, 0.9)',
-                    backdropFilter: 'blur(12px)',
-                    padding: '8px 20px',
-                    borderRadius: '30px',
-                    border: `1px solid ${isDark ? 'rgba(0, 240, 255, 0.3)' : 'rgba(0, 131, 143, 0.2)'}`,
-                    boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
                     zIndex: 10000,
-                    animation: 'slideUpFade 0.5s cubic-bezier(0.16, 1, 0.3, 1)',
-                    pointerEvents: 'none',
-                    maxWidth: '90vw'
+                    display: 'flex',
+                    flexDirection: 'column',
+                    background: isDark ? 'rgba(12, 12, 22, 0.97)' : 'rgba(245, 247, 250, 0.97)',
+                    backdropFilter: 'blur(12px)',
+                    borderTop: `1px solid ${isDark ? 'rgba(68, 170, 255, 0.25)' : 'rgba(0, 131, 143, 0.15)'}`,
+                    boxShadow: '0 -4px 20px rgba(0, 0, 0, 0.2)',
+                    fontFamily: "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif",
+                    transition: 'max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
                 }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite' }}></div>
-                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px' }}>LATEST EVENT:</span>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 600, color: isDark ? '#44aaff' : '#007080' }}>
-                        {lastUpdatedShip.name} <span style={{ opacity: 0.6, fontWeight: 400, marginLeft: '5px' }}>(MMSI {lastUpdatedShip.mmsi})</span>
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: colors.textMuted, opacity: 0.8, marginLeft: '10px' }}>
-                        {new Date(lastUpdatedShip.time).toLocaleTimeString()}
-                    </span>
+                    {/* Expanded log area */}
+                    {consoleExpanded && eventLog.length > 1 && (
+                        <div style={{
+                            maxHeight: '200px',
+                            overflowY: 'auto',
+                            borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'}`,
+                            padding: '4px 0'
+                        }}>
+                            {eventLog.slice(1, 30).map((ev, i) => (
+                                <div key={`${ev.mmsi}-${ev.time}-${i}`} style={{
+                                    display: 'grid',
+                                    gridTemplateColumns: '75px 50px 240px 95px 1fr',
+                                    alignItems: 'center',
+                                    padding: '3px 20px',
+                                    fontSize: '0.8rem',
+                                    color: colors.textMuted,
+                                    opacity: Math.max(0.3, 1 - i * 0.05),
+                                    borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'}`,
+                                    gap: '12px'
+                                }}>
+                                    <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.75rem' }}>
+                                        {new Date(ev.time).toLocaleTimeString([], { hour12: false })}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isDark ? 'rgba(68,170,255,0.7)' : 'rgba(0,112,128,0.7)' }}>
+                                        {ev.msgType != null ? `Type ${ev.msgType}` : '—'}
+                                    </span>
+                                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isDark ? 'rgba(68,170,255,0.5)' : 'rgba(0,112,128,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {ev.msgType != null ? getAisMsgTypeName(ev.msgType) : ''}
+                                    </span>
+                                    <span style={{ fontSize: '0.75rem', opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>
+                                        {ev.mmsi}
+                                    </span>
+                                    <span style={{ fontWeight: 600, color: isDark ? 'rgba(68,170,255,0.7)' : 'rgba(0,112,128,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                        {ev.name}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Main bar (always visible) */}
+                    <div
+                        onClick={() => setConsoleExpanded(prev => !prev)}
+                        style={{
+                            display: 'grid',
+                            gridTemplateColumns: '8px auto 75px 50px 240px 95px 1fr 70px 24px',
+                            alignItems: 'center',
+                            padding: '8px 20px',
+                            gap: '12px',
+                            cursor: 'pointer',
+                            minHeight: '36px',
+                            userSelect: 'none'
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                        {/* Pulse dot */}
+                        <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite', flexShrink: 0 }} />
+
+                        {/* Label */}
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Latest Event</span>
+
+                        {/* Timestamp */}
+                        <span style={{ fontSize: '0.8rem', color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            {new Date(lastUpdatedShip.time).toLocaleTimeString([], { hour12: false })}
+                        </span>
+
+                        {/* Type number */}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isDark ? '#44aaff' : '#007080', whiteSpace: 'nowrap' }}>
+                            {lastUpdatedShip.msgType != null ? `Type ${lastUpdatedShip.msgType}` : '\u2014'}
+                        </span>
+
+                        {/* Type name */}
+                        <span style={{
+                            fontSize: '0.78rem',
+                            fontWeight: 600,
+                            color: isDark ? '#44aaff' : '#007080',
+                            background: isDark ? 'rgba(68,170,255,0.1)' : 'rgba(0,112,128,0.08)',
+                            padding: '3px 10px',
+                            borderRadius: '4px',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                        }}>
+                            {lastUpdatedShip.msgType != null ? getAisMsgTypeName(lastUpdatedShip.msgType) : '\u2014'}
+                        </span>
+
+                        {/* MMSI */}
+                        <span style={{ fontSize: '0.8rem', color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            {lastUpdatedShip.mmsi}
+                        </span>
+
+                        {/* Ship name */}
+                        <span style={{ fontSize: '0.88rem', fontWeight: 600, color: isDark ? '#44aaff' : '#007080', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {lastUpdatedShip.name}
+                        </span>
+
+                        {/* Event count */}
+                        <span style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.6, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            {eventLog.length} events
+                        </span>
+
+                        {/* Expand/collapse chevron */}
+                        {consoleExpanded ? <ChevronDown size={14} color={colors.textMuted} /> : <ChevronUp size={14} color={colors.textMuted} />}
+                    </div>
                 </div>
             )}
         </div>
@@ -6206,7 +6339,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                                 boxShadow: '0 0 10px rgba(0,240,255,0.3)',
                                                 textTransform: 'uppercase'
                                             }}>
-                                                DECODED MSG • {log.decoded.type}
+                                                TYPE {log.decoded.msg_type ?? log.decoded.type} • {getAisMsgTypeName(log.decoded.msg_type ?? log.decoded.type)}
                                             </span>
                                             {expandedIds.has(log.id) ? <ChevronUp size={16} color={colors.textMuted} /> : <ChevronDown size={16} color={colors.textMuted} />}
                                         </div>
@@ -6311,7 +6444,7 @@ function NmeaConsoleModal({ isOpen, onClose, logs, colors }: any) {
                                                                 fontWeight: 900, 
                                                                 boxShadow: '0 0 10px rgba(0,240,255,0.3)'
                                                             }}>
-                                                                DECODED MSG
+                                                                TYPE {log.decoded.msg_type ?? log.decoded.type} • {getAisMsgTypeName(log.decoded.msg_type ?? log.decoded.type)}
                                                             </span>
                                                             {expandedIds.has(log.id) ? <ChevronUp size={14} color={colors.textMuted} /> : <ChevronDown size={14} color={colors.textMuted} />}
                                                         </div>
