@@ -5104,15 +5104,23 @@ export default function App() {
                                                          <div style={{ padding: (s.is_aton || mmsiStr.startsWith('99')) ? '10px 15px' : '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.02)' }}>
                                                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
                                                                  <span style={{ fontSize: '1.1rem', lineHeight: 1 }} dangerouslySetInnerHTML={{ __html: getFlagEmoji(mmsiStr, s.country_code) }} />
-                                                                 <strong style={{ 
-                                                                     fontSize: (s.is_aton || mmsiStr.startsWith('99')) ? '1rem' : '0.9rem', 
-                                                                     fontWeight: 800, 
-                                                                     whiteSpace: 'nowrap',
-                                                                     textOverflow: (s.is_aton || mmsiStr.startsWith('99')) ? 'initial' : 'ellipsis',
-                                                                     overflow: (s.is_aton || mmsiStr.startsWith('99')) ? 'initial' : 'hidden'
-                                                                 }}>
-                                                                     {s.name || 'Unknown'} 
-                                                                 </strong>
+                                                                 <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                                                                     <strong style={{ 
+                                                                         fontSize: (s.is_aton || mmsiStr.startsWith('99')) ? '1rem' : '0.9rem', 
+                                                                         fontWeight: 800, 
+                                                                         whiteSpace: 'nowrap',
+                                                                         textOverflow: (s.is_aton || mmsiStr.startsWith('99')) ? 'initial' : 'ellipsis',
+                                                                         overflow: (s.is_aton || mmsiStr.startsWith('99')) ? 'initial' : 'hidden',
+                                                                         lineHeight: 1.1
+                                                                     }}>
+                                                                         {s.name || 'Unknown'} 
+                                                                     </strong>
+                                                                     {!(s.is_aton || mmsiStr.startsWith('99')) && s.length && s.width ? (
+                                                                         <span style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, marginTop: '2px' }}>
+                                                                             {s.length} × {s.width} m
+                                                                         </span>
+                                                                     ) : null}
+                                                                 </div>
                                                              </div>
                                                              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0 }}>
                                                                  {!(s.is_aton || mmsiStr.startsWith('99')) ? (
