@@ -681,8 +681,15 @@ async def process_ais_data(data: dict):
                 dac, fid = ship_data.get("dac"), ship_data.get("fid")
                 ship_data["status_text"] = f"Advanced Binary (DAC:{dac}, FI:{fid})" if dac is not None and fid is not None else "Advanced Binary Message"
 
-            if ship_data.get("sog") is not None and ship_data["sog"] < 0.1:
-                if data.get("nav_status") in [0, 8]: ship_data["status_text"] = "Moored (Stationary)"
+            if ship_data.get("sog") is not None:
+                sog = ship_data["sog"]
+                nav_status = data.get("nav_status")
+                # Case 1: Stationary but reported as Under Way (0=Engine, 8=Sailing)
+                if sog < 0.1 and nav_status in [0, 8]:
+                    ship_data["status_text"] = "Moored (Stationary)"
+                # Case 2: Moving but reported as Stationary (1=Anchor, 5=Moored)
+                elif sog > 1.0 and nav_status in [1, 5]:
+                    ship_data["status_text"] = "Under way (SOG > 1kn)"
 
             # If current message has no lat/lon but we have it in DB, use it for the broadcast/mqtt
             if ship_data.get("lat") is None and last_known_lat is not None:
