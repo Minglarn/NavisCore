@@ -1,6 +1,6 @@
 # NavisCore 📡
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2026.03.29-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
 ![Status](https://img.shields.io/badge/status-active-success)
@@ -16,18 +16,24 @@
 - **High Concurrency Database**: Optimized SQLite engine using **Write-Ahead Logging (WAL)** and centralized session management for lock-free performance under heavy traffic.
 - **Standardized Ship Mapping**: Full support for **ITU-R M.1371-5** AIS standards, including a smart editable ship category system with predefined dropdowns.
 - **Smart Data Hybridization**: Seamless integration of local SDR data (via [AIS-catcher](https://github.com/jvde-github/AIS-catcher)) and global feeds from [AisStream.io](https://aisstream.io) with intelligent deduplication.
+- **Safety-Related Messages (AIS Type 12/14)**: Built-in support for receiving, persisting, and displaying critical maritime safety alerts in a dedicated notification system.
 - **Vessel Enrichment**: Automatic vessel image fetching with intelligent caching (30-day persistence) and fallback logic.
 - **Advanced Visualization**: Sleek, high-performance map featuring real-time tracking, COG lines, and persistent user settings (zoom, center, layer preferences).
-- **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, with a comprehensive color-coding system for maritime situational awareness.
+- **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, including a **high-precision live timer** that updates every 10 seconds for sub-minute accuracy.
+- **Automated Data Maintenance**: Configurable auto-purge system that cleans up old vessel records and images to maintain peak database performance.
 
 ## 🧭 UI Visual Indicators
 
 Understanding what happens on the map:
 
 ### 💡 Animations & Effects
-- **🟡 Yellow Pulsing Ring**: Indicates a **New Vessel**. This appears when a ship is detected for the first time in your database or after a long absence.
+- **🟡 Yellow Pulsing Ring**: Indicates a **New Vessel**. This appears when a ship is detected for the first time in your database or after a long absence (configurable timeout).
 - **🔵 Cyan Radar Ping**: Indicates a **Data Update**. This quick flash happens every time a new AIS message is received for that specific vessel.
 - **🚨 Red Pulsing Glow**: Indicates an **Emergency Status**. This vessel is broadcasting an active distress signal or emergency message.
+
+### 🧠 Smart Logic
+- **SOG Status Override**: NavisCore automatically overrides misleading navigation statuses. For example, if a ship reports "At anchor" but its Speed Over Ground (SOG) exceeds 1.0 knot, the UI intelligently displays "Under way (SOG > 1kn)".
+- **Detailed Metadata**: Vessel HoverCards display enhanced data including dimensions (Length x Width), AIS Channel (A/B), and calculated distance from your station.
 
 ### 🎨 Vessel Color Coding
 | Color | Vessel Type |
@@ -53,7 +59,7 @@ Understanding what happens on the map:
 - **Wind Sock**: Weather or Meteorological station.
 - **Aircraft**: Search & Rescue aircraft or helicopters.
 
-### 📡 Signal Propagation Indicators (Tropy)
+### 📡 Signal Propagation Indicators (Tropo)
 
 NavisCore automatically classifies signals based on reception distance to identify unusual atmospheric conditions:
 

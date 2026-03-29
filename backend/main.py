@@ -249,13 +249,19 @@ def translate_aisstream_message(msg: dict) -> dict:
         body = msg.get("Message", {}).get(msg_type_str, {})
         mmsi = meta.get("MMSI")
         if not mmsi: return None
+        
+        # Mapping AisStream MessageTypes to internal AIS types
         type_map = {
             "PositionReport": 1,
+            "StandardClassBPositionReport": 18,
+            "ExtendedClassBPositionReport": 19,
             "ShipStaticData": 5,
             "AidsToNavigationReport": 21,
             "StandardSearchAndRescueAircraftReport": 9,
-            "SafetyBroadcastMessage": 14
+            "SafetyBroadcastMessage": 14,
+            "MultiSlotBinaryMessage": 25
         }
+        
         internal_data = {
             "mmsi": mmsi,
             "type": type_map.get(msg_type_str, 0),
@@ -267,6 +273,11 @@ def translate_aisstream_message(msg: dict) -> dict:
             "heading": body.get("TrueHeading"),
             "source": "aisstream"
         }
+        
+        # Enhanced extraction for Class B specific fields if needed
+        if not internal_data["speed"] and "Sog" in body:
+             internal_data["speed"] = body["Sog"]
+             
         if msg_type_str == "AidsToNavigationReport":
             internal_data["is_aton"] = True
         elif msg_type_str == "StandardSearchAndRescueAircraftReport":
@@ -276,9 +287,10 @@ def translate_aisstream_message(msg: dict) -> dict:
             internal_data["is_safety"] = True
             internal_data["safety_text"] = body.get("Text", "")
             internal_data["is_broadcast_alert"] = True
+            
         return internal_data
     except Exception as e:
-        logger.error(f"Error translating AisStream message: {e}")
+        logger.error(f"Error translating AisStream message ({msg.get('MessageType')}): {e}")
         return None
 
 async def restart_aisstream():
@@ -320,18 +332,34 @@ async def aisstream_loop():
                         "APIKey": api_key,
                         "BoundingBoxes": [[[sw_lat, sw_lon], [ne_lat, ne_lon]]],
                         "FiltersShipMMSI": [],
-                        "FilterMessageTypes": ["PositionReport", "ShipStaticData", "AidsToNavigationReport", "StandardSearchAndRescueAircraftReport", "SafetyBroadcastMessage"]
+                        "FilterMessageTypes": ["PositionReport", "StandardClassBPositionReport", "ExtendedClassBPositionReport", "ShipStaticData", "AidsToNavigationReport", "StandardSearchAndRescueAircraftReport", "SafetyBroadcastMessage", "MultiSlotBinaryMessage"]
                     }
                     await ws.send(json.dumps(sub_msg))
                     logger.info("AisStream.io subscription sent successfully.")
-                    async for message in ws:
-                        try:
-                            msg_json = json.loads(message)
-                            translated = translate_aisstream_message(msg_json)
-                            if translated:
-                                asyncio.create_task(process_ais_data(translated))
-                        except Exception as inner_e:
-                            logger.error(f"Error processing AisStream message: {inner_e}")
+                    
+                    # Debug counter for raw messages
+                    debug_count = 0
+                    last_heartbeat = time.time()
+                    
+                    try:
+                        async for message in ws:
+                            now = time.time()
+                            if now - last_heartbeat > 60:
+                                logger.info(f"AisStream.io Heartbeat: Loop active, total messages this session: {debug_count}")
+                                last_heartbeat = now
+                            
+                            debug_count += 1
+                            try:
+                                msg_json = json.loads(message)
+                                translated = translate_aisstream_message(msg_json)
+                                if translated:
+                                    asyncio.create_task(process_ais_data(translated))
+                            except Exception as inner_e:
+                                logger.error(f"Error processing AisStream message: {inner_e}")
+                    except websockets.exceptions.ConnectionClosed as ecc:
+                        logger.error(f"AisStream.io connection closed by server: {ecc.code} - {ecc.reason}")
+                    except Exception as loop_e:
+                        logger.error(f"AisStream.io connection loop error: {loop_e}")
             except Exception as e:
                 logger.error(f"AisStream.io loop error: {e}")
                 await asyncio.sleep(10)
@@ -554,7 +582,9 @@ async def process_ais_data(data: dict):
     source = data.get("source", "local")
 
     if source == "aisstream":
-        if mmsi_str in local_vessels and time.time() - local_vessels[mmsi_str] < 600: return
+        if mmsi_str in local_vessels and time.time() - local_vessels[mmsi_str] < 600:
+            logger.debug(f"[Deduplication] Dropping AisStream message for MMSI {mmsi_str} (Seen locally recently)")
+            return
     else: local_vessels[mmsi_str] = time.time()
 
     if data.get("is_safety"):
