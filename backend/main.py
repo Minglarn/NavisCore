@@ -915,6 +915,7 @@ async def process_ais_data(data: dict):
                                 # History & Meta
                                 "last_seen": ship_data.get("timestamp"),
                                 "previous_seen": ship_data.get("previous_seen"),
+                                "registration_count": ship_data.get("registration_count"),
                                 "source": source,
                                 "event_type": event_type,
                                 "timestamp": ship_data.get("timestamp"),
