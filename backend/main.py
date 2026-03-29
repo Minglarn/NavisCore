@@ -218,7 +218,7 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_new_topic": os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected"),
         "mqtt_pub_forward_sdr": "true",
         "mqtt_pub_forward_udp": "true",
-        "mqtt_pub_forward_aisstream": "false",
+        "mqtt_pub_forward_aisstream": "true",
         "mqtt_pub_wait_for_name": "false",
         "new_vessel_threshold": "5",
         "new_vessel_timeout_h": "24",
