@@ -5883,8 +5883,17 @@ export default function App() {
                                                                 <span style={{ fontSize: '0.65rem', opacity: 0.7, marginRight: '3px' }}>Distance:</span>
                                                                 {ship.distance !== Infinity ? formatDistance(ship.distance, mqttSettings.units) : '--'}
                                                             </span>
-                                                            <span style={{ marginLeft: 'auto', background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : 'rgba(16, 185, 129, 0.1)', color: (ship.source === 'aisstream') ? '#44aaff' : '#10b981', padding: '1px 5px', borderRadius: '3px', fontSize: '0.6rem', fontWeight: 700, border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : 'rgba(16, 185, 129, 0.2)'}` }}>
-                                                                {ship.source === 'aisstream' ? 'STREAM' : 'SDR'}
+                                                            <span style={{ 
+                                                                marginLeft: 'auto', 
+                                                                background: (ship.source === 'aisstream') ? 'rgba(68,170,255,0.1)' : (ship.source === 'udp' ? 'rgba(234, 179, 8, 0.1)' : 'rgba(16, 185, 129, 0.1)'), 
+                                                                color: (ship.source === 'aisstream') ? '#44aaff' : (ship.source === 'udp' ? '#eab308' : '#10b981'), 
+                                                                padding: '1px 5px', 
+                                                                borderRadius: '3px', 
+                                                                fontSize: '0.6rem', 
+                                                                fontWeight: 700, 
+                                                                border: `1px solid ${(ship.source === 'aisstream') ? 'rgba(68,170,255,0.2)' : (ship.source === 'udp' ? 'rgba(234, 179, 8, 0.2)' : 'rgba(16, 185, 129, 0.2)')}` 
+                                                            }}>
+                                                                {ship.source === 'aisstream' ? 'STR' : (ship.source === 'udp' ? 'UDP' : 'SDR')}
                                                             </span>
                                                         </div>
                                                     </div>
