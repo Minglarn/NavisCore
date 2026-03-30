@@ -1193,14 +1193,17 @@ async def mqtt_publisher_worker():
                         if isinstance(item, tuple) and len(item) == 2:
                             topic, payload = item
                         else:
-                            base_topic = s.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
-                            # If setting doesn't end with /objects, treat it as a prefix and append /objects
-                            if not base_topic.endswith("/objects"):
-                                topic = f"{base_topic}/objects"
-                            else:
-                                topic = base_topic
+                            # 1. Use _topic from dictionary if present (explicit topic)
+                            topic = item.pop("_topic", None)
+                            
+                            # 2. Defaut to main topic logic if no explicit topic
+                            if not topic:
+                                base_topic = s.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+                                if not base_topic.endswith("/objects"):
+                                    topic = f"{base_topic}/objects"
+                                else:
+                                    topic = base_topic
                                 
-                            item.pop("_topic", None) # Clean up if it exists
                             payload = json.dumps(item)
                         
                         await client.publish(topic, payload=payload)

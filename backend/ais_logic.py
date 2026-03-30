@@ -33,22 +33,32 @@ NAV_STATUS_MAP = {
 }
 
 SHIP_TYPE_MAP = {
-    0: "Not Available",
+    0: "Not available",
     # 1-19 Reserved
-    20: "Wing in Ground (WIG)",
-    30: "Fishing Vessel",
-    31: "Towing Vessel",
-    32: "Towing (length >200m or breadth >25m)",
+    20: "Wing in ground (WIG) - all ships of this type",
+    21: "Wing in ground (WIG) - Hazardous category A",
+    22: "Wing in ground (WIG) - Hazardous category B",
+    23: "Wing in ground (WIG) - Hazardous category C",
+    24: "Wing in ground (WIG) - Hazardous category D",
+    # 25-29 Reserved
+    30: "Fishing",
+    31: "Towing",
+    32: "Towing: length exceeds 200m or breadth exceeds 25m",
     33: "Dredging or underwater ops",
     34: "Diving ops",
-    35: "Military Ops",
-    36: "Sailing Vessel",
+    35: "Military ops",
+    36: "Sailing",
     37: "Pleasure Craft",
-    38: "Reserved",
-    39: "Reserved",
-    40: "High Speed Craft (HSC)",
+    # 38-39 Reserved
+    40: "High speed craft (HSC) - all ships of this type",
+    41: "High speed craft (HSC) - Hazardous category A",
+    42: "High speed craft (HSC) - Hazardous category B",
+    43: "High speed craft (HSC) - Hazardous category C",
+    44: "High speed craft (HSC) - Hazardous category D",
+    # 45-48 Reserved
+    49: "High speed craft (HSC) - No additional information",
     50: "Pilot Vessel",
-    51: "Search and Rescue Vessel",
+    51: "Search and Rescue vessel",
     52: "Tug",
     53: "Port Tender",
     54: "Anti-pollution equipment",
@@ -56,11 +66,35 @@ SHIP_TYPE_MAP = {
     56: "Spare - Local Vessel",
     57: "Spare - Local Vessel",
     58: "Medical Transport",
-    59: "Ship according to RR Resolution No. 18",
-    60: "Passenger",
-    70: "Cargo",
-    80: "Tanker",
-    90: "Other Type",
+    59: "Noncombatant ship according to RR Resolution No. 18",
+    60: "Passenger - all ships of this type",
+    61: "Passenger - Hazardous category A",
+    62: "Passenger - Hazardous category B",
+    63: "Passenger - Hazardous category C",
+    64: "Passenger - Hazardous category D",
+    # 65-68 Reserved
+    69: "Passenger - No additional information",
+    70: "Cargo - all ships of this type",
+    71: "Cargo - Hazardous category A",
+    72: "Cargo - Hazardous category B",
+    73: "Cargo - Hazardous category C",
+    74: "Cargo - Hazardous category D",
+    # 75-78 Reserved
+    79: "Cargo - No additional information",
+    80: "Tanker - all ships of this type",
+    81: "Tanker - Hazardous category A",
+    82: "Tanker - Hazardous category B",
+    83: "Tanker - Hazardous category C",
+    84: "Tanker - Hazardous category D",
+    # 85-88 Reserved
+    89: "Tanker - No additional information",
+    90: "Other Type - all ships of this type",
+    91: "Other Type - Hazardous category A",
+    92: "Other Type - Hazardous category B",
+    93: "Other Type - Hazardous category C",
+    94: "Other Type - Hazardous category D",
+    # 95-98 Reserved
+    99: "Other Type - no additional information",
 }
 
 def get_ship_type_info(code: int) -> dict:
@@ -68,31 +102,31 @@ def get_ship_type_info(code: int) -> dict:
     Returns a dictionary with 'description' and 'icon_category' 
     based on the international AIS ship type standard.
     """
-    # Base description
+    # 1. Base description from our comprehensive map
     desc = SHIP_TYPE_MAP.get(code)
     
-    # Handle hazardous categories (last digit 1-4) for specific ranges
-    hazard_map = {
-        1: "Hazardous category A",
-        2: "Hazardous category B",
-        3: "Hazardous category C",
-        4: "Hazardous category D"
-    }
-    
-    last_digit = code % 10
-    parent_cat = (code // 10) * 10
-    
+    # 2. Fallback for values not explicitly in map (e.g., ranges 1-19, 25-29)
     if desc is None:
+        last_digit = code % 10
+        parent_cat = (code // 10) * 10
+        
+        # Generic hazard logic for unmapped sub-codes
+        hazard_map = {
+            1: "Hazardous category A",
+            2: "Hazardous category B",
+            3: "Hazardous category C",
+            4: "Hazardous category D"
+        }
+        
         if parent_cat in [20, 40, 60, 70, 80, 90] and 1 <= last_digit <= 4:
             base_name = SHIP_TYPE_MAP.get(parent_cat, "Unknown")
             desc = f"{base_name}, {hazard_map[last_digit]}"
-        elif parent_cat in [20, 40, 60, 70, 80, 90] and 5 <= last_digit <= 8:
-            base_name = SHIP_TYPE_MAP.get(parent_cat, "Unknown")
-            desc = f"{base_name}, Reserved"
-        elif last_digit == 9:
-             desc = SHIP_TYPE_MAP.get(parent_cat, "Unknown")
         elif 1 <= code <= 19:
             desc = "Reserved"
+        elif 25 <= code <= 29:
+            desc = "Wing in ground (WIG) - Reserved"
+        elif 95 <= code <= 98:
+            desc = "Other Type - Reserved"
         else:
             desc = "Unknown"
 
@@ -446,8 +480,8 @@ def _decode_type_12(bitstr: str, data: dict):
     if len(bitstr) < 72:
         return
     data["dest_mmsi"] = get_int_from_bits(bitstr, 40, 30)
-    seq_num = get_int_from_bits(bitstr, 70, 2)
-    data["seq_num"] = seq_num
+    data["seq_num"] = get_int_from_bits(bitstr, 38, 2)  # Correct bit position
+    data["retransmit_flag"] = get_int_from_bits(bitstr, 70, 2) # Retransmit flag at bit 70
 
     # Decode text (starts at bit 72, variable length, 6-bit chars)
     avail_chars = (len(bitstr) - 72) // 6
@@ -768,7 +802,8 @@ class AisStreamManager:
             return
 
         if total_fragments == 1:
-            self._decode_payload(payload, [sentence], channel=channel)
+            padding = int(parts[6][0]) if len(parts) > 6 and parts[6] else 0
+            self._decode_payload(payload, [sentence], channel=channel, padding=padding)
         else:
             key = (sequence_id, channel)
             if key not in self.buffer:
@@ -790,8 +825,9 @@ class AisStreamManager:
                     full_payload += self.buffer[key]["fragments"].get(i, "")
                     full_sentences.append(self.buffer[key]["sentences"].get(i, ""))
 
+                padding = int(parts[6][0]) if len(parts) > 6 and parts[6] else 0
                 del self.buffer[key]
-                self._decode_payload(full_payload, full_sentences, channel=channel)
+                self._decode_payload(full_payload, full_sentences, channel=channel, padding=padding)
 
     def _cleanup(self):
         now = time.time()
@@ -804,8 +840,12 @@ class AisStreamManager:
         for k in expired_24:
             del self.type24_buffer[k]
 
-    def _decode_payload(self, payload: str, sentences: list = None, channel: str = None):
+    def _decode_payload(self, payload: str, sentences: list = None, channel: str = None, padding: int = 0):
         bitstr = "".join([to_6_bit_string(c) for c in payload])
+
+        # Strip padding bits from the end as indicated by NMEA sentence
+        if padding > 0 and len(bitstr) >= padding:
+            bitstr = bitstr[:-padding]
 
         if len(bitstr) < 38:
             return
