@@ -26,6 +26,7 @@ PORT = int(os.getenv("PORT", 8080))
 UDP_PORT = int(os.getenv("UDP_PORT", 10110))
 MOCK_MODE = os.getenv("MOCK_MODE", "false").lower() == "true"
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+MAX_STATS_RANGE_KM = 1000.0 # Threshold for statistics (approx 540 nm). Higher than this is treated as outlier/extreme TROPO.
 
 logging.basicConfig(
     level=getattr(logging, LOG_LEVEL),
@@ -140,15 +141,17 @@ class StatsCollector:
 stats_collector = StatsCollector()
 
 # Database helper
+ais_queue = asyncio.Queue(maxsize=1000)
+
 @asynccontextmanager
 async def db_session():
-    async with aiosqlite.connect(DB_PATH, timeout=30.0) as db:
+    async with aiosqlite.connect(DB_PATH, timeout=60.0) as db:
         # Attempt to use WAL mode for better concurrency
         try:
             await db.execute('PRAGMA journal_mode=WAL')
         except Exception:
             pass
-        await db.execute('PRAGMA busy_timeout=30000')
+        await db.execute('PRAGMA busy_timeout=60000')
         yield db
 
 # Settings Helpers
@@ -164,6 +167,18 @@ async def cleanup_history_task():
         except Exception as e:
             logger.error(f"Error in cleanup_history_task: {e}")
         await asyncio.sleep(3600)
+
+async def ais_processing_worker():
+    """Background worker to process AIS messages sequentially from the queue."""
+    logger.info("AIS processing worker started.")
+    while True:
+        try:
+            data = await ais_queue.get()
+            await process_ais_data(data)
+            ais_queue.task_done()
+        except Exception as e:
+            logger.error(f"Worker error: {e}")
+            await asyncio.sleep(1)
 
 async def get_setting(key: str, default_val: str = "", db: aiosqlite.Connection = None) -> str:
     if db:
@@ -353,7 +368,7 @@ async def aisstream_loop():
                                 msg_json = json.loads(message)
                                 translated = translate_aisstream_message(msg_json)
                                 if translated:
-                                    asyncio.create_task(process_ais_data(translated))
+                                    ais_queue.put_nowait(translated)
                             except Exception as inner_e:
                                 logger.error(f"Error processing AisStream message: {inner_e}")
                     except websockets.exceptions.ConnectionClosed as ecc:
@@ -837,7 +852,8 @@ async def process_ais_data(data: dict):
                    not ship_data.get("is_sar") and not mmsi_str.startswith("99"):
                     try:
                         dist = haversine_distance(float(origin_lat), float(origin_lon), lat, lon)
-                        if ship_data.get("message_count", 0) >= 1 and 1.0 <= dist <= 370.4:
+                        # ONLY update general coverage stats if distance is reasonable
+                        if ship_data.get("message_count", 0) >= 1 and 1.0 <= dist <= MAX_STATS_RANGE_KM:
                             stats_collector.update_range(dist)
                             bearing = calculate_bearing(float(origin_lat), float(origin_lon), lat, lon)
                             sector = int(bearing // 5) % 72
@@ -867,10 +883,34 @@ async def process_ais_data(data: dict):
                     ship_data["dist_to_station_km"] = round(dist_km, 2)
                 except: pass
 
+            # --- Range per Channel ---
+            ais_channel = ship_data.get("ais_channel")
+            # Filter: ONLY real vessels (excludes AtoN, Base Stations, Meteo, and SAR Aircraft)
+            is_real_vessel = ship_data.get("is_vessel") and not (is_aton or is_meteo or is_base_station or is_sar_mmsi)
+
+            # Tropo Filter for Statistics: Only update records if distance is below threshold
+            if ais_channel and 0 < dist_km <= MAX_STATS_RANGE_KM and is_real_vessel:
+                try:
+                    await db.execute('''
+                        INSERT INTO channel_stats (channel_id, max_range_km, last_seen, mmsi, name, ship_type, msg_type) 
+                        VALUES (?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?)
+                        ON CONFLICT(channel_id) DO UPDATE SET 
+                            last_seen = CASE WHEN ? > max_range_km THEN CURRENT_TIMESTAMP ELSE last_seen END,
+                            mmsi = CASE WHEN ? > max_range_km THEN ? ELSE mmsi END,
+                            name = CASE WHEN ? > max_range_km THEN ? ELSE name END,
+                            ship_type = CASE WHEN ? > max_range_km THEN ? ELSE ship_type END,
+                            msg_type = CASE WHEN ? > max_range_km THEN ? ELSE msg_type END,
+                            max_range_km = MAX(max_range_km, ?)
+                    ''', (ais_channel, dist_km, mmsi_str, ship_data.get("name"), ship_data.get("shiptype"), msg_type,
+                          dist_km, dist_km, mmsi_str, dist_km, ship_data.get("name"), dist_km, ship_data.get("shiptype"), dist_km, msg_type, dist_km))
+                except Exception as e:
+                    logger.error(f"Error updating channel stats: {e}")
+
+            await db.commit()
+
             # Filter False Tropo: objects > 200nm away with only 1 message
             if dist_nm > 200 and ship_data.get("message_count", 0) < 2:
                 logger.info(f"False Tropo candidate suppressed: {mmsi_str} at {dist_nm:.1f}nm (Messages: {ship_data.get('message_count')})")
-                await db.commit()
                 return
 
             # --- MQTT Publisher Logic ---
@@ -1029,7 +1069,16 @@ async def process_ais_data(data: dict):
                                         # IMPORTANT: Update memory cache BEFORE the sleep to block other threads
                                         mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
                                         
-                                        new_topic = settings.get("mqtt_pub_new_topic", "naviscore/new_detected")
+                                        # Derive prefix from main topic setting
+                                        base_topic = settings.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+                                        if base_topic.endswith("/objects"):
+                                            prefix = base_topic.rsplit("/", 1)[0]
+                                        else:
+                                            prefix = base_topic
+                                        
+                                        # Use prefix for new_detected topic
+                                        new_topic = f"{prefix}/new_detected"
+                                        
                                         img_bytes = get_image_bytes(mmsi_str)
                                         if img_bytes:
                                             mqtt_pub_queue.put_nowait((new_topic, img_bytes))
@@ -1063,7 +1112,7 @@ class UDPProtocol(asyncio.DatagramProtocol):
         self.stream_manager = AisStreamManager()
         self.stream_manager.on_decode(self.handle_parsed_custom)
         asyncio.create_task(self.update_settings_loop())
-    def handle_parsed_custom(self, d): d["source"] = "udp"; asyncio.create_task(process_ais_data(d))
+    def handle_parsed_custom(self, d): d["source"] = "udp"; ais_queue.put_nowait(d)
     async def update_settings_loop(self):
         while True: self.settings = await get_all_settings(); await asyncio.sleep(5)
     def datagram_received(self, data, addr):
@@ -1105,7 +1154,7 @@ async def mqtt_loop():
                 mqtt_connected = True; await broadcast({"type": "mqtt_status", "connected": True})
                 await c.subscribe(s["mqtt_topic"])
                 async for m in c.messages:
-                    try: asyncio.create_task(process_ais_data(json.loads(m.payload.decode())))
+                    try: ais_queue.put_nowait(json.loads(m.payload.decode()))
                     except Exception: pass
         except Exception as e: logger.error(f"MQTT error: {e}"); mqtt_connected = False; await broadcast({"type": "mqtt_status", "connected": False}); await asyncio.sleep(5)
 
@@ -1144,7 +1193,14 @@ async def mqtt_publisher_worker():
                         if isinstance(item, tuple) and len(item) == 2:
                             topic, payload = item
                         else:
-                            topic = item.pop("_topic", s.get("mqtt_pub_topic", "naviscore/objects"))
+                            base_topic = s.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+                            # If setting doesn't end with /objects, treat it as a prefix and append /objects
+                            if not base_topic.endswith("/objects"):
+                                topic = f"{base_topic}/objects"
+                            else:
+                                topic = base_topic
+                                
+                            item.pop("_topic", None) # Clean up if it exists
                             payload = json.dumps(item)
                         
                         await client.publish(topic, payload=payload)
@@ -1185,9 +1241,16 @@ async def mqtt_stats_reporter():
                 snapshot = stats_collector.get_hourly_snapshot()
                 
                 s = await get_all_settings()
-                base_topic = s.get("mqtt_pub_topic", "naviscore/objects")
-                prefix = base_topic.rsplit("/", 1)[0] if "/" in base_topic else ""
-                hourly_topic = f"{prefix}/objects_stat_hourly" if prefix else "objects_stat_hourly"
+                base_topic = s.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+                
+                # Derive prefix: if it ends with /objects, take the part before. 
+                # Otherwise, the whole thing is the prefix.
+                if base_topic.endswith("/objects"):
+                    prefix = base_topic.rsplit("/", 1)[0]
+                else:
+                    prefix = base_topic
+                
+                hourly_topic = f"{prefix}/objects_stat_hourly"
                 
                 logger.info(f"[StatsReporter] Queuing hourly stats to topic: {hourly_topic}")
                 mqtt_pub_queue.put_nowait({
@@ -1234,9 +1297,13 @@ async def mqtt_stats_reporter():
                             daily_payload["max_range_nm"] = round(km * 0.539957, 2)
                         
                         s = await get_all_settings()
-                        base_topic = s.get("mqtt_pub_topic", "naviscore/objects")
-                        prefix = base_topic.rsplit("/", 1)[0] if "/" in base_topic else ""
-                        daily_topic = f"{prefix}/objects_stat_daily" if prefix else "objects_stat_daily"
+                        base_topic = s.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+                        if base_topic.endswith("/objects"):
+                            prefix = base_topic.rsplit("/", 1)[0]
+                        else:
+                            prefix = base_topic
+                            
+                        daily_topic = f"{prefix}/objects_stat_daily"
                         
                         mqtt_pub_queue.put_nowait({
                             "_topic": daily_topic,
@@ -1362,6 +1429,11 @@ async def startup_event():
         await db.execute('CREATE TABLE IF NOT EXISTS sector_history (sector_id INTEGER, distance_km REAL, timestamp INTEGER)')
         await db.execute('CREATE INDEX IF NOT EXISTS idx_sector_history_ts ON sector_history (timestamp)')
         await db.execute('CREATE TABLE IF NOT EXISTS safety_alerts (id INTEGER PRIMARY KEY AUTOINCREMENT, mmsi TEXT NOT NULL, dest_mmsi TEXT, text TEXT, is_broadcast BOOLEAN DEFAULT 0, msg_type INTEGER, timestamp DATETIME DEFAULT CURRENT_TIMESTAMP, dismissed BOOLEAN DEFAULT 0)')
+        await db.execute('CREATE TABLE IF NOT EXISTS channel_stats (channel_id TEXT PRIMARY KEY, max_range_km REAL DEFAULT 0.0, last_seen DATETIME DEFAULT CURRENT_TIMESTAMP, mmsi TEXT, name TEXT, ship_type INTEGER, msg_type INTEGER)')
+        # Ensure columns exist in case table already existed
+        for col in [("mmsi", "TEXT"), ("name", "TEXT"), ("ship_type", "INTEGER"), ("msg_type", "INTEGER")]:
+            try: await db.execute(f"ALTER TABLE channel_stats ADD COLUMN {col[0]} {col[1]}")
+            except Exception: pass
         await db.commit()
     asyncio.create_task(start_udp_listener())
     restart_mqtt()
@@ -1372,6 +1444,7 @@ async def startup_event():
     asyncio.create_task(restart_aisstream())
     asyncio.create_task(enrichment_worker())
     asyncio.create_task(mqtt_stats_reporter())
+    asyncio.create_task(ais_processing_worker())
 @app.get("/api/ships")
 async def get_ships():
     s = await get_all_settings(); t = int(s.get("ship_timeout", 60))
@@ -1652,7 +1725,7 @@ async def set_settings_api(settings: dict):
     if settings.get("udp_port") or settings.get("udp_enabled"): asyncio.create_task(start_udp_listener())
     if any(k in settings for k in ["aisstream_enabled", "aisstream_api_key", "aisstream_sw_lat", "aisstream_sw_lon", "aisstream_ne_lat", "aisstream_ne_lon"]):
         await restart_aisstream()
-    if any(k in settings for k in ["mqtt_pub_enabled", "mqtt_pub_url", "mqtt_pub_topic", "mqtt_pub_user", "mqtt_pub_pass", "mqtt_pub_only_new"]):
+    if any(k.startswith("mqtt_pub_") for k in settings.keys()):
         restart_mqtt_pub()
     restart_mqtt(); return {"success": True, "settings": await get_all_settings()}
 
@@ -1732,6 +1805,18 @@ async def get_statistics(date: str = None):
                 "minute_breakdown": min_brk, "sector_max_last_hour": sector_max, "sector_max_last_24h": sector_24h_max
             }
     except Exception as e: logger.error(f"Stats err: {e}"); return {"error": "Stats error"}
+
+@app.get("/api/channel_stats")
+async def get_channel_stats():
+    async with db_session() as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            cursor = await db.execute("SELECT channel_id, max_range_km, last_seen, mmsi, name, ship_type, msg_type FROM channel_stats ORDER BY max_range_km DESC")
+            rows = await cursor.fetchall()
+            return [dict(r) for r in rows]
+        except Exception as e:
+            logger.error(f"Error fetching channel stats: {e}")
+            return []
 
 @app.get("/api/status")
 async def get_status():

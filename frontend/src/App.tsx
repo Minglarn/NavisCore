@@ -1168,23 +1168,29 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [timeRange, setTimeRange] = useState<'7d' | '30d' | '1y'>('30d');
     const [stats, setStats] = useState<any>(null);
+    const [channelStats, setChannelStats] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
             setLoading(true);
             const isDev = window.location.port === '5173';
-            const fetchPath = isDev ? `http://127.0.0.1:8080/api/statistics?date=${selectedDate}` : `/api/statistics?date=${selectedDate}`;
-            fetch(fetchPath)
-                .then(r => r.json())
-                .then(data => {
-                    setStats(data);
-                    setLoading(false);
-                })
-                .catch(err => {
-                    console.error("Failed to fetch stats", err);
-                    setLoading(false);
-                });
+            const statsPath = isDev ? `http://127.0.0.1:8080/api/statistics?date=${selectedDate}` : `/api/statistics?date=${selectedDate}`;
+            const channelPath = isDev ? `http://127.0.0.1:8080/api/channel_stats` : `/api/channel_stats`;
+
+            Promise.all([
+                fetch(statsPath).then(r => r.json()),
+                fetch(channelPath).then(r => r.json())
+            ])
+            .then(([statsData, channelData]) => {
+                setStats(statsData);
+                setChannelStats(channelData);
+                setLoading(false);
+            })
+            .catch(err => {
+                console.error("Failed to fetch statistics", err);
+                setLoading(false);
+            });
         }
     }, [isOpen, selectedDate]);
 
@@ -1446,6 +1452,46 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                                     
                                     <ChartCard title="Messages per Hour (Selected Day)" colors={colors} style={{ height: '350px' }}>
                                         <Line data={hourlyData} options={hourlyOptions} />
+                                    </ChartCard>
+                                </div>
+
+                                {/* Range per Channel */}
+                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '30px' }}>
+                                    <ChartCard title="Maximum Range per AIS Channel (All-time Record)" colors={colors}>
+                                        <div style={{ padding: '0 0' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', color: colors.textMain }}>
+                                                <thead>
+                                                    <tr style={{ borderBottom: `2px solid ${colors.border}`, textAlign: 'left' }}>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Channel</th>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>MMSI</th>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Ship Name</th>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Ship Type</th>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Max Range (nm)</th>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Max Range (km)</th>
+                                                        <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Last Record Seen</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {channelStats.length > 0 ? (
+                                                        channelStats.map((cs, idx) => (
+                                                            <tr key={idx} style={{ borderBottom: `1px solid ${colors.border}44`, transition: 'background 0.2s' }}>
+                                                                <td style={{ padding: '15px 8px', fontWeight: 800, color: '#44aaff' }}>{cs.channel_id}</td>
+                                                                <td style={{ padding: '15px 8px', fontFamily: 'monospace', color: colors.textMuted }}>{cs.mmsi || 'N/A'}</td>
+                                                                <td style={{ padding: '15px 8px', fontWeight: 700 }}>{cs.name || 'Unknown'}</td>
+                                                                <td style={{ padding: '15px 8px', fontSize: '0.85rem', color: colors.textMuted }}>{getShipTypeName(String(cs.mmsi), cs.ship_type)}</td>
+                                                                <td style={{ padding: '15px 8px', fontWeight: 700 }}>{(cs.max_range_km * 0.539957).toFixed(2)} nm</td>
+                                                                <td style={{ padding: '15px 8px', color: colors.textMuted }}>{Number(cs.max_range_km).toFixed(2)} km</td>
+                                                                <td style={{ padding: '15px 8px', fontSize: '0.9rem', color: colors.textMuted }}>{cs.last_seen}</td>
+                                                            </tr>
+                                                        ))
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan={4} style={{ padding: '40px', textAlign: 'center', color: colors.textMuted }}>No channel range data available. Collecting records...</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </ChartCard>
                                 </div>
                             </>
