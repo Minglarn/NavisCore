@@ -146,34 +146,72 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string, 
     // Prefer backend-supplied text
     if (typeText) return typeText;
 
-    if (!shipType && shipType !== 0) return 'Unknown Type';
-
-    if (shipType >= 20 && shipType <= 29) return 'Wing in ground (WIG)';
-    if (shipType >= 40 && shipType <= 49) return 'High speed craft (HSC)';
-    if (shipType >= 60 && shipType <= 69) return 'Passenger';
-    if (shipType >= 70 && shipType <= 79) return 'Cargo';
-    if (shipType >= 80 && shipType <= 89) return 'Tanker';
-    if (shipType >= 90 && shipType <= 99) return 'Other Type';
+    if (shipType === undefined || shipType === null) return 'Unknown Type';
 
     switch (shipType) {
-        case 0: return "Not available";
+        case 0: return "Not available (default)";
+        case 20: return "Wing in ground (WIG), all ships";
+        case 21: return "Wing in ground (WIG), Hazardous category A";
+        case 22: return "Wing in ground (WIG), Hazardous category B";
+        case 23: return "Wing in ground (WIG), Hazardous category C";
+        case 24: return "Wing in ground (WIG), Hazardous category D";
+        case 25: case 26: case 27: case 28: case 29: return "Wing in ground (WIG), Reserved";
         case 30: return "Fishing";
-        case 31: case 32: return "Towing";
-        case 33: return "Dredging/Underwater";
+        case 31: return "Towing";
+        case 32: return "Towing: length >200m or breadth >25m";
+        case 33: return "Dredging or underwater ops";
         case 34: return "Diving ops";
         case 35: return "Military ops";
         case 36: return "Sailing";
         case 37: return "Pleasure Craft";
+        case 38: case 39: return "Reserved";
+        case 40: return "High speed craft (HSC), all ships";
+        case 41: return "High speed craft (HSC), Hazardous category A";
+        case 42: return "High speed craft (HSC), Hazardous category B";
+        case 43: return "High speed craft (HSC), Hazardous category C";
+        case 44: return "High speed craft (HSC), Hazardous category D";
+        case 45: case 46: case 47: case 48: return "High speed craft (HSC), Reserved";
+        case 49: return "High speed craft (HSC), No additional information";
         case 50: return "Pilot Vessel";
-        case 51: return "S.A.R";
+        case 51: return "Search and Rescue vessel";
         case 52: return "Tug";
         case 53: return "Port Tender";
-        case 54: return "Anti-pollution";
+        case 54: return "Anti-pollution equipment";
         case 55: return "Law Enforcement";
-        case 56: case 57: return "Local Vessel";
+        case 56: case 57: return "Spare - Local Vessel";
         case 58: return "Medical Transport";
-        case 59: return "Noncombatant ship";
-        default: return "Unknown Type";
+        case 59: return "Non-combatant ship according to RR Resolution No. 18";
+        case 60: return "Passenger, all ships";
+        case 61: return "Passenger, Hazardous category A";
+        case 62: return "Passenger, Hazardous category B";
+        case 63: return "Passenger, Hazardous category C";
+        case 64: return "Passenger, Hazardous category D";
+        case 65: case 66: case 67: case 68: return "Passenger, Reserved";
+        case 69: return "Passenger, No additional information";
+        case 70: return "Cargo, all ships";
+        case 71: return "Cargo, Hazardous category A";
+        case 72: return "Cargo, Hazardous category B";
+        case 73: return "Cargo, Hazardous category C";
+        case 74: return "Cargo, Hazardous category D";
+        case 75: case 76: case 77: case 78: return "Cargo, Reserved";
+        case 79: return "Cargo, No additional information";
+        case 80: return "Tanker, all ships";
+        case 81: return "Tanker, Hazardous category A";
+        case 82: return "Tanker, Hazardous category B";
+        case 83: return "Tanker, Hazardous category C";
+        case 84: return "Tanker, Hazardous category D";
+        case 85: case 86: case 87: case 88: return "Tanker, Reserved";
+        case 89: return "Tanker, No additional information";
+        case 90: return "Other Type, all ships";
+        case 91: return "Other Type, Hazardous category A";
+        case 92: return "Other Type, Hazardous category B";
+        case 93: return "Other Type, Hazardous category C";
+        case 94: return "Other Type, Hazardous category D";
+        case 95: case 96: case 97: case 98: return "Other Type, Reserved";
+        case 99: return "Other Type, no additional information";
+        default: 
+            if (shipType >= 1 && shipType <= 19) return "Reserved for future use";
+            return "Unknown Type";
     }
 }
 
@@ -233,29 +271,30 @@ function getShipFilterCategory(s: any): string {
 }
  
 const aisShipTypes = [
-    { value: 0, label: "Not available" },
+    { value: 0, label: "Not available (default)" },
+    { value: 20, label: "Wing in ground (WIG), all ships" },
     { value: 30, label: "Fishing" },
     { value: 31, label: "Towing" },
-    { value: 32, label: "Towing (Large)" },
-    { value: 33, label: "Dredging/Underwater" },
+    { value: 32, label: "Towing: length >200m or breadth >25m" },
+    { value: 33, label: "Dredging or underwater ops" },
     { value: 34, label: "Diving ops" },
     { value: 35, label: "Military ops" },
     { value: 36, label: "Sailing" },
     { value: 37, label: "Pleasure Craft" },
+    { value: 40, label: "High speed craft (HSC), all ships" },
     { value: 50, label: "Pilot Vessel" },
-    { value: 51, label: "S.A.R" },
+    { value: 51, label: "Search and Rescue vessel" },
     { value: 52, label: "Tug" },
     { value: 53, label: "Port Tender" },
-    { value: 54, label: "Anti-pollution" },
+    { value: 54, label: "Anti-pollution equipment" },
     { value: 55, label: "Law Enforcement" },
-    { value: 56, label: "Local Vessel" },
-    { value: 57, label: "Local Vessel" },
+    { value: 56, label: "Spare - Local Vessel" },
     { value: 58, label: "Medical Transport" },
-    { value: 59, label: "Noncombatant ship" },
-    { value: 60, label: "Passenger" },
-    { value: 70, label: "Cargo" },
-    { value: 80, label: "Tanker" },
-    { value: 90, label: "Other Type" }
+    { value: 59, label: "Non-combatant ship" },
+    { value: 60, label: "Passenger, all ships" },
+    { value: 70, label: "Cargo, all ships" },
+    { value: 80, label: "Tanker, all ships" },
+    { value: 90, label: "Other Type, all ships" }
 ];
 
 
@@ -1650,29 +1689,30 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                         <div style={{ color: colors.textMain, fontWeight: 800, fontSize: '1.1rem' }}>Spara ändringar?</div>
                         <div style={{ color: colors.textMuted, fontSize: '0.9rem' }}>Du har gjort ändringar i fartygets uppgifter. Vill du spara dem?</div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <button 
+                              <button 
                                 onClick={async () => {
-                                    await handleSave();
-                                    setShowSavePrompt(false);
+                                  await handleSave();
+                                  setShowSavePrompt(false);
                                 }}
                                 style={{ background: '#10b981', color: 'white', border: 'none', padding: '12px', borderRadius: '8px', fontWeight: 800, cursor: 'pointer' }}
-                            >
+                              >
                                 Spara och stäng
-                            </button>
-                            <button 
+                              </button>
+                              <button 
                                 onClick={() => {
-                                    setIsEditing(false);
-                                    setEditData({ ...ship });
-                                    setShowSavePrompt(false);
+                                  setIsEditing(false);
+                                  setEditData({ ...ship });
+                                  setShowSavePrompt(false);
                                 }}
                                 style={{ background: 'transparent', border: `1px solid ${colors.border}`, color: colors.textMuted, padding: '10px', borderRadius: '8px', cursor: 'pointer' }}
-                            >
+                              >
                                 Ignorera ändringar
-                            </button>
+                              </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
+                
             {/* Header Row */}
             <div style={{ 
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center', 
@@ -1929,6 +1969,49 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             value={ship.registration_count || '1'} 
                             colors={colors} 
                         />
+                    </div>
+                </Accordion>
+                <Accordion 
+                    title="MQTT & Notifications" 
+                    colors={colors} 
+                    isOpen={expandedSections["MQTT & Notifications"] ?? false} 
+                    setIsOpen={() => toggleSection("MQTT & Notifications")}
+                >
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: `1px solid ${colors.border}88` }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Ignore Vessel</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: colors.textMain }}>Do not send MQTT events</span>
+                            </div>
+                            <label className="switch" style={{ transform: 'scale(0.85)' }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={!!editData.mqtt_ignore} 
+                                    onChange={(e) => {
+                                        setEditData({ ...editData, mqtt_ignore: e.target.checked });
+                                        if (!isEditing) setIsEditing(true);
+                                    }} 
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 16px', borderBottom: `1px solid ${colors.border}88` }}>
+                            <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                <span style={{ fontSize: '0.65rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', marginBottom: '2px' }}>Send on Rediscovery</span>
+                                <span style={{ fontSize: '0.85rem', fontWeight: 800, color: colors.textMain }}>Send event type NEW</span>
+                            </div>
+                            <label className="switch" style={{ transform: 'scale(0.85)' }}>
+                                <input 
+                                    type="checkbox" 
+                                    checked={editData.mqtt_send_new !== false} 
+                                    onChange={(e) => {
+                                        setEditData({ ...editData, mqtt_send_new: e.target.checked });
+                                        if (!isEditing) setIsEditing(true);
+                                    }} 
+                                />
+                                <span className="slider"></span>
+                            </label>
+                        </div>
                     </div>
                 </Accordion>
             </div>
@@ -2470,6 +2553,43 @@ function VesselEditModal({ ship, isOpen, onClose, onSave, onDelete, colors, isDa
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                             <label style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase' }}>Draught (m)</label>
                             <input name="draught" type="number" step="0.1" value={formData.draught || ''} onChange={handleChange} style={{ padding: '10px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: isDark ? 'rgba(0,0,0,0.2)' : '#fff', color: colors.textMain }} />
+                        </div>
+                    </div>
+                    
+                    {/* Full Width section for MQTT flags */}
+                    <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: '20px', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                        <div style={{ fontSize: '0.75rem', color: colors.textMuted, fontWeight: 700, textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Bell size={14} /> MQTT Configuration
+                        </div>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.textMain }}>Ignore Vessel (MQTT)</div>
+                                    <div style={{ fontSize: '0.65rem', color: colors.textMuted }}>Mute this vessel completely from MQTT stream</div>
+                                </div>
+                                <label className="switch">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={!!formData.mqtt_ignore} 
+                                        onChange={(e) => setFormData((prev: any) => ({ ...prev, mqtt_ignore: e.target.checked }))} 
+                                    />
+                                    <span className="slider"></span>
+                                </label>
+                            </div>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 15px', background: isDark ? 'rgba(255,255,255,0.03)' : '#f8fafc', borderRadius: '8px', border: `1px solid ${colors.border}` }}>
+                                <div>
+                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: colors.textMain }}>Send on Rediscovery</div>
+                                    <div style={{ fontSize: '0.65rem', color: colors.textMuted }}>Trigger 'NEW' alert on MQTT when vessel returns</div>
+                                </div>
+                                <label className="switch">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={formData.mqtt_send_new !== false} 
+                                        onChange={(e) => setFormData((prev: any) => ({ ...prev, mqtt_send_new: e.target.checked }))} 
+                                    />
+                                    <span className="slider"></span>
+                                </label>
+                            </div>
                         </div>
                     </div>
                 </div>
