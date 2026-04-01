@@ -1632,7 +1632,10 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
 
     useEffect(() => {
         setLocalImage(ship ? ship.imageUrl : null);
-        setEditData(ship ? { ...ship } : {});
+        // Don't overwrite editData while user is actively editing
+        if (!isEditing) {
+            setEditData(ship ? { ...ship } : {});
+        }
     }, [ship]);
 
     const handleSave = async () => {
@@ -2014,9 +2017,16 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                                 <input 
                                     type="checkbox" 
                                     checked={!!editData.mqtt_ignore} 
-                                    onChange={(e) => {
-                                        setEditData({ ...editData, mqtt_ignore: e.target.checked });
-                                        if (!isEditing) setIsEditing(true);
+                                    onChange={async (e) => {
+                                        const newVal = e.target.checked;
+                                        setEditData((prev: any) => ({ ...prev, mqtt_ignore: newVal }));
+                                        // Auto-save toggle directly
+                                        const isDev = window.location.port === '5173';
+                                        const url = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/details` : `/api/ships/${mmsiStr}/details`;
+                                        try {
+                                            await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mqtt_ignore: newVal }) });
+                                            if (ship) ship.mqtt_ignore = newVal;
+                                        } catch (err) { console.error('Failed to save mqtt_ignore', err); }
                                     }} 
                                 />
                                 <span className="slider"></span>
@@ -2030,10 +2040,17 @@ function VesselDetailSidebar({ isOpen, onClose, ship, mqttSettings, colors }: an
                             <label className="switch" style={{ transform: 'scale(0.85)' }}>
                                 <input 
                                     type="checkbox" 
-                                    checked={editData.mqtt_send_new !== false} 
-                                    onChange={(e) => {
-                                        setEditData({ ...editData, mqtt_send_new: e.target.checked });
-                                        if (!isEditing) setIsEditing(true);
+                                    checked={!!editData.mqtt_send_new} 
+                                    onChange={async (e) => {
+                                        const newVal = e.target.checked;
+                                        setEditData((prev: any) => ({ ...prev, mqtt_send_new: newVal }));
+                                        // Auto-save toggle directly
+                                        const isDev = window.location.port === '5173';
+                                        const url = isDev ? `http://127.0.0.1:8080/api/ships/${mmsiStr}/details` : `/api/ships/${mmsiStr}/details`;
+                                        try {
+                                            await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mqtt_send_new: newVal }) });
+                                            if (ship) ship.mqtt_send_new = newVal;
+                                        } catch (err) { console.error('Failed to save mqtt_send_new', err); }
                                     }} 
                                 />
                                 <span className="slider"></span>
