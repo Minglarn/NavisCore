@@ -603,19 +603,37 @@ async def process_ais_data(data: dict):
     else: local_vessels[mmsi_str] = time.time()
 
     if data.get("is_safety"):
-        safety_msg = {"type": "safety_alert", "mmsi": mmsi_str, "text": data.get("safety_text", ""), "dest_mmsi": str(data.get("dest_mmsi", "")) if data.get("dest_mmsi") else None, "is_broadcast": data.get("is_broadcast_alert", False), "msg_type": data.get("type", 0), "timestamp": int(datetime.now().timestamp() * 1000)}
-        # Persist to database
+        safety_msg = {
+            "type": "safety_alert", 
+            "mmsi": mmsi_str, 
+            "text": data.get("safety_text", ""), 
+            "dest_mmsi": str(data.get("dest_mmsi", "")) if data.get("dest_mmsi") else None, 
+            "is_broadcast": data.get("is_broadcast_alert", False), 
+            "msg_type": data.get("type", 0), 
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        }
+        # Persist to database & enrich with name
         try:
             async with db_session() as db:
+                # Try to get ship name and category
+                async with db.execute('SELECT name, type FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        safety_msg["name"] = row[0]
+                        if row[1] is not None:
+                            safety_msg["ship_category"] = get_ship_category(row[1])
+
                 await db.execute('INSERT INTO safety_alerts (mmsi, dest_mmsi, text, is_broadcast, msg_type) VALUES (?, ?, ?, ?, ?)',
                     (mmsi_str, safety_msg.get("dest_mmsi"), safety_msg["text"], 1 if safety_msg["is_broadcast"] else 0, safety_msg.get("msg_type", 0)))
                 await db.commit()
+                
                 # Get the inserted ID for the WS payload
                 async with db.execute('SELECT last_insert_rowid()') as cursor:
                     row = await cursor.fetchone()
                     if row: safety_msg["id"] = row[0]
         except Exception as e:
             logger.error(f"Error saving safety alert: {e}")
+            
         for ws in list(connected_clients):
             try: await ws.send_json(safety_msg)
             except Exception: pass
@@ -697,7 +715,9 @@ async def process_ais_data(data: dict):
                 "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": is_aton,
                 "is_sar": final_is_sar, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
                 "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
-                "emergency_type": data.get("emergency_type"), "virtual_aton": data.get("virtual_aton", False) or db_virtual_aton, "is_advanced_binary": data.get("is_advanced_binary", False),
+                "emergency_type": data.get("emergency_type"), "emergency_label": data.get("emergency_label"),
+                "sart_mode": data.get("sart_mode"),
+                "virtual_aton": data.get("virtual_aton", False) or db_virtual_aton, "is_advanced_binary": data.get("is_advanced_binary", False),
                 "dac": data.get("dac"), "fid": data.get("fid"), "raw_payload": data.get("raw_payload"),
                 "source": source, "nmea": data.get("nmea"), "ship_type_text": data.get("ship_type_text"), "ship_category": data.get("ship_category"),
                 "wind_speed": data.get("wind_speed"), "wind_gust": data.get("wind_gust"), "wind_direction": data.get("wind_direction"),

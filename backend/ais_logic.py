@@ -179,6 +179,36 @@ def get_ship_type_name(code: int) -> str:
 def get_ship_category(code: int) -> str:
     return get_ship_type_info(code)["icon_category"]
 
+
+# ═══════════════════════════════════════════════════════
+# EMERGENCY MMSI CLASSIFICATION
+# ═══════════════════════════════════════════════════════
+
+EMERGENCY_MMSI_PREFIXES = {
+    "970": {"type": "AIS-SART", "label": "AIS-SART (Search and Rescue Transponder)"},
+    "972": {"type": "MOB", "label": "MOB (Man Over Board)"},
+    "974": {"type": "EPIRB", "label": "AIS-EPIRB (Emergency Position Indicating Radio Beacon)"},
+}
+
+
+def classify_emergency_mmsi(mmsi: int) -> dict:
+    """
+    Classifies an MMSI as an emergency device based on its prefix.
+    Returns a dict with 'is_emergency', 'emergency_type', 'emergency_label'.
+    970xxxxxx = AIS-SART, 972xxxxxx = MOB, 974xxxxxx = EPIRB.
+    """
+    mmsi_str = str(mmsi).zfill(9)
+    prefix = mmsi_str[:3]
+    info = EMERGENCY_MMSI_PREFIXES.get(prefix)
+    if info:
+        return {
+            "is_emergency": True,
+            "emergency_type": info["type"],
+            "emergency_label": info["label"],
+        }
+    return {"is_emergency": False, "emergency_type": None, "emergency_label": None}
+
+
 ATON_TYPE_MAP = {
     0: "Default/Unspecified",
     1: "Reference point",
@@ -308,6 +338,22 @@ def _decode_type_1_2_3(bitstr: str, data: dict):
     data["cog"] = cog if cog < 360.0 else None
     data["heading"] = heading if heading < 511 else None
     data["timestamp_sec"] = timestamp
+
+    # SART/MOB/EPIRB: Interpret nav_status 14/15 as Active Distress for 97x devices
+    mmsi_str = str(data.get("mmsi", "")).zfill(9)
+    if mmsi_str[:3] in ("970", "972", "974"):
+        if nav_status in (14, 15):
+            data["status_text"] = "Active Distress"
+        # SOG from SART is unreliable — force to 0
+        data["sog"] = 0.0
+        data["is_search_area_center"] = True
+        # Auto-flag as safety event so it generates an alert
+        etype = classify_emergency_mmsi(data["mmsi"])
+        data["is_safety"] = True
+        data["is_broadcast_alert"] = True
+        data["safety_text"] = f"{etype['emergency_type']} POSITION REPORT — {data['status_text']}"
+        data["sart_mode"] = "active"
+        logger.warning(f"[EMERGENCY] {etype['emergency_type']} position from MMSI {mmsi_str}: {lat:.5f}, {lon:.5f} — {data['status_text']}")
 
 
 def _decode_type_4_11(bitstr: str, data: dict):
@@ -515,6 +561,15 @@ def _decode_type_14(bitstr: str, data: dict):
         data["is_safety"] = True
         data["is_broadcast_alert"] = True
         logger.warning(f"[AIS Broadcast Alert] MMSI={data['mmsi']}: {text}")
+
+        # Detect SART status strings
+        text_upper = text.upper().strip()
+        if "SART ACTIVE" in text_upper:
+            data["sart_mode"] = "active"
+            logger.critical(f"[SART ACTIVE] MMSI={data['mmsi']}: {text}")
+        elif "SART TEST" in text_upper:
+            data["sart_mode"] = "test"
+            logger.info(f"[SART TEST] MMSI={data['mmsi']}: {text}")
 
 
 def _decode_type_15(bitstr: str, data: dict):
@@ -865,28 +920,21 @@ class AisStreamManager:
         msg_type = get_int_from_bits(bitstr, 0, 6)
         mmsi = get_int_from_bits(bitstr, 8, 30)
 
-        # Emergency Detection (MMSI Prefixes)
-        mmsi_str = str(mmsi)
-        is_emergency = False
-        emergency_type = None
-        if mmsi_str.startswith("970"):
-            is_emergency = True
-            emergency_type = "AIS-SART"
-        elif mmsi_str.startswith("972"):
-            is_emergency = True
-            emergency_type = "MOB"
-        elif mmsi_str.startswith("974"):
-            is_emergency = True
-            emergency_type = "EPIRB"
+        # Emergency Detection (MMSI Prefixes) — using central classifier
+        emergency_info = classify_emergency_mmsi(mmsi)
 
         decoded_data = {
             "mmsi": mmsi,
             "type": msg_type,
             "nmea": sentences[0] if sentences and len(sentences) == 1 else sentences,
-            "is_emergency": is_emergency,
-            "emergency_type": emergency_type,
+            "is_emergency": emergency_info["is_emergency"],
+            "emergency_type": emergency_info["emergency_type"],
+            "emergency_label": emergency_info.get("emergency_label"),
             "ais_channel": channel
         }
+
+        if emergency_info["is_emergency"]:
+            logger.warning(f"[EMERGENCY DEVICE] {emergency_info['emergency_type']} detected: MMSI {mmsi} (MsgType {msg_type})")
 
         # Type 24: Class B CS Static Data Report (Part A + B pairing)
         if msg_type == 24:

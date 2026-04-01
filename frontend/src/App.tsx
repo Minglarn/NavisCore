@@ -419,10 +419,14 @@ const LiveTimeAgo = ({ timestamp, colors, style = {} }: { timestamp: number, col
     return <span style={style}>{m > 0 ? `${m}m ` : ''}{s}s</span>;
 };
 
-function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean, isDark?: boolean, statusText?: string) {
+function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string, type?: number, shouldFlash?: boolean, shipScale: number = 1.0, circleScale: number = 1.0, isMeteo?: boolean, isAton?: boolean, atonType?: number, isEmergency?: boolean, virtualAton?: boolean, isNew?: boolean, isDark?: boolean, statusText?: string, hasAlert?: boolean, sartMode?: string | null, emergencyType?: string | null) {
     const isStationaryStatus = statusText && (statusText.toLowerCase().includes('anchor') || statusText.toLowerCase().includes('moored'));
     const isMoving = sog !== undefined && sog > 1.0 && cog !== undefined && !isStationaryStatus;
     const isAircraft = type === 9;
+
+    // SART/MOB/EPIRB detection: check MMSI prefix OR explicit emergency flag
+    const isSartDevice = emergencyType === 'AIS-SART' || emergencyType === 'MOB' || emergencyType === 'EPIRB' || mmsi.startsWith('970') || mmsi.startsWith('972') || mmsi.startsWith('974');
+
     const color = getShipColor(mmsi, type, isMeteo, isAton, isEmergency);
     const borderColor = '#000000';
     const strokeDash = virtualAton ? 'stroke-dasharray="2,2"' : '';
@@ -432,7 +436,18 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
     const baseHitArea = 24;
     const hitAreaSize = baseHitArea * Math.max(shipScale, circleScale, 1);
 
-    if (isAton) {
+    if (isSartDevice) {
+        // SART/MOB/EPIRB Icon: Red circle with cross (IMO standard)
+        // Color: orange for TEST, blinking red for ACTIVE, red for default
+        const sartColor = sartMode === 'test' ? '#f59e0b' : '#ff0000';
+        const sartClass = sartMode === 'active' ? 'svg-emergency-pulse' : (sartMode === 'test' ? '' : 'svg-emergency-pulse');
+        const size = 32 * shipScale;
+        svg = `<svg width="${size}" height="${size}" viewBox="0 0 32 32" class="${sartClass}">
+                 <circle cx="16" cy="16" r="14" fill="${sartColor}" stroke="#ffffff" stroke-width="2.5" />
+                 <line x1="8" y1="8" x2="24" y2="24" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+                 <line x1="24" y1="8" x2="8" y2="24" stroke="#ffffff" stroke-width="3" stroke-linecap="round" />
+               </svg>`;
+    } else if (isAton) {
         // AtoN Icon: Lighthouse for fixed structures (1, 3, 5-20), Buoy for floating (21-31)
         const isFloating = atonType && atonType >= 21 && atonType <= 31;
         const size = (isFloating ? 24 : 32) * shipScale;
@@ -494,10 +509,22 @@ function ShipIcon(sog: number | undefined, cog: number | undefined, mmsi: string
                </svg>`;
     }
 
+    // SART devices get highest z-index
+    const zIndexStyle = isSartDevice ? 'z-index: 9999;' : '';
+
     return L.divIcon({
-        html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%; position: relative;">
+        html: `<div class="ship-custom-icon" style="display:flex; justify-content:center; align-items:center; width: 100%; height: 100%; position: relative; ${zIndexStyle}">
                  ${shouldFlash ? `<div class="ship-update-flash"></div>` : ''}
                  ${isNew ? `<div class="new-vessel-ping"></div>` : ''}
+                 ${hasAlert ? `
+                   <div style="position: absolute; top: -14px; right: -14px; z-index: 10; animation: svg-emergency-pulse-anim 1s infinite alternate;">
+                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff0000" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                       <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                       <line x1="12" y1="9" x2="12" y2="13"></line>
+                       <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                     </svg>
+                   </div>
+                 ` : ''}
                  <div style="z-index: 1; display:flex;">${svg}</div>
                </div>`,
         className: 'ship-custom-icon-container',
@@ -5091,7 +5118,6 @@ export default function App() {
                                  const now = Date.now();
                                  const threshold = parseInt(mqttSettings.new_vessel_threshold || '5');
                                  const isNew = s.session_start && (now - s.session_start < threshold * 60000);
-
                                  if (!s.lat || !s.lon) return null;
 
                                  // Spatial Grid Decluttering:
@@ -5138,12 +5164,19 @@ export default function App() {
                                     s.virtual_aton,
                                     isNew,
                                     isDark,
-                                    s.status_text
+                                    s.status_text,
+                                    safetyAlerts.some((a: any) => a.mmsi === mmsiStr && !a.dismissed && (Date.now() - (a.timestamp_ms || 0)) < 3600000),
+                                    s.sart_mode || null,
+                                    s.emergency_type || null
                                 );
+
+                                // SART/MOB/EPIRB: Ensure markers float above everything
+                                const isSartMarker = s.emergency_type === 'AIS-SART' || s.emergency_type === 'MOB' || s.emergency_type === 'EPIRB' || mmsiStr.startsWith('970') || mmsiStr.startsWith('972') || mmsiStr.startsWith('974');
 
                                 return (
                                     <Marker key={`vessel-${mmsiStr}`} position={[s.lat, s.lon]} icon={icon}
                                         riseOnHover={true}
+                                        zIndexOffset={isSartMarker ? 10000 : 0}
                                     eventHandlers={{
                                         mouseover: () => {
                                             if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
@@ -6266,9 +6299,10 @@ export default function App() {
                                     </div>
 
                                     {/* MMSI info */}
-                                    <div style={{ fontSize: '0.78rem', color: colors.textMuted, marginBottom: '6px', display: 'flex', gap: '12px' }}>
-                                        <span><strong>From:</strong> {alert.mmsi}</span>
-                                        {alert.dest_mmsi && <span><strong>To:</strong> {alert.dest_mmsi}</span>}
+                                    <div style={{ fontSize: '0.78rem', color: colors.textMuted, marginBottom: '6px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                        <span><strong>From:</strong> <span style={{ color: colors.textMain, fontWeight: 700 }}>{alert.name || alert.mmsi}</span></span>
+                                        {alert.name && <span style={{ opacity: 0.6, fontSize: '0.7rem' }}>({alert.mmsi})</span>}
+                                        {alert.dest_mmsi && <span><strong>• To:</strong> {alert.dest_mmsi}</span>}
                                     </div>
 
                                     {/* Message text */}
@@ -6318,7 +6352,7 @@ export default function App() {
                         </span>
                     </div>
                     <div style={{ fontSize: '0.78rem', color: colors.textMuted, marginBottom: '4px' }}>
-                        From: {safetyToast.mmsi} {safetyToast.dest_mmsi ? `→ ${safetyToast.dest_mmsi}` : ''}
+                        From: <span style={{ fontWeight: 800, color: colors.textMain }}>{safetyToast.name || safetyToast.mmsi}</span> {safetyToast.dest_mmsi ? `→ ${safetyToast.dest_mmsi}` : ''}
                     </div>
                     <div style={{
                         fontSize: '0.8rem', fontWeight: 500, color: colors.textMain,
