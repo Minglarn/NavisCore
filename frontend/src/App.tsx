@@ -4,7 +4,7 @@ import MarkerClusterGroup from 'react-leaflet-cluster'
 import 'leaflet.markercluster/dist/MarkerCluster.css'
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css'
 import L from 'leaflet'
-import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save, Trash2, Bell } from 'lucide-react';
+import { Settings, X, Moon, Sun, Anchor, List, Navigation, Search, Ship, Signal, Info, Crosshair, Radio, BarChart2, Globe, Plus, Calendar, ChevronLeft, ChevronRight, Activity, Radar, Terminal, ChevronDown, ChevronUp, ArrowDownLeft, ArrowUpRight, LayoutGrid, Rows, Database, Wifi, User, TrendingUp, AlertTriangle, Check, Edit, Save, Trash2, Bell, Download, Upload, RefreshCw } from 'lucide-react';
 import 'leaflet/dist/leaflet.css'
 
 import {
@@ -2968,7 +2968,7 @@ function Toggle({ checked, onChange }: { checked: boolean, onChange: (val: boole
     );
 }
 
-function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme }: any) {
+function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme, setIsRestarting }: any) {
 
     if (!isOpen) return null;
 
@@ -3561,6 +3561,102 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             {activeTab === 'data' && (
                                 <div className="settings-grid">
                                     <div className="settings-card">
+                                        <div className="settings-card-title"><Database size={14} /> System Backup & Migration</div>
+                                        <div style={{ display: 'grid', gap: '20px' }}>
+                                            <div className="form-group-premium">
+                                                <div>
+                                                    <label>Full System Backup</label>
+                                                    <div className="description">Downloads a ZIP archive containing the database and all vessel images.</div>
+                                                </div>
+                                                <button 
+                                                    className="styled-button" 
+                                                    style={{ padding: '10px 20px', background: 'rgba(68,170,255,0.1)', borderColor: '#44aaff66', color: '#44aaff' }}
+                                                    onClick={async () => {
+                                                        const isDev = window.location.port === '5173';
+                                                        const url = isDev ? 'http://127.0.0.1:8080/api/backup/full' : '/api/backup/full';
+                                                        window.location.href = url;
+                                                    }}
+                                                >
+                                                    <Download size={16} style={{marginRight: '8px'}} /> Download Backup (ZIP)
+                                                </button>
+                                            </div>
+                                            
+                                            <div className="form-group-premium">
+                                                <div>
+                                                    <label>Restore from Backup</label>
+                                                    <div className="description">Upload a previously downloaded ZIP. <strong>Warning: This overwrites current data!</strong></div>
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '10px' }}>
+                                                    <input 
+                                                        type="file" 
+                                                        id="restore-upload" 
+                                                        style={{ display: 'none' }} 
+                                                        accept=".zip"
+                                                        onChange={async (e) => {
+                                                            const file = e.target.files?.[0];
+                                                            if (!file) return;
+                                                            if (window.confirm('Are you sure you want to restore the system from this backup? This will overwrite your current database and images.')) {
+                                                                const formData = new FormData();
+                                                                formData.append('file', file);
+                                                                const isDev = window.location.port === '5173';
+                                                                const url = isDev ? 'http://127.0.0.1:8080/api/restore/full' : '/api/restore/full';
+                                                                try {
+                                                                    const res = await fetch(url, { method: 'POST', body: formData });
+                                                                    const data = await res.json();
+                                                                    if (data.status === 'success') {
+                                                                        alert('Restore successful! The system will now restart to apply changes.');
+                                                                        // Trigger restart
+                                                                        const restartUrl = isDev ? 'http://127.0.0.1:8080/api/system/restart' : '/api/system/restart';
+                                                                        await fetch(restartUrl, { method: 'POST' });
+                                                                        setIsRestarting(true);
+                                                                    } else {
+                                                                        alert('Restore failed: ' + data.message);
+                                                                    }
+                                                                } catch (err) {
+                                                                    alert('Error during restore.');
+                                                                }
+                                                            }
+                                                            e.target.value = '';
+                                                        }}
+                                                    />
+                                                    <button 
+                                                        className="styled-button" 
+                                                        style={{ padding: '10px 20px', background: 'rgba(16,185,129,0.1)', borderColor: '#10b98166', color: '#10b981' }}
+                                                        onClick={() => document.getElementById('restore-upload')?.click()}
+                                                    >
+                                                        <Upload size={16} style={{marginRight: '8px'}} /> Select Backup File
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="form-group-premium">
+                                                <div>
+                                                    <label>Restart Backend Service</label>
+                                                    <div className="description">Actively restarts the NavisCore backend process. Useful after restore or hardware changes.</div>
+                                                </div>
+                                                <button 
+                                                    className="styled-button" 
+                                                    style={{ padding: '10px 20px', background: 'rgba(255,170,0,0.1)', borderColor: '#ffaa0066', color: '#ffaa00' }}
+                                                    onClick={async () => {
+                                                        if (window.confirm('Do you want to restart the backend service? Navigation and AIS tracking will temporarily stop for a few seconds.')) {
+                                                            const isDev = window.location.port === '5173';
+                                                            const url = isDev ? 'http://127.0.0.1:8080/api/system/restart' : '/api/system/restart';
+                                                            try {
+                                                                await fetch(url, { method: 'POST' });
+                                                                setIsRestarting(true);
+                                                            } catch (e) {
+                                                                alert('Restart command failed.');
+                                                            }
+                                                        }
+                                                    }}
+                                                >
+                                                    <RefreshCw size={16} style={{marginRight: '8px'}} /> Restart Backend Now
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
                                         <div className="settings-card-title"><Calendar size={14} /> Automatic Purge</div>
                                         <div className="form-group-premium">
                                             <div>
@@ -3997,10 +4093,33 @@ export default function App() {
         const saved = localStorage.getItem('naviscore_sidebar_view_mode');
         return (saved === 'compact' || saved === 'detail') ? saved : 'detail';
     });
+    const [isRestarting, setIsRestarting] = useState(false);
 
     useEffect(() => {
         localStorage.setItem('naviscore_sort_config', JSON.stringify(sortConfig));
     }, [sortConfig]);
+
+    // Backend Restart Ping Logic
+    useEffect(() => {
+        let interval: any;
+        if (isRestarting) {
+            const isDev = window.location.port === '5173';
+            const pingUrl = isDev ? 'http://127.0.0.1:8080/api/settings' : '/api/settings';
+            
+            interval = setInterval(async () => {
+                try {
+                    const res = await fetch(pingUrl);
+                    if (res.ok) {
+                        setIsRestarting(false);
+                        window.location.reload(); // Reload to refresh all states
+                    }
+                } catch (e) {
+                    // Still down
+                }
+            }, 2000);
+        }
+        return () => clearInterval(interval);
+    }, [isRestarting]);
 
     useEffect(() => {
         localStorage.setItem('naviscore_sidebar_view_mode', sidebarViewMode);
@@ -6145,6 +6264,7 @@ export default function App() {
                 setActiveTab={setSettingsTab}
                 colors={colors}
                 theme={theme}
+                setIsRestarting={setIsRestarting}
             />
 
             <VesselDatabaseModal
@@ -6335,19 +6455,19 @@ export default function App() {
                                         {alert.text || '(no text)'}
                                     </div>
 
-                                    {/* Timestamp */}
-                                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.7 }}>
-                                        {alert.timestamp_ms ? new Date(alert.timestamp_ms).toLocaleString() : alert.timestamp || '—'}
-                                    </div>
-                                </div>
-                            ))
-                        )}
+                    {/* Timestamp */}
+                    <div style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.7 }}>
+                        {alert.timestamp_ms ? new Date(alert.timestamp_ms).toLocaleString() : alert.timestamp || '—'}
                     </div>
                 </div>
-            )}
+            ))
+        )}
+    </div>
+</div>
+)}
 
-            {/* Safety Alert Toast */}
-            {safetyToast && (
+{/* Safety Alert Toast */}
+{safetyToast && (
                 <div style={{
                     position: 'fixed', top: '80px', right: '20px',
                     background: isDark ? 'rgba(30, 20, 10, 0.95)' : 'rgba(255, 250, 240, 0.95)',
@@ -6542,6 +6662,36 @@ export default function App() {
                     </div>
                 </div>
             )}
+            {isRestarting && (
+                <div style={{
+                    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                    background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(15px)',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    zIndex: 20000, color: 'white', textAlign: 'center'
+                }}>
+                    <RefreshCw size={64} className="restart-pulse" style={{ color: '#44aaff', marginBottom: '25px' }} />
+                    <h1 style={{ margin: 0, fontSize: '2.2rem', fontWeight: 900, letterSpacing: '-1px' }}>Backend Restarting...</h1>
+                    <p style={{ opacity: 0.7, marginTop: '12px', fontSize: '1.1rem', maxWidth: '400px', lineHeight: '1.5' }}>
+                        NavisCore is reconnecting to the backend service. This usually takes 5-10 seconds.
+                    </p>
+                    <div style={{ width: '300px', height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '10px', marginTop: '40px', overflow: 'hidden', position: 'relative' }}>
+                        <div className="loading-bar-progress" style={{ position: 'absolute', height: '100%', background: 'linear-gradient(90deg, #44aaff, #0072ff)', width: '30%' }}></div>
+                    </div>
+                </div>
+            )}
+            <style>{`
+                @keyframes restart-pulse-anim {
+                    from { transform: rotate(0deg) scale(1); opacity: 0.8; }
+                    to { transform: rotate(360deg) scale(1.15); opacity: 1; }
+                }
+                .restart-pulse { animation: restart-pulse-anim 2s infinite linear; }
+                .loading-bar-progress { animation: loading-bar-anim 1.5s infinite ease-in-out; }
+                @keyframes loading-bar-anim {
+                    0% { left: -40%; width: 30%; }
+                    50% { width: 60%; }
+                    100% { left: 110%; width: 30%; }
+                }
+            `}</style>
         </div>
     );
 }

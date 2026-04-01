@@ -1,4 +1,6 @@
 import asyncio
+# NavisCore Backend - Version 1.1.0-BACKUP_FIX
+# Last Modified: 2026-04-01T17:49:00Z
 import time
 import json
 import random
@@ -13,9 +15,12 @@ import math
 from datetime import datetime, timedelta, timezone
 from contextlib import asynccontextmanager
 import base64
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, UploadFile, File, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+import zipfile
+import io
 from ais_logic import AisStreamManager, get_ship_type_name, get_ship_category
 from dotenv import load_dotenv
 
@@ -953,7 +958,56 @@ async def process_ais_data(data: dict):
                     if ship_data.get("mqtt_ignore"):
                         should_forward = False
 
-                    if should_forward:
+                        # 1. Initialize payload with common data
+                        pub_payload = {
+                            "mmsi": mmsi_str,
+                            "name": ship_data.get("name"),
+                            "lat": round(ship_data.get("lat"), 5) if ship_data.get("lat") is not None else None,
+                            "lon": round(ship_data.get("lon"), 5) if ship_data.get("lon") is not None else None,
+                            # Basic Identification
+                            "msg_type": msg_type,
+                            "imo": ship_data.get("imo"),
+                            "callsign": ship_data.get("callsign"),
+                            "country_code": ship_data.get("country_code"),
+                            "ais_channel": ship_data.get("ais_channel"),
+                            # Movement & Position
+                            "sog": ship_data.get("sog"),
+                            "cog": ship_data.get("cog"),
+                            "heading": ship_data.get("heading"),
+                            "rot": ship_data.get("rot"),
+                            # Type & Category
+                            "shiptype": ship_data.get("shiptype"),
+                            "ship_type_label": ship_data.get("ship_type_text"),
+                            "icon_category": ship_data.get("ship_category"),
+                            "is_nav_aid": bool(ship_data.get("is_aton")),
+                            # Dimensions
+                            "length": ship_data.get("length"),
+                            "width": ship_data.get("width"),
+                            "draught": ship_data.get("draught"),
+                            # Status & Voyage
+                            "status_text": ship_data.get("status_text"),
+                            "nav_status": ship_data.get("nav_status"),
+                            "destination": ship_data.get("destination"),
+                            "eta": ship_data.get("eta"),
+                            # Meteo Data
+                            "wind_speed": ship_data.get("wind_speed"),
+                            "wind_gust": ship_data.get("wind_gust"),
+                            "wind_direction": ship_data.get("wind_direction"),
+                            "water_level": ship_data.get("water_level"),
+                            "air_temp": ship_data.get("air_temp"),
+                            "air_pressure": ship_data.get("air_pressure"),
+                            # History & Meta
+                            "last_seen": ship_data.get("timestamp"),
+                            "previous_seen": ship_data.get("previous_seen"),
+                            "registration_count": ship_data.get("registration_count"),
+                            "source": source,
+                            "timestamp": ship_data.get("timestamp"),
+                            "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None,
+                            "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None,
+                            "dist_to_station_km": round(dist_km, 2) if dist_km > 0 else None
+                        }
+
+                        # 2. Determine Event Type & Overrides
                         event_type = "new" if is_new_v or reset_count else "update"
                         wait_for_name = settings.get("mqtt_pub_wait_for_name", "false") == "true"
                         only_new = settings.get("mqtt_pub_only_new") == "true"
@@ -982,54 +1036,7 @@ async def process_ais_data(data: dict):
                                 should_forward = False
 
                         if not only_new or should_trigger_new:
-                            pub_payload = {
-                                "mmsi": mmsi_str,
-                                "name": ship_data.get("name"),
-                                "lat": round(ship_data.get("lat"), 5) if ship_data.get("lat") is not None else None,
-                                "lon": round(ship_data.get("lon"), 5) if ship_data.get("lon") is not None else None,
-                                # Basic Identification
-                                "msg_type": msg_type,
-                                "imo": ship_data.get("imo"),
-                                "callsign": ship_data.get("callsign"),
-                                "country_code": ship_data.get("country_code"),
-                                "ais_channel": ship_data.get("ais_channel"),
-                                # Movement & Position
-                                "sog": ship_data.get("sog"),
-                                "cog": ship_data.get("cog"),
-                                "heading": ship_data.get("heading"),
-                                "rot": ship_data.get("rot"),
-                                # Type & Category
-                                "shiptype": ship_data.get("shiptype"),
-                                "ship_type_label": ship_data.get("ship_type_text"),
-                                "icon_category": ship_data.get("ship_category"),
-                                "is_nav_aid": bool(ship_data.get("is_aton")),
-                                # Dimensions
-                                "length": ship_data.get("length"),
-                                "width": ship_data.get("width"),
-                                "draught": ship_data.get("draught"),
-                                # Status & Voyage
-                                "status_text": ship_data.get("status_text"),
-                                "nav_status": ship_data.get("nav_status"),
-                                "destination": ship_data.get("destination"),
-                                "eta": ship_data.get("eta"),
-                                # Meteo Data
-                                "wind_speed": ship_data.get("wind_speed"),
-                                "wind_gust": ship_data.get("wind_gust"),
-                                "wind_direction": ship_data.get("wind_direction"),
-                                "water_level": ship_data.get("water_level"),
-                                "air_temp": ship_data.get("air_temp"),
-                                "air_pressure": ship_data.get("air_pressure"),
-                                # History & Meta
-                                "last_seen": ship_data.get("timestamp"),
-                                "previous_seen": ship_data.get("previous_seen"),
-                                "registration_count": ship_data.get("registration_count"),
-                                "source": source,
-                                "event_type": event_type,
-                                "timestamp": ship_data.get("timestamp"),
-                                "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None,
-                                "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None,
-                                "dist_to_station_km": round(dist_km, 2) if dist_km > 0 else None
-                            }
+                            pub_payload["event_type"] = event_type
                             
                             # Signal Propagation classification
                             if dist_nm > 200: pub_payload["propagation"] = "tropo_ducting"
@@ -1876,6 +1883,90 @@ async def websocket_endpoint(websocket: WebSocket):
         await websocket.send_text(json.dumps({"type": "mqtt_status", "connected": mqtt_connected}))
         while True: await websocket.receive_text()
     except: connected_clients.remove(websocket) if websocket in connected_clients else None
+
+@app.get("/api/backup/full")
+async def backup_full():
+    """Download a ZIP archive containing the database and all vessel images."""
+    try:
+        # 1. Create a copy of the database to avoid locking issues
+        temp_db = os.path.join(DATA_DIR, "naviscore_backup.db")
+        shutil.copy2(DB_PATH, temp_db)
+        
+        # 2. Create ZIP in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, "a", zipfile.ZIP_DEFLATED, False) as zip_file:
+            # Add database
+            zip_file.write(temp_db, "naviscore.db")
+            
+            # Add images
+            for root, _, files in os.walk(IMAGES_DIR):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.join("images", os.path.relpath(file_path, IMAGES_DIR))
+                    zip_file.write(file_path, arcname)
+        
+        # Cleanup temp db
+        if os.path.exists(temp_db):
+            os.remove(temp_db)
+            
+        zip_buffer.seek(0)
+        filename = f"naviscore_backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        
+        return Response(
+            zip_buffer.getvalue(),
+            media_type="application/x-zip-compressed",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"Backup error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/restore/full")
+async def restore_full(file: UploadFile = File(...)):
+    """Upload a ZIP archive and restore the database and images."""
+    try:
+        contents = await file.read()
+        zip_buffer = io.BytesIO(contents)
+        
+        with zipfile.ZipFile(zip_buffer) as zip_ref:
+            # 1. Restore Database if present
+            if "naviscore.db" in zip_ref.namelist():
+                # We save it as a 'new' file first
+                restore_db_path = os.path.join(DATA_DIR, "naviscore.db.restore")
+                with open(restore_db_path, "wb") as f:
+                    f.write(zip_ref.read("naviscore.db"))
+                
+                # Move to actual path (will require restart to take full effect)
+                shutil.move(restore_db_path, DB_PATH)
+                logger.info("Database restored from backup")
+
+            # 2. Restore Images
+            for member in zip_ref.namelist():
+                if member.startswith("images/") and not member.endswith("/"):
+                    filename = os.path.basename(member)
+                    if filename:
+                        target_path = os.path.join(IMAGES_DIR, filename)
+                        with open(target_path, "wb") as f:
+                            f.write(zip_ref.read(member))
+            
+        return {"status": "success", "message": "System restored. Restart recommended."}
+    except Exception as e:
+        logger.error(f"Restore error: {e}")
+        return {"status": "error", "message": str(e)}
+
+@app.post("/api/system/restart")
+async def system_restart():
+    """Restart the backend service (requires Docker restart policy)."""
+    logger.warning("System restart requested via API")
+    
+    # We use a background task to exit after returning response
+    async def exit_later():
+        await asyncio.sleep(1.0)
+        logger.info("Exiting process for Docker restart")
+        os._exit(0)
+        
+    asyncio.create_task(exit_later())
+    return {"status": "success", "message": "Restarting system... UI will reconnect shortly."}
 
 if __name__ == "__main__":
     import uvicorn

@@ -2,12 +2,12 @@
 
 # Start Nginx in background
 nginx -g "daemon off;" &
-NGINX_PID=$!
 
 # Start Python backend
 cd /app/backend
-uvicorn main:app --host 0.0.0.0 --port 8080 &
-UVICORN_PID=$!
+# Running uvicorn without & to keep it in foreground, 
+# or use a helper to kill the script if it dies.
+uvicorn main:app --host 0.0.0.0 --port 8080
 
-# Wait for both processes
-wait $NGINX_PID $UVICORN_PID
+# If uvicorn exits, kill the entire container (including nginx)
+kill -9 $(pgrep nginx)
