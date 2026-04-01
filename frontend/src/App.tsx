@@ -150,7 +150,7 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string, 
 
     switch (shipType) {
         case 0: return "Not available (default)";
-        case 20: return "Wing in ground (WIG), all ships";
+        case 20: return "Wing in ground (WIG)";
         case 21: return "Wing in ground (WIG), Hazardous category A";
         case 22: return "Wing in ground (WIG), Hazardous category B";
         case 23: return "Wing in ground (WIG), Hazardous category C";
@@ -165,15 +165,15 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string, 
         case 36: return "Sailing";
         case 37: return "Pleasure Craft";
         case 38: case 39: return "Reserved";
-        case 40: return "High speed craft (HSC), all ships";
+        case 40: return "High speed craft (HSC)";
         case 41: return "High speed craft (HSC), Hazardous category A";
         case 42: return "High speed craft (HSC), Hazardous category B";
         case 43: return "High speed craft (HSC), Hazardous category C";
         case 44: return "High speed craft (HSC), Hazardous category D";
         case 45: case 46: case 47: case 48: return "High speed craft (HSC), Reserved";
-        case 49: return "High speed craft (HSC), No additional information";
+        case 49: return "High speed craft (HSC)";
         case 50: return "Pilot Vessel";
-        case 51: return "Search and Rescue vessel";
+        case 51: return "SAR";
         case 52: return "Tug";
         case 53: return "Port Tender";
         case 54: return "Anti-pollution equipment";
@@ -181,34 +181,34 @@ function getShipTypeName(mmsiStr: string, shipType?: number, typeText?: string, 
         case 56: case 57: return "Spare - Local Vessel";
         case 58: return "Medical Transport";
         case 59: return "Non-combatant ship according to RR Resolution No. 18";
-        case 60: return "Passenger, all ships";
+        case 60: return "Passenger";
         case 61: return "Passenger, Hazardous category A";
         case 62: return "Passenger, Hazardous category B";
         case 63: return "Passenger, Hazardous category C";
         case 64: return "Passenger, Hazardous category D";
         case 65: case 66: case 67: case 68: return "Passenger, Reserved";
-        case 69: return "Passenger, No additional information";
-        case 70: return "Cargo, all ships";
+        case 69: return "Passenger";
+        case 70: return "Cargo";
         case 71: return "Cargo, Hazardous category A";
         case 72: return "Cargo, Hazardous category B";
         case 73: return "Cargo, Hazardous category C";
         case 74: return "Cargo, Hazardous category D";
         case 75: case 76: case 77: case 78: return "Cargo, Reserved";
-        case 79: return "Cargo, No additional information";
-        case 80: return "Tanker, all ships";
+        case 79: return "Cargo";
+        case 80: return "Tanker";
         case 81: return "Tanker, Hazardous category A";
         case 82: return "Tanker, Hazardous category B";
         case 83: return "Tanker, Hazardous category C";
         case 84: return "Tanker, Hazardous category D";
         case 85: case 86: case 87: case 88: return "Tanker, Reserved";
-        case 89: return "Tanker, No additional information";
-        case 90: return "Other Type, all ships";
+        case 89: return "Tanker";
+        case 90: return "Other Type";
         case 91: return "Other Type, Hazardous category A";
         case 92: return "Other Type, Hazardous category B";
         case 93: return "Other Type, Hazardous category C";
         case 94: return "Other Type, Hazardous category D";
         case 95: case 96: case 97: case 98: return "Other Type, Reserved";
-        case 99: return "Other Type, no additional information";
+        case 99: return "Other Type";
         default: 
             if (shipType >= 1 && shipType <= 19) return "Reserved for future use";
             return "Unknown Type";
@@ -5397,7 +5397,7 @@ export default function App() {
                                                                         gridColumn: (s.is_aton || mmsiStr.startsWith('99')) ? 'span 2' : 'auto'
                                                                     }}>
                                                                         <div style={{ fontSize: '0.6rem', color: colors.textMuted, textTransform: 'uppercase', fontWeight: 'bold' }}>Type</div>
-                                                                        <div style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                         <div style={{ fontSize: '0.75rem', fontWeight: 700, whiteSpace: 'normal', lineHeight: '1.2' }}>
                                                                             {s.virtual_aton ? 'Virtual AtoN' : (s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : ((s.is_aton || mmsiStr.startsWith('99')) ? 'Fixed Aid' : 'Unknown')))}
                                                                         </div>
                                                                     </div>
@@ -5618,7 +5618,7 @@ export default function App() {
                                                                 )}
                                                                 <div>
                                                                 <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Type / Stat</div>
-                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'N/A')}</div>
+                                                                <div style={{ fontWeight: 600, fontSize: '0.9rem', whiteSpace: 'normal', lineHeight: '1.2' }}>{s.ship_type_text || (s.shiptype ? `Type ${s.shiptype}` : 'N/A')}</div>
                                                             </div>
                                                             <div>
                                                                 <div style={{ fontSize: '0.7rem', color: colors.textMuted, textTransform: 'uppercase' }}>Draught</div>
