@@ -2,7 +2,7 @@
 
 All notable changes to the NavisCore project will be documented in this file.
 
-## [1.1.0] - 2026-04-01
+## [2026.04.01] - 2026-04-01
 
 ### Added
 - **System Backup & Migration**:
@@ -26,7 +26,7 @@ All notable changes to the NavisCore project will be documented in this file.
   - Updated "Database & Images" settings tab to "Database & System".
   - Cleaned up AIS Message Type names and corrected ship type list for better readability and word-wrap.
 
-## [1.0.9] - 2026-03-27
+## [2026.03.27] - 2026-03-27
 
 ### Added
 - **Safety Messaging (AIS Type 12/14)**:
@@ -41,7 +41,7 @@ All notable changes to the NavisCore project will be documented in this file.
   - Added vessel dimensions (Length x Width) to Map HoverCards.
   - Implemented high-precision "LiveTimeAgo" timer updates (every 10s) in the sidebar.
 
-## [1.0.8] - 2026-03-22
+## [2026.03.22] - 2026-03-22
 
 ### Added
 - **Stats & Reporting**:
