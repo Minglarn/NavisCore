@@ -249,6 +249,12 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
             settings[k] = v
     return settings
 
+def is_true(val):
+    if val is None: return False
+    if isinstance(val, bool): return val
+    s = str(val).lower()
+    return s in ("true", "1", "yes", "on")
+
 async def broadcast(data: dict):
     if not connected_clients:
         return
@@ -330,7 +336,7 @@ async def aisstream_loop():
         while True:
             try:
                 settings = await get_all_settings()
-                enabled = settings.get("aisstream_enabled") == "true"
+                enabled = is_true(settings.get("aisstream_enabled"))
                 api_key = settings.get("aisstream_api_key")
                 if not enabled or not api_key:
                     await asyncio.sleep(15)
@@ -874,7 +880,7 @@ async def process_ais_data(data: dict):
             # Range tracking (only if current message has position)
             if lat is not None and lon is not None:
                 origin_lat, origin_lon = settings.get("origin_lat"), settings.get("origin_lon")
-                if (source != "aisstream" or settings.get("include_aisstream_in_range") == "true") and \
+                if (source != "aisstream" or is_true(settings.get("include_aisstream_in_range"))) and \
                    origin_lat and origin_lon and not is_meteo and not ship_data.get("is_aton") and \
                    not ship_data.get("is_sar") and not mmsi_str.startswith("99"):
                     try:
@@ -941,15 +947,15 @@ async def process_ais_data(data: dict):
                 return
 
             # --- MQTT Publisher Logic ---
-            if settings.get("mqtt_pub_enabled") == "true":
+            if is_true(settings.get("mqtt_pub_enabled")):
                 try:
-                    forward_sdr = settings.get("mqtt_pub_forward_sdr", "true") == "true"
-                    forward_stream = settings.get("mqtt_pub_forward_aisstream", "false") == "true"
+                    forward_sdr = is_true(settings.get("mqtt_pub_forward_sdr", "true"))
+                    forward_stream = is_true(settings.get("mqtt_pub_forward_aisstream", "false"))
                     
                     should_forward = False
                     if (source == "local" or source == "sdr") and forward_sdr:
                         should_forward = True
-                    elif source == "udp" and settings.get("mqtt_pub_forward_udp", "true") == "true":
+                    elif source == "udp" and is_true(settings.get("mqtt_pub_forward_udp", "true")):
                         should_forward = True
                     elif source == "aisstream" and forward_stream:
                         should_forward = True
@@ -1011,21 +1017,25 @@ async def process_ais_data(data: dict):
                     }
 
                     # 2. Determine Event Type & Overrides
-                    event_type = "new" if is_new_v or reset_count else "update"
-                    wait_for_name = settings.get("mqtt_pub_wait_for_name", "false") == "true"
-                    only_new = settings.get("mqtt_pub_only_new") == "true"
+                    initial_event_type = "new" if is_new_v or reset_count else "update"
+                    wait_for_name = is_true(settings.get("mqtt_pub_wait_for_name", "false"))
+                    only_new = is_true(settings.get("mqtt_pub_only_new"))
+                    
+                    event_type = initial_event_type
+                    should_trigger_new = False
                     
                     # Special Logic: Wait for name if enabled
-                    if wait_for_name and event_type == "new" and not ship_data.get("name"):
+                    if wait_for_name and initial_event_type == "new" and not ship_data.get("name"):
                         # Skip sending "new" for now as name is missing
                         should_trigger_new = False
-                    elif wait_for_name and event_type == "update" and ship_data.get("name") and not ship_data.get("mqtt_new_sent"):
-                            # Name finally arrived and we haven't sent "new" yet
-                            should_trigger_new = True
-                            event_type = "new" # Upgrade this update to a "new" event for MQTT
+                        event_type = "update" # Downgrade to update so it doesn't trigger "new" logic
+                    elif wait_for_name and initial_event_type == "update" and ship_data.get("name") and not ship_data.get("mqtt_new_sent"):
+                        # Name finally arrived and we haven't sent "new" yet
+                        should_trigger_new = True
+                        event_type = "new" # Upgrade this update to a "new" event for MQTT
                     else:
                         # Normal logic
-                        should_trigger_new = (event_type == "new")
+                        should_trigger_new = (initial_event_type == "new")
                     
                     # Per-Vessel override for NEW events
                     if should_trigger_new and ship_data.get("mqtt_send_new") == False:
@@ -1205,7 +1215,7 @@ async def mqtt_loop():
     global mqtt_connected
     while True:
         s = await get_all_settings()
-        if s["mqtt_enabled"] != "true" or not s["mqtt_url"]: mqtt_connected = False; await asyncio.sleep(5); continue
+        if not is_true(s["mqtt_enabled"]) or not s["mqtt_url"]: mqtt_connected = False; await asyncio.sleep(5); continue
         try:
             p = s["mqtt_url"].replace("mqtt://", "").replace("mqtts://", "").split(":")
             async with aiomqtt.Client(hostname=p[0], port=int(p[1]) if len(p)>1 else 1883, username=s["mqtt_user"] or None, password=s["mqtt_pass"] or None) as c:
@@ -1226,7 +1236,7 @@ async def mqtt_publisher_worker():
     while True:
         try:
             s = await get_all_settings()
-            if s.get("mqtt_pub_enabled") != "true" or not s.get("mqtt_pub_url"):
+            if not is_true(s.get("mqtt_pub_enabled")) or not s.get("mqtt_pub_url"):
                 mqtt_pub_connected = False
                 await asyncio.sleep(5)
                 continue
@@ -1886,7 +1896,7 @@ async def get_status():
         with open('/proc/uptime','r') as f: up = float(f.readline().split()[0])
     except: pass
     s = await get_all_settings()
-    return {"sdr": not MOCK_MODE, "mock_mode": MOCK_MODE, "mqtt": s["mqtt_enabled"]=="true", "uptime": up}
+    return {"sdr": not MOCK_MODE, "mock_mode": MOCK_MODE, "mqtt": is_true(s["mqtt_enabled"]), "uptime": up}
 
 @app.websocket("/ws")
 @app.websocket("/")
