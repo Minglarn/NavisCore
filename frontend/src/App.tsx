@@ -4094,6 +4094,8 @@ export default function App() {
         return (saved === 'compact' || saved === 'detail') ? saved : 'detail';
     });
     const [isRestarting, setIsRestarting] = useState(false);
+    const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const isConnectingRef = useRef(false);
 
     useEffect(() => {
         localStorage.setItem('naviscore_sort_config', JSON.stringify(sortConfig));
@@ -4110,8 +4112,12 @@ export default function App() {
                 try {
                     const res = await fetch(pingUrl);
                     if (res.ok) {
+                        console.log("Backend reachable again. Reconnecting WebSocket...");
                         setIsRestarting(false);
-                        window.location.reload(); // Reload to refresh all states
+                        // Instead of reload, we now just trigger a reconnect
+                        if (connectWebSocketRef.current) {
+                            connectWebSocketRef.current();
+                        }
                     }
                 } catch (e) {
                     // Still down
@@ -4474,60 +4480,51 @@ export default function App() {
     }, [dbSearchTerm, dbFilterType, dbFilterSource, isDatabaseModalOpen, dbSort]);
 
     const isUnmountingRef = useRef(false);
-    useEffect(() => {
-        const style = document.createElement('style');
-        style.innerHTML = extraStyles;
-        document.head.appendChild(style);
+    const connectWebSocketRef = useRef<(() => void) | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
 
+    const connectWebSocket = useCallback(() => {
+        if (isUnmountingRef.current || isConnectingRef.current) return;
+        
+        isConnectingRef.current = true;
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         const isDev = window.location.port === '5173';
         const wsUrl = isDev ? 'ws://127.0.0.1:8080/ws' : `${protocol}//${window.location.host}/ws`;
 
-        // Load persisted ships from DB on page load
-        const shipsPath = isDev ? 'http://127.0.0.1:8080/api/ships' : '/api/ships';
-        fetch(shipsPath)
-            .then(r => r.json())
-            .then((data: any[]) => {
-                if (Array.isArray(data) && data.length > 0) {
-                    setShips(data.filter((s: any) => s.lat && s.lon));
-                }
-            })
-            .catch(console.error);
-
-        // Load persisted safety alerts from DB on page load
-        const alertsPath = isDev ? 'http://127.0.0.1:8080/api/safety-alerts' : '/api/safety-alerts';
-        fetch(alertsPath)
-            .then(r => r.json())
-            .then((data: any[]) => {
-                if (Array.isArray(data)) setSafetyAlerts(data);
-            })
-            .catch(console.error);
-
+        console.log("Connecting to WebSocket:", wsUrl);
         const ws = new WebSocket(wsUrl);
-            ws.onopen = () => setStatus('Connected to NavisCore');
-            ws.onmessage = (event: MessageEvent) => {
-                const data = JSON.parse(event.data);
-                
-                const nowTime = Date.now();
-                if (data.source === 'sdr' || data.source === 'local') setLastSdrTime(nowTime);
-                else if (data.source === 'udp') setLastUdpTime(nowTime);
-                else if (data.source === 'aisstream') setLastStreamTime(nowTime);
+        wsRef.current = ws;
 
-                if (data.mmsi && (data.name || data.mmsi)) {
-                    const entry = {
-                        name: data.name || `MMSI ${data.mmsi}`,
-                        mmsi: data.mmsi,
-                        time: nowTime,
-                        msgType: data.msg_type
-                    };
-                    setLastUpdatedShip(entry);
-                    setEventLog(prev => [entry, ...prev].slice(0, 50));
-                }
+        ws.onopen = () => {
+            console.log("WebSocket connected.");
+            setStatus('Connected to NavisCore');
+            isConnectingRef.current = false;
+            if (reconnectTimerRef.current) {
+                clearTimeout(reconnectTimerRef.current);
+                reconnectTimerRef.current = null;
+            }
+            setIsRestarting(false);
+        };
+
+        ws.onmessage = (event: MessageEvent) => {
+            const data = JSON.parse(event.data);
+            const nowTime = Date.now();
             
-            // Allow weather objects
-            // const nameUpper = (data.name || "").toUpperCase();
-            // if (data.is_meteo || nameUpper.includes('METEO') || nameUpper.includes('WEATHER')) return;
+            if (data.source === 'sdr' || data.source === 'local') setLastSdrTime(nowTime);
+            else if (data.source === 'udp') setLastUdpTime(nowTime);
+            else if (data.source === 'aisstream') setLastStreamTime(nowTime);
 
+            if (data.mmsi && (data.name || data.mmsi)) {
+                const entry = {
+                    name: data.name || `MMSI ${data.mmsi}`,
+                    mmsi: data.mmsi,
+                    time: nowTime,
+                    msgType: data.msg_type
+                };
+                setLastUpdatedShip(entry);
+                setEventLog(prev => [entry, ...prev].slice(0, 50));
+            }
+        
             if (data.type === 'status') {
                 setStatus('Status: ' + data.message);
             } else if (data.type === 'mqtt_status') {
@@ -4555,24 +4552,20 @@ export default function App() {
                         range_km_alltime: data.range_km_alltime
                     };
                     if (idx !== -1) {
-                        // Update existing sector
                         const next = [...prev];
                         next[idx] = newSector;
                         return next;
                     }
-                    // Insert new sector and keep sorted
                     return [...prev, newSector].sort((a: any, b: any) => a.sector_id - b.sector_id);
                 });
             } else {
                 setShips((prev: any[]) => {
                     const existing = prev.find((s: any) => s.mmsi === data.mmsi);
-                    const historyMax = 100; // Keep a reasonable buffer in memory
-
+                    const historyMax = 100;
                     if (existing) {
                         let newHistory = existing.history || [];
                         if (data.lat && data.lon) {
                             const last = newHistory[newHistory.length - 1];
-                            // Only add to history if moved > 50m
                             if (!last || haversineDistance(last[0], last[1], data.lat, data.lon) > 0.05) {
                                 newHistory = [...newHistory, [data.lat, data.lon]].slice(-historyMax);
                             }
@@ -4582,12 +4575,11 @@ export default function App() {
                     const history = (data.lat && data.lon) ? [[data.lat, data.lon]] : [];
                     return [...prev, { ...data, history }];
                 });
-                // Flash effect with cooldown (10 seconds)
+                
                 if (data.mmsi) {
                     const mmsiKey = String(data.mmsi);
                     const now = Date.now();
                     const lastFlash = lastFlashRef.current[mmsiKey] || 0;
-                    
                     if (now - lastFlash > 10000) {
                         lastFlashRef.current[mmsiKey] = now;
                         setFlashedMmsis(prev => new Set(prev).add(mmsiKey));
@@ -4601,36 +4593,81 @@ export default function App() {
                     }
                 }
 
-                // If this ship update includes decoded nmea, update the nmea log entry
                 if (data.nmea && data.mmsi) {
                     setNmeaLogs(prev => prev.map(log => {
                         const rawMatches = Array.isArray(data.nmea) 
                             ? data.nmea.includes(log.raw)
                             : log.raw === data.nmea;
-                        
-                        if (rawMatches) {
-                            return { ...log, decoded: data };
-                        }
+                        if (rawMatches) return { ...log, decoded: data };
                         return log;
                     }));
                 }
             }
         };
+
         ws.onclose = () => {
+            isConnectingRef.current = false;
             setStatus('Disconnected');
             if (!isUnmountingRef.current) {
-                console.log("WebSocket closed unexpectedly. Triggering reconnect UI.");
-                setIsRestarting(true);
+                console.log("WebSocket closed. Starting quiet reconnect...");
+                // Start a timer before showing "Restarting" UI (5 seconds grace period)
+                if (!reconnectTimerRef.current) {
+                    reconnectTimerRef.current = setTimeout(() => {
+                        console.log("Still disconnected after 5s. Triggering full reconnect UI.");
+                        setIsRestarting(true);
+                    }, 5000);
+                }
+                // Try to reconnect immediately in background
+                setTimeout(() => connectWebSocket(), 3000);
             }
         };
-        ws.onerror = () => setStatus('WebSocket Error');
+
+        ws.onerror = (err) => {
+            isConnectingRef.current = false;
+            console.error("WebSocket Error:", err);
+            setStatus('WebSocket Error');
+        };
+    }, []);
+
+    useEffect(() => {
+        connectWebSocketRef.current = connectWebSocket;
+    }, [connectWebSocket]);
+
+    useEffect(() => {
+        const style = document.createElement('style');
+        style.innerHTML = extraStyles;
+        document.head.appendChild(style);
+
+        const isDev = window.location.port === '5173';
+        
+        // Initial data fetches
+        const shipsPath = isDev ? 'http://127.0.0.1:8080/api/ships' : '/api/ships';
+        fetch(shipsPath)
+            .then(r => r.json())
+            .then((data: any[]) => {
+                if (Array.isArray(data) && data.length > 0) {
+                    setShips(data.filter((s: any) => s.lat && s.lon));
+                }
+            })
+            .catch(console.error);
+
+        const alertsPath = isDev ? 'http://127.0.0.1:8080/api/safety-alerts' : '/api/safety-alerts';
+        fetch(alertsPath)
+            .then(r => r.json())
+            .then((data: any[]) => {
+                if (Array.isArray(data)) setSafetyAlerts(data);
+            })
+            .catch(console.error);
+
+        connectWebSocket();
 
         return () => {
             isUnmountingRef.current = true;
-            ws.close();
+            if (wsRef.current) wsRef.current.close();
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
             document.head.removeChild(style);
         };
-    }, []);
+    }, [connectWebSocket]);
 
     // Handle selection mode from settings
     useEffect(() => {

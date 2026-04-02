@@ -1195,21 +1195,29 @@ async def start_udp_listener():
     if udp_server_transport:
         logger.info("Closing existing UDP server transport")
         udp_server_transport.close()
-        await asyncio.sleep(0.2) # Give OS a moment to release
+        udp_server_transport = None
+        await asyncio.sleep(0.5) # Give OS more time to release
         
     if settings.get("udp_enabled", "true") == "true":
-        try:
-            # reuse_port=True is critical for quick restarts on Linux
-            # We wrap the protocol in a lambda to pass initial settings
-            transport, _ = await loop.create_datagram_endpoint(
-                lambda: UDPProtocol(settings),
-                local_addr=('0.0.0.0', port),
-                reuse_port=True
-            )
-            udp_server_transport = transport
-            logger.info(f"UDP server started on port {port} (reuse_port=True)")
-        except Exception as e:
-            logger.error(f"Failed to start UDP listener: {e}")
+        attempts = 0
+        while attempts < 3:
+            try:
+                # reuse_port=True is critical for quick restarts on Linux
+                transport, _ = await loop.create_datagram_endpoint(
+                    lambda: UDPProtocol(settings),
+                    local_addr=('0.0.0.0', port),
+                    reuse_port=True
+                )
+                udp_server_transport = transport
+                logger.info(f"UDP server started on port {port} (reuse_port=True)")
+                break
+            except Exception as e:
+                attempts += 1
+                logger.warning(f"Failed to start UDP listener (attempt {attempts}/3) on port {port}: {e}")
+                if attempts < 3:
+                    await asyncio.sleep(1.5)
+                else:
+                    logger.error(f"Permanent failure starting UDP listener on port {port}")
 
 async def mqtt_loop():
     global mqtt_connected
@@ -1794,43 +1802,53 @@ async def set_settings_api(settings: dict):
     for k, v in settings.items():
         if v is not None:
             old_val = old.get(k)
-            new_val = str(v)
-            if old_val != new_val:
+            # Robust normalization for comparison: cast everything to string
+            # but also handle boolean-like strings consistently.
+            new_val = str(v).lower() if isinstance(v, bool) else str(v)
+            
+            # If we are comparing against a boolean-like old value, normalize it too
+            normalized_old = old_val.lower() if old_val in ["true", "false", "True", "False"] else old_val
+            
+            if normalized_old != new_val:
+                logger.info(f"Setting change detected: [{k}] '{old_val}' -> '{new_val}'")
                 await set_setting(k, new_val)
                 changed_keys.append(k)
     
     if not changed_keys:
         return {"success": True, "message": "No settings changed", "settings": old}
         
-    logger.info(f"Settings updated via API. Changed fields: {', '.join(changed_keys)}")
+    logger.info(f"Settings update summary: {len(changed_keys)} fields changed: {', '.join(changed_keys)}")
     
     # 1. Origin Change (Reset coverage)
     if "origin_lat" in changed_keys or "origin_lon" in changed_keys:
         logger.info("Origin coordinates changed. Resetting coverage sectors...")
-        async with db_session() as db: 
-            await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
-            await db.commit()
+        try:
+            async with db_session() as db: 
+                await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
+                await db.commit()
+        except Exception as e:
+            logger.error(f"Failed to reset coverage sectors: {e}")
             
     # 2. UDP Listener Restart
     if "udp_port" in changed_keys or "udp_enabled" in changed_keys:
-        logger.info(f"Restarting UDP listener due to changes in: {', '.join([k for k in ['udp_port', 'udp_enabled'] if k in changed_keys])}")
+        logger.info("Scheduling UDP listener restart...")
         asyncio.create_task(start_udp_listener())
         
     # 3. AisStream Restart
     aisstream_keys = ["aisstream_enabled", "aisstream_api_key", "aisstream_sw_lat", "aisstream_sw_lon", "aisstream_ne_lat", "aisstream_ne_lon"]
     if any(k in changed_keys for k in aisstream_keys):
-        logger.info(f"Restarting AisStream due to changes in: {', '.join([k for k in aisstream_keys if k in changed_keys])}")
-        await restart_aisstream()
+        logger.info("Scheduling AisStream restart...")
+        asyncio.create_task(restart_aisstream())
         
     # 4. MQTT Pub Restart
     if any(k.startswith("mqtt_pub_") for k in changed_keys):
-        logger.info("Restarting MQTT Publisher due to configuration changes")
+        logger.info("Scheduling MQTT Publisher restart...")
         restart_mqtt_pub()
         
     # 5. Core MQTT Restart
     mqtt_keys = ["mqtt_enabled", "mqtt_url", "mqtt_user", "mqtt_pass"]
     if any(k in changed_keys for k in mqtt_keys):
-        logger.info("Restarting Core MQTT due to configuration changes")
+        logger.info("Scheduling Core MQTT restart...")
         restart_mqtt()
         
     return {"success": True, "settings": await get_all_settings(), "changed": changed_keys}
