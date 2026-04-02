@@ -420,87 +420,116 @@ def _decode_type_7_13(bitstr: str, data: dict):
 
 
 def _decode_type_8(bitstr: str, data: dict):
-    """Type 8: Binary Broadcast Message (including weather)."""
+    """Type 8: Binary Broadcast Message (Gatekeeper/Dispatcher)."""
     if len(bitstr) < 56:
         return
+    
     dac = get_int_from_bits(bitstr, 40, 10)
     fid = get_int_from_bits(bitstr, 50, 6)
     data["dac"] = dac
     data["fid"] = fid
 
-    # Swedish weather station (DAC 1, FID 31 — meteorological/hydro)
-    if dac == 1 and fid == 31 and len(bitstr) >= 163:
-        lon = get_int_from_bits(bitstr, 56, 25, signed=True) / 60000.0
-        lat = get_int_from_bits(bitstr, 81, 24, signed=True) / 60000.0
-        
-        # Wind: Apply 0.1 scaling (Common for SMA legacy stations)
-        wind_speed = get_int_from_bits(bitstr, 140, 7) / 10.0
-        wind_gust = get_int_from_bits(bitstr, 147, 7) / 10.0
-        wind_dir = get_int_from_bits(bitstr, 154, 9)
+    mmsi = data.get("mmsi", 0)
+    is_shore = str(mmsi).zfill(9).startswith('00')
 
-        if len(bitstr) >= 185:
-            # Water level: standard offset for FID 31 is different but let's 
-            # try to detect if it needs scaling.
-            water_raw = get_int_from_bits(bitstr, 163, 12, signed=True)
-            water_level = water_raw / 100.0
-            data["water_level"] = water_level
+    # Dispatch based on DAC and FI
+    if dac == 265 and fid == 1 and is_shore:
+        decode_swedish_viva_weather(bitstr, data)
+    elif dac == 200 and fid == 10:
+        decode_inland_blue_sign(bitstr, data)
+    elif dac == 1:
+        if fid == 31 and is_shore:
+            decode_legacy_swedish_weather(bitstr, data)
+        else:
+            decode_international_asm(bitstr, data)
+    else:
+        logger.debug(f"[AIS T8] Unsupported Binary Message: DAC={dac} FI={fid} from {'Shore' if is_shore else 'Vessel'} {mmsi}")
 
-        # Validation per user rules (even for DAC 1)
-        if wind_dir > 360 or wind_speed > 120.0:
-            return
+def decode_swedish_viva_weather(bitstr: str, data: dict):
+    """Swedish weather report (DAC 265, FI 01 - Maritime Administration VIVA)."""
+    if len(bitstr) < 185:
+        return
+    
+    # Station name: Bits 56-115 (10 chars of 6-bit ASCII)
+    station_name = decode_6bit_string(bitstr, 56, 10)
+    
+    # Wind: Medel (7 bits), Byar (7 bits), Riktning (9 bits)
+    # Unit: 0.1 m/s for speeds (ITU/SMA standard)
+    wind_raw = get_int_from_bits(bitstr, 116, 7)
+    gust_raw = get_int_from_bits(bitstr, 123, 7)
+    wind_dir = get_int_from_bits(bitstr, 130, 9)
+    
+    # Scaling and Null Handling (127/511 indicares missing data)
+    data["wind_speed"] = wind_raw / 10.0 if wind_raw < 127 else None
+    data["wind_gust"] = gust_raw / 10.0 if gust_raw < 127 else None
+    data["wind_direction"] = wind_dir if wind_dir < 360 else None
+    
+    # Lufttryck: Bits 139-152 (14 bits, Unit: hPa)
+    pressure_raw = get_int_from_bits(bitstr, 139, 14)
+    data["air_pressure"] = pressure_raw if pressure_raw < 16383 else None
+    
+    # Water level: Bits 153-166 (14 bits, Unit: cm)
+    water_val = get_int_from_bits(bitstr, 153, 14)
+    if water_val > 8192: water_val -= 16384 # Signed 14-bit
+    data["water_level"] = water_val / 100.0 if water_val != 8191 else None # cm to meters
+    
+    # Air temperature: Bits 175-185 (11 bits, 0.1C units)
+    temp_val = get_int_from_bits(bitstr, 175, 11)
+    if temp_val > 1024: temp_val -= 2048 # Signed 11-bit
+    data["air_temp"] = temp_val / 10.0 if temp_val != 1023 else None
+    
+    data["is_meteo"] = True
+    data["is_vessel"] = False
+    data["name"] = station_name if station_name else f"VIVA WEATHER {data['mmsi']}"
 
-        data["lat"] = lat
-        data["wind_speed"] = wind_speed
-        data["wind_gust"] = wind_gust
-        data["wind_direction"] = wind_dir
-        data["is_meteo"] = True
-        data["is_vessel"] = False
-        data["name"] = f"METEO WEATHER {data['mmsi']}"
+def decode_inland_blue_sign(bitstr: str, data: dict):
+    """Inland AIS Blue Sign (DAC 200, FI 10)."""
+    if len(bitstr) < 58:
+        return
+    # Blue Sign Active: Bit 56-57 (0=Not available, 1=Not active, 2=Active)
+    blue_sign = get_int_from_bits(bitstr, 56, 2)
+    data["blue_sign"] = blue_sign
+    if blue_sign == 2:
+        data["blue_sign_active"] = True
+        logger.info(f"[Inland AIS] MMSI {data['mmsi']} Blue Sign ACTIVE (Requesting Stbd-to-Stbd meeting)")
 
-    # Swedish weather report (DAC 265, FI 01)
-    elif dac == 265 and fid == 1 and len(bitstr) >= 185:
-        # According to SMA / VIVA AIS specification (Strict Rule Implementation)
-        
-        # Station name: Bits 56-115 (10 chars of 6-bit ASCII)
-        station_name = decode_6bit_string(bitstr, 56, 10)
-        
-        # Wind: Medel (7 bits), Byar (7 bits), Riktning (9 bits)
-        # Unit: 0.1 m/s for speeds
-        wind_speed = get_int_from_bits(bitstr, 116, 7) / 10.0
-        wind_gust = get_int_from_bits(bitstr, 123, 7) / 10.0
-        wind_dir = get_int_from_bits(bitstr, 130, 9)
-        
-        # Lufttryck: Bits 139-152 (14 bits, Unit: hPa)
-        air_pressure = get_int_from_bits(bitstr, 139, 14)
-        
-        # Water level: Bits 153-166 (14 bits, Unit: cm)
-        # Signed 14-bit: If RawValue > 8192, val = RawValue - 16384
-        water_val = get_int_from_bits(bitstr, 153, 14)
-        if water_val > 8192:
-            water_val -= 16384
-        water_level = water_val / 100.0  # cm to meters
-        
-        # Air temperature: Bits 175-185 (11 bits, 0.1C units)
-        # Signed 11-bit: If bit 175 is 1 (val > 1024), val = val - 2048
-        temp_val = get_int_from_bits(bitstr, 175, 11)
-        if temp_val > 1024:
-            temp_val -= 2048
-        air_temp = temp_val / 10.0
+def decode_international_asm(bitstr: str, data: dict):
+    """International Application Specific Message (DAC 001)."""
+    fid = data.get("fid")
+    if fid == 32 and len(bitstr) >= 70: # Dynamic Draught
+        draught_raw = get_int_from_bits(bitstr, 56, 14)
+        if draught_raw < 16383:
+            data["draught"] = draught_raw / 100.0
+            logger.info(f"[AIS ASM] MMSI {data.get('mmsi')} Dynamic Draught: {data['draught']}m")
+    elif fid == 22: # AtoN Status
+        if len(bitstr) >= 72:
+            data["aton_status_bits"] = get_int_from_bits(bitstr, 56, 8)
+            data["off_position"] = bool(get_int_from_bits(bitstr, 64, 1))
+            data["light_status"] = bool(get_int_from_bits(bitstr, 65, 1))
 
-        # Validation per user rules
-        if wind_dir > 360 or wind_speed > 120.0:
-            logger.warning(f"[AIS] VIVA decode error (bad offset?): mmsi={data.get('mmsi')} wind={wind_speed} dir={wind_dir}")
-            return
+def decode_legacy_swedish_weather(bitstr: str, data: dict):
+    """Legacy Swedish weather station (DAC 1, FID 31 — Sjöfartsverket legacy)."""
+    if len(bitstr) < 163:
+        return
+    lon = get_int_from_bits(bitstr, 56, 25, signed=True) / 60000.0
+    lat = get_int_from_bits(bitstr, 81, 24, signed=True) / 60000.0
+    
+    wind_raw = get_int_from_bits(bitstr, 140, 7)
+    gust_raw = get_int_from_bits(bitstr, 147, 7)
+    wind_dir = get_int_from_bits(bitstr, 154, 9)
 
-        data["wind_speed"] = wind_speed
-        data["wind_direction"] = wind_dir
-        data["wind_gust"] = wind_gust
-        data["air_pressure"] = air_pressure
-        data["water_level"] = water_level
-        data["air_temp"] = air_temp
-        data["is_meteo"] = True
-        data["is_vessel"] = False
-        data["name"] = station_name if station_name else f"VIVA WEATHER {data['mmsi']}"
+    data["wind_speed"] = wind_raw / 10.0 if wind_raw < 127 else None
+    data["wind_gust"] = gust_raw / 10.0 if gust_raw < 127 else None
+    data["wind_direction"] = wind_dir if wind_dir < 360 else None
+
+    if len(bitstr) >= 185:
+        water_raw = get_int_from_bits(bitstr, 163, 12, signed=True)
+        data["water_level"] = water_raw / 100.0 if water_raw != 2047 else None
+
+    data["lat"], data["lon"] = lat, lon
+    data["is_meteo"] = True
+    data["is_vessel"] = False
+    data["name"] = f"SMA WEATHER {data['mmsi']}"
 
 
 def _decode_type_9(bitstr: str, data: dict):
