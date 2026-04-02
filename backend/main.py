@@ -1789,16 +1789,51 @@ async def get_settings_api(): return await get_all_settings()
 @app.post("/api/settings")
 async def set_settings_api(settings: dict):
     old = await get_all_settings()
+    changed_keys = []
+    
     for k, v in settings.items():
-        if v is not None: await set_setting(k, str(v))
-    if str(settings.get("origin_lat")) != old.get("origin_lat") or str(settings.get("origin_lon")) != old.get("origin_lon"):
-        async with db_session() as db: await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0'); await db.commit()
-    if settings.get("udp_port") or settings.get("udp_enabled"): asyncio.create_task(start_udp_listener())
-    if any(k in settings for k in ["aisstream_enabled", "aisstream_api_key", "aisstream_sw_lat", "aisstream_sw_lon", "aisstream_ne_lat", "aisstream_ne_lon"]):
+        if v is not None:
+            old_val = old.get(k)
+            new_val = str(v)
+            if old_val != new_val:
+                await set_setting(k, new_val)
+                changed_keys.append(k)
+    
+    if not changed_keys:
+        return {"success": True, "message": "No settings changed", "settings": old}
+        
+    logger.info(f"Settings updated via API. Changed fields: {', '.join(changed_keys)}")
+    
+    # 1. Origin Change (Reset coverage)
+    if "origin_lat" in changed_keys or "origin_lon" in changed_keys:
+        logger.info("Origin coordinates changed. Resetting coverage sectors...")
+        async with db_session() as db: 
+            await db.execute('UPDATE coverage_sectors SET range_km_24h = 0.0, range_km_alltime = 0.0')
+            await db.commit()
+            
+    # 2. UDP Listener Restart
+    if "udp_port" in changed_keys or "udp_enabled" in changed_keys:
+        logger.info(f"Restarting UDP listener due to changes in: {', '.join([k for k in ['udp_port', 'udp_enabled'] if k in changed_keys])}")
+        asyncio.create_task(start_udp_listener())
+        
+    # 3. AisStream Restart
+    aisstream_keys = ["aisstream_enabled", "aisstream_api_key", "aisstream_sw_lat", "aisstream_sw_lon", "aisstream_ne_lat", "aisstream_ne_lon"]
+    if any(k in changed_keys for k in aisstream_keys):
+        logger.info(f"Restarting AisStream due to changes in: {', '.join([k for k in aisstream_keys if k in changed_keys])}")
         await restart_aisstream()
-    if any(k.startswith("mqtt_pub_") for k in settings.keys()):
+        
+    # 4. MQTT Pub Restart
+    if any(k.startswith("mqtt_pub_") for k in changed_keys):
+        logger.info("Restarting MQTT Publisher due to configuration changes")
         restart_mqtt_pub()
-    restart_mqtt(); return {"success": True, "settings": await get_all_settings()}
+        
+    # 5. Core MQTT Restart
+    mqtt_keys = ["mqtt_enabled", "mqtt_url", "mqtt_user", "mqtt_pass"]
+    if any(k in changed_keys for k in mqtt_keys):
+        logger.info("Restarting Core MQTT due to configuration changes")
+        restart_mqtt()
+        
+    return {"success": True, "settings": await get_all_settings(), "changed": changed_keys}
 
 @app.get("/api/coverage")
 async def get_coverage():
