@@ -1,4 +1,15 @@
-# Changelog - NavisCore
+# Changelog
+
+## [2026.04.02] - 2026-04-02
+
+### Added
+- **Automatic Frontend Reconnection**: The UI now detects unexpected WebSocket closures (e.g., backend restarts or crashes) and automatically shows the "Restarting..." overlay.
+- **Robust UDP Re-binding (Linux)**: Implemented `reuse_port=True` and explicit socket closure on shutdown to ensure the UDP port is released and can be re-bound immediately on Linux environments.
+- **Enhanced Queue Resilience**: Increased `ais_queue` size from 1000 to 5000 and added non-blocking safety wrappers to prevent potential crashes during high-traffic startup spikes.
+
+### Changed
+- Standardized backend versioning string in source code.
+- Optimized UDP protocol initialization to use injected settings instead of polling logic.
 
 All notable changes to the NavisCore project will be documented in this file.
 

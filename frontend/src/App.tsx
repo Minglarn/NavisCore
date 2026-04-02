@@ -4473,6 +4473,7 @@ export default function App() {
         }
     }, [dbSearchTerm, dbFilterType, dbFilterSource, isDatabaseModalOpen, dbSort]);
 
+    const isUnmountingRef = useRef(false);
     useEffect(() => {
         const style = document.createElement('style');
         style.innerHTML = extraStyles;
@@ -4615,10 +4616,17 @@ export default function App() {
                 }
             }
         };
-        ws.onclose = () => setStatus('Disconnected');
+        ws.onclose = () => {
+            setStatus('Disconnected');
+            if (!isUnmountingRef.current) {
+                console.log("WebSocket closed unexpectedly. Triggering reconnect UI.");
+                setIsRestarting(true);
+            }
+        };
         ws.onerror = () => setStatus('WebSocket Error');
 
         return () => {
+            isUnmountingRef.current = true;
             ws.close();
             document.head.removeChild(style);
         };

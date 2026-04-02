@@ -1,6 +1,6 @@
 import asyncio
-# NavisCore Backend - Version 1.1.0-BACKUP_FIX
-# Last Modified: 2026-04-01T17:49:00Z
+# NavisCore Backend - Version 2026.04.02
+# Last Modified: 2026-04-02T06:12:44Z
 import time
 import json
 import random
@@ -146,7 +146,7 @@ class StatsCollector:
 stats_collector = StatsCollector()
 
 # Database helper
-ais_queue = asyncio.Queue(maxsize=1000)
+ais_queue = asyncio.Queue(maxsize=5000)
 
 @asynccontextmanager
 async def db_session():
@@ -958,186 +958,172 @@ async def process_ais_data(data: dict):
                     if ship_data.get("mqtt_ignore"):
                         should_forward = False
 
-                        # 1. Initialize payload with common data
-                        pub_payload = {
-                            "mmsi": mmsi_str,
-                            "name": ship_data.get("name"),
-                            "lat": round(ship_data.get("lat"), 5) if ship_data.get("lat") is not None else None,
-                            "lon": round(ship_data.get("lon"), 5) if ship_data.get("lon") is not None else None,
-                            # Basic Identification
-                            "msg_type": msg_type,
-                            "imo": ship_data.get("imo"),
-                            "callsign": ship_data.get("callsign"),
-                            "country_code": ship_data.get("country_code"),
-                            "ais_channel": ship_data.get("ais_channel"),
-                            # Movement & Position
-                            "sog": ship_data.get("sog"),
-                            "cog": ship_data.get("cog"),
-                            "heading": ship_data.get("heading"),
-                            "rot": ship_data.get("rot"),
-                            # Type & Category
-                            "shiptype": ship_data.get("shiptype"),
-                            "ship_type_label": ship_data.get("ship_type_text"),
-                            "icon_category": ship_data.get("ship_category"),
-                            "is_nav_aid": bool(ship_data.get("is_aton")),
-                            # Dimensions
-                            "length": ship_data.get("length"),
-                            "width": ship_data.get("width"),
-                            "draught": ship_data.get("draught"),
-                            # Status & Voyage
-                            "status_text": ship_data.get("status_text"),
-                            "nav_status": ship_data.get("nav_status"),
-                            "destination": ship_data.get("destination"),
-                            "eta": ship_data.get("eta"),
-                            # Meteo Data
-                            "wind_speed": ship_data.get("wind_speed"),
-                            "wind_gust": ship_data.get("wind_gust"),
-                            "wind_direction": ship_data.get("wind_direction"),
-                            "water_level": ship_data.get("water_level"),
-                            "air_temp": ship_data.get("air_temp"),
-                            "air_pressure": ship_data.get("air_pressure"),
-                            # History & Meta
-                            "last_seen": ship_data.get("timestamp"),
-                            "previous_seen": ship_data.get("previous_seen"),
-                            "registration_count": ship_data.get("registration_count"),
-                            "source": source,
-                            "timestamp": ship_data.get("timestamp"),
-                            "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None,
-                            "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None,
-                            "dist_to_station_km": round(dist_km, 2) if dist_km > 0 else None
-                        }
+                    if not should_forward:
+                        return
 
-                        # 2. Determine Event Type & Overrides
-                        event_type = "new" if is_new_v or reset_count else "update"
-                        wait_for_name = settings.get("mqtt_pub_wait_for_name", "false") == "true"
-                        only_new = settings.get("mqtt_pub_only_new") == "true"
-                        
-                        # Special Logic: Wait for name if enabled
-                        if wait_for_name and event_type == "new" and not ship_data.get("name"):
-                            # Skip sending "new" for now as name is missing
-                            should_trigger_new = False
-                        elif wait_for_name and event_type == "update" and ship_data.get("name") and not ship_data.get("mqtt_new_sent"):
-                                # Name finally arrived and we haven't sent "new" yet
-                                should_trigger_new = True
-                                event_type = "new" # Upgrade this update to a "new" event for MQTT
+                    # 1. Initialize payload with common data
+                    pub_payload = {
+                        "mmsi": mmsi_str,
+                        "name": ship_data.get("name"),
+                        "lat": round(ship_data.get("lat"), 5) if ship_data.get("lat") is not None else None,
+                        "lon": round(ship_data.get("lon"), 5) if ship_data.get("lon") is not None else None,
+                        # Basic Identification
+                        "msg_type": msg_type,
+                        "imo": ship_data.get("imo"),
+                        "callsign": ship_data.get("callsign"),
+                        "country_code": ship_data.get("country_code"),
+                        "ais_channel": ship_data.get("ais_channel"),
+                        # Movement & Position
+                        "sog": ship_data.get("sog"),
+                        "cog": ship_data.get("cog"),
+                        "heading": ship_data.get("heading"),
+                        "rot": ship_data.get("rot"),
+                        # Type & Category
+                        "shiptype": ship_data.get("shiptype"),
+                        "ship_type_label": ship_data.get("ship_type_text"),
+                        "icon_category": ship_data.get("ship_category"),
+                        "is_nav_aid": bool(ship_data.get("is_aton")),
+                        # Dimensions
+                        "length": ship_data.get("length"),
+                        "width": ship_data.get("width"),
+                        "draught": ship_data.get("draught"),
+                        # Status & Voyage
+                        "status_text": ship_data.get("status_text"),
+                        "nav_status": ship_data.get("nav_status"),
+                        "destination": ship_data.get("destination"),
+                        "eta": ship_data.get("eta"),
+                        # Meteo Data
+                        "wind_speed": ship_data.get("wind_speed"),
+                        "wind_gust": ship_data.get("wind_gust"),
+                        "wind_direction": ship_data.get("wind_direction"),
+                        "water_level": ship_data.get("water_level"),
+                        "air_temp": ship_data.get("air_temp"),
+                        "air_pressure": ship_data.get("air_pressure"),
+                        # History & Meta
+                        "last_seen": ship_data.get("timestamp"),
+                        "previous_seen": ship_data.get("previous_seen"),
+                        "registration_count": ship_data.get("registration_count"),
+                        "source": source,
+                        "timestamp": ship_data.get("timestamp"),
+                        "image_url": ship_data.get("imageUrl", "").split("/")[-1] if ship_data.get("imageUrl") else None,
+                        "dist_to_station_nm": round(dist_nm, 2) if dist_nm > 0 else None,
+                        "dist_to_station_km": round(dist_km, 2) if dist_km > 0 else None
+                    }
+
+                    # 2. Determine Event Type & Overrides
+                    event_type = "new" if is_new_v or reset_count else "update"
+                    wait_for_name = settings.get("mqtt_pub_wait_for_name", "false") == "true"
+                    only_new = settings.get("mqtt_pub_only_new") == "true"
+                    
+                    # Special Logic: Wait for name if enabled
+                    if wait_for_name and event_type == "new" and not ship_data.get("name"):
+                        # Skip sending "new" for now as name is missing
+                        should_trigger_new = False
+                    elif wait_for_name and event_type == "update" and ship_data.get("name") and not ship_data.get("mqtt_new_sent"):
+                            # Name finally arrived and we haven't sent "new" yet
+                            should_trigger_new = True
+                            event_type = "new" # Upgrade this update to a "new" event for MQTT
+                    else:
+                        # Normal logic
+                        should_trigger_new = (event_type == "new")
+                    
+                    # Per-Vessel override for NEW events
+                    if should_trigger_new and ship_data.get("mqtt_send_new") == False:
+                        should_trigger_new = False
+                        # If we suppress the 'new' event, we still want to send it as a normal 'update' 
+                        # if mqtt_pub_only_new is false.
+                        if not only_new:
+                            event_type = "update"
+                            pub_payload["event_type"] = "update"
                         else:
-                            # Normal logic
-                            should_trigger_new = (event_type == "new")
+                            return
+
+                    if not only_new or should_trigger_new:
+                        pub_payload["event_type"] = event_type
                         
-                        # Per-Vessel override for NEW events
-                        if should_trigger_new and ship_data.get("mqtt_send_new") == False:
-                            should_trigger_new = False
-                            # If we suppress the 'new' event, we still want to send it as a normal 'update' 
-                            # if mqtt_pub_only_new is false.
-                            if not only_new:
-                                event_type = "update"
-                                pub_payload["event_type"] = "update"
-                            else:
-                                should_forward = False
-
-                        if not only_new or should_trigger_new:
-                            pub_payload["event_type"] = event_type
+                        # Signal Propagation classification
+                        if dist_nm > 200: pub_payload["propagation"] = "tropo_ducting"
+                        elif 40 < dist_nm < 80: pub_payload["propagation"] = "enhanced_range"
+                        else: pub_payload["propagation"] = "normal"
+                        
+                        # De-duplication check
+                        should_send_mqtt = True
+                        if event_type != "new":
+                            now_ts = time.time()
+                            # Fingerprint: rounded position and core movement/status
+                            fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
                             
-                            # Signal Propagation classification
-                            if dist_nm > 200: pub_payload["propagation"] = "tropo_ducting"
-                            elif 40 < dist_nm < 80: pub_payload["propagation"] = "enhanced_range"
-                            else: pub_payload["propagation"] = "normal"
-                            
-                            # De-duplication check
-                            should_send_mqtt = True
-                            if event_type != "new":
-                                now_ts = time.time()
-                                # Fingerprint: rounded position and core movement/status
-                                # (0.0001 lat/lon is approx 10m)
-                                fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
+                            if mmsi_str in mqtt_last_sent:
+                                last = mqtt_last_sent[mmsi_str]
+                                is_identical = last["fingerprint"] == fingerprint
+                                time_since = now_ts - last["timestamp"]
                                 
+                                if is_identical:
+                                    # If identical, only send if 30s have passed (anti-dupe) 
+                                    if time_since < 30:
+                                        should_send_mqtt = False
+                                        
+                            if should_send_mqtt:
+                                mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
+
+                        if event_type == "new":
+                            async with mqtt_new_vessel_lock:
+                                # Fingerprint for dedupe check
+                                fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
+                                now_ts = time.time()
+                                
+                                # Re-check Memory Cache
+                                is_already_handled = False
                                 if mmsi_str in mqtt_last_sent:
-                                    last = mqtt_last_sent[mmsi_str]
-                                    is_identical = last["fingerprint"] == fingerprint
-                                    time_since = now_ts - last["timestamp"]
-                                    
-                                    if is_identical:
-                                        # If identical, only send if 30s have passed (anti-dupe) 
-                                        # and always send at least every 5 mins (heartbeat)
-                                        if time_since < 30:
-                                            should_send_mqtt = False
-                                    else:
-                                        # Data has changed, but if it's very frequent (e.g. < 2s), we could throttle?
-                                        # For now, if it's different, we send it to keep real-time accuracy.
-                                        pass
+                                    time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
+                                    if time_since < 10:
+                                        is_already_handled = True
+                                    elif mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30:
+                                        is_already_handled = True
                                         
-                                if should_send_mqtt:
-                                    mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
+                                # Re-check DB if not in memory
+                                if not is_already_handled:
+                                    async with db.execute("SELECT mqtt_new_sent FROM ships WHERE mmsi = ?", (mmsi_str,)) as cursor:
+                                        row_recheck = await cursor.fetchone()
+                                        if row_recheck and bool(row_recheck[0]):
+                                            is_already_handled = True
 
-                            if event_type == "new":
-                                async with mqtt_new_vessel_lock:
-                                    # Fingerprint for dedupe check
-                                    fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
-                                    now_ts = time.time()
+                                if is_already_handled:
+                                    # Downgrade to update
+                                    if only_new:
+                                        return
+                                        
+                                    event_type = "update"
+                                    pub_payload["event_type"] = "update"
                                     
-                                    # Re-check Memory Cache FIRST (for pending race conditions during sleep)
-                                    is_already_handled = False
                                     if mmsi_str in mqtt_last_sent:
-                                        # During discovery (first 10s), we are MORE aggressive with MMSI-only dedupe
-                                        # to avoid a burst of (Position+Static) from multiple streams.
                                         time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
-                                        if time_since < 10:
-                                            # If already handled or pending in last 10s, downgrade or suppress
-                                            is_already_handled = True
-                                        elif mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30:
-                                            is_already_handled = True
+                                        if time_since < 10 or (mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30):
+                                            should_send_mqtt = False
                                             
-                                    # Re-check DB if not in memory
-                                    if not is_already_handled:
-                                        async with db.execute("SELECT mqtt_new_sent FROM ships WHERE mmsi = ?", (mmsi_str,)) as cursor:
-                                            row_recheck = await cursor.fetchone()
-                                            if row_recheck and bool(row_recheck[0]):
-                                                is_already_handled = True
-
-                                    if is_already_handled:
-                                        # Already sent or in progress by another thread, downgrade to update and apply dedupe
-                                        event_type = "update"
-                                        pub_payload["event_type"] = "update" # CRITICAL FIX: Ensure payload reflects change
-                                        
-                                        if mmsi_str in mqtt_last_sent:
-                                            time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
-                                            # If it's the exact same fingerprint or within the 10s discovery lockout, skip
-                                            if time_since < 10 or (mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30):
-                                                should_send_mqtt = False
-                                                
-                                        if should_send_mqtt:
-                                            mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
-                                            mqtt_pub_queue.put_nowait(pub_payload)
-                                    else:
-                                        # Still new! 
-                                        # IMPORTANT: Update memory cache BEFORE the sleep to block other threads
+                                    if should_send_mqtt:
                                         mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
-                                        
-                                        # Derive prefix from main topic setting
-                                        base_topic = settings.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
-                                        if base_topic.endswith("/objects"):
-                                            prefix = base_topic.rsplit("/", 1)[0]
-                                        else:
-                                            prefix = base_topic
-                                        
-                                        # Use prefix for new_detected topic
-                                        new_topic = f"{prefix}/new_detected"
-                                        
-                                        img_bytes = get_image_bytes(mmsi_str)
-                                        if img_bytes:
-                                            mqtt_pub_queue.put_nowait((new_topic, img_bytes))
-                                        else:
-                                            mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
-                                        
-                                        # Wait 5s before sending the object details as requested
-                                        await asyncio.sleep(5)
-                                        
                                         mqtt_pub_queue.put_nowait(pub_payload)
-                                        # Update DB after sleep
-                                        await db.execute("UPDATE ships SET mqtt_new_sent = 1 WHERE mmsi = ?", (mmsi_str,))
-                                        await db.commit()
-                            elif should_send_mqtt:
-                                mqtt_pub_queue.put_nowait(pub_payload)
+                                else:
+                                    # Still new!
+                                    mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
+                                    
+                                    base_topic = settings.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+                                    prefix = base_topic.rsplit("/", 1)[0] if base_topic.endswith("/objects") else base_topic
+                                    new_topic = f"{prefix}/new_detected"
+                                    
+                                    img_bytes = get_image_bytes(mmsi_str)
+                                    if img_bytes:
+                                        mqtt_pub_queue.put_nowait((new_topic, img_bytes))
+                                    else:
+                                        mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
+                                    
+                                    await asyncio.sleep(5)
+                                    mqtt_pub_queue.put_nowait(pub_payload)
+                                    await db.execute("UPDATE ships SET mqtt_new_sent = 1 WHERE mmsi = ?", (mmsi_str,))
+                                    await db.commit()
+                        elif should_send_mqtt:
+                            mqtt_pub_queue.put_nowait(pub_payload)
 
 
 
@@ -1151,24 +1137,39 @@ async def process_ais_data(data: dict):
         logger.error(f"Error for MMSI {mmsi_str}: {e}")
 
 class UDPProtocol(asyncio.DatagramProtocol):
-    def connection_made(self, transport):
-        self.transport = transport; self.settings = {}
+    def __init__(self, initial_settings=None):
+        self.settings = initial_settings or {}
         self.stream_manager = AisStreamManager()
         self.stream_manager.on_decode(self.handle_parsed_custom)
-        asyncio.create_task(self.update_settings_loop())
-    def handle_parsed_custom(self, d): d["source"] = "udp"; ais_queue.put_nowait(d)
-    async def update_settings_loop(self):
-        while True: self.settings = await get_all_settings(); await asyncio.sleep(5)
+        
+    def connection_made(self, transport):
+        self.transport = transport
+        logger.info(f"UDP connection established to {transport.get_extra_info('socket').getsockname()}")
+
+    def handle_parsed_custom(self, d):
+        d["source"] = "udp"
+        try:
+            ais_queue.put_nowait(d)
+        except asyncio.QueueFull:
+            logger.warning("AIS queue full! UDP message dropped.")
+
     def datagram_received(self, data, addr):
         if MOCK_MODE: return
-        try: msg = data.decode('utf-8', errors='ignore').strip()
-        except Exception: return
+        try:
+            msg = data.decode('utf-8', errors='ignore').strip()
+            # logger.debug(f"Received {len(data)} bytes from {addr}")
+        except Exception:
+            return
+            
         now_ms = int(datetime.now().timestamp() * 1000)
-        for line in msg.splitlines():
+        lines = msg.splitlines()
+        for line in lines:
             line = line.strip()
             if line:
                 asyncio.create_task(broadcast({"type": "nmea", "raw": line, "timestamp": now_ms}))
                 self.stream_manager.process_sentence(line)
+        
+        # Forwarding logic
         if self.settings.get("forward_enabled") == "true":
             f_ip, f_p = self.settings.get("forward_ip"), self.settings.get("forward_port")
             if f_ip and f_p:
@@ -1177,15 +1178,28 @@ class UDPProtocol(asyncio.DatagramProtocol):
 
 async def start_udp_listener():
     global udp_server_transport
-    loop, settings = asyncio.get_running_loop(), await get_all_settings()
+    loop = asyncio.get_running_loop()
+    settings = await get_all_settings()
     port = int(settings.get("udp_port", str(UDP_PORT)))
-    if udp_server_transport: udp_server_transport.close()
+    
+    if udp_server_transport:
+        logger.info("Closing existing UDP server transport")
+        udp_server_transport.close()
+        await asyncio.sleep(0.2) # Give OS a moment to release
+        
     if settings.get("udp_enabled", "true") == "true":
         try:
-            transport, _ = await loop.create_datagram_endpoint(UDPProtocol, local_addr=('0.0.0.0', port))
+            # reuse_port=True is critical for quick restarts on Linux
+            # We wrap the protocol in a lambda to pass initial settings
+            transport, _ = await loop.create_datagram_endpoint(
+                lambda: UDPProtocol(settings),
+                local_addr=('0.0.0.0', port),
+                reuse_port=True
+            )
             udp_server_transport = transport
-            logger.info(f"UDP server started on port {port}")
-        except Exception as e: logger.error(f"Failed to start UDP listener: {e}")
+            logger.info(f"UDP server started on port {port} (reuse_port=True)")
+        except Exception as e:
+            logger.error(f"Failed to start UDP listener: {e}")
 
 async def mqtt_loop():
     global mqtt_connected
@@ -1962,6 +1976,13 @@ async def system_restart():
     # We use a background task to exit after returning response
     async def exit_later():
         await asyncio.sleep(1.0)
+        
+        # Explicitly close UDP transport to help Linux release the port immediately
+        global udp_server_transport
+        if udp_server_transport:
+            logger.info("Closing UDP transport before exit")
+            udp_server_transport.close()
+            
         logger.info("Exiting process for Docker restart")
         os._exit(0)
         
