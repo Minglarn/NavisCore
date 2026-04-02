@@ -4094,7 +4094,7 @@ export default function App() {
         return (saved === 'compact' || saved === 'detail') ? saved : 'detail';
     });
     const [isRestarting, setIsRestarting] = useState(false);
-    const reconnectTimerRef = useRef<NodeJS.Timeout | null>(null);
+    const reconnectTimerRef = useRef<any | null>(null);
     const isConnectingRef = useRef(false);
 
     useEffect(() => {
