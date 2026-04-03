@@ -56,3 +56,131 @@ html,
 .center-station-btn {
     bottom: 140px !important;
 }
+
+/* --- Mobile Adaptation Utility Classes --- */
+:root {
+    --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@media (max-width: 768px) {
+    /* Larger touch targets */
+    button, .styled-button, .btn-cancel-premium {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Hide redundant map UI on mobile to save space */
+    .leaflet-control-zoom {
+        display: none !important; /* Most mobile users use pinch-to-zoom */
+    }
+
+    /* Reposition custom map buttons for easier thumb access */
+    .center-station-btn {
+        bottom: 80px !important;
+        left: 20px !important;
+    }
+
+    /* Simplify scrollbars further for mobile touch */
+    ::-webkit-scrollbar {
+        width: 4px;
+    }
+
+    /* Responsive Header Layout */
+    .nav-header {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        padding: 10px 15px !important;
+        gap: 12px;
+        height: auto !important;
+    }
+    
+    .nav-header-left, .nav-header-right {
+        width: 100%;
+        justify-content: space-between !important;
+    }
+    
+    .nav-header-indicators {
+        border-left: none !important;
+        padding: 0 !important;
+        margin-left: auto;
+    }
+
+    .nav-header-vessels {
+        border-left: none !important;
+        padding-left: 0 !important;
+    }
+
+    /* Stack Seen Objects Filters */
+    .seen-objects-filters {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Adjust Leaflet Attributes so FAB doesn't cover them */
+    .leaflet-bottom.leaflet-right {
+        margin-bottom: 20px !important;
+        margin-right: 70px !important; 
+    }
+
+    /* Statistics Modal Responsive Layout */
+    .stats-controls-grid,
+    .stats-charts-grid,
+    .stats-charts-grid-equal {
+        grid-template-columns: 1fr !important;
+        gap: 20px !important;
+    }
+
+    .stats-control-card {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+        gap: 15px;
+    }
+
+    /* General Modal Responsiveness */
+    .modal-header {
+        padding: 15px 20px !important;
+    }
+
+    .modal-title {
+        font-size: 1.2rem !important;
+    }
+
+    .modal-sub-title {
+        font-size: 0.8rem !important;
+    }
+
+    .modal-body {
+        padding: 15px 20px !important;
+    }
+
+    .modal-toolbar {
+        padding: 12px 20px !important;
+        gap: 10px !important;
+    }
+
+    /* Full-screen modals on mobile */
+    .settings-modal {
+        border-radius: 0 !important;
+    }
+
+    /* Table adjustments for mobile */
+    .db-table-compact th:nth-child(n+5),
+    .db-table-compact td:nth-child(n+5) {
+        display: none; /* Hide less important columns on mobile */
+    }
+    
+    .db-table-compact th:nth-child(1),
+    .db-table-compact td:nth-child(1) {
+        width: 45px !important;
+    }
+}
+
+/* Animations for mobile panels */
+@keyframes slideUp {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+    from { transform: translateX(100%); }
+    to { transform: translateX(0); }
+}

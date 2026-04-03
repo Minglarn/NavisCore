@@ -1590,8 +1590,8 @@ async def get_database(q: str = None, ship_type: int = None, source: str = None,
         params = []
         
         if q:
-            conditions.append("(mmsi LIKE ? OR name LIKE ?)")
-            params.extend([f"%{q}%", f"%{q}%"])
+            conditions.append("(mmsi LIKE ? OR name LIKE ? COLLATE NOCASE OR callsign LIKE ? COLLATE NOCASE)")
+            params.extend([f"%{q}%", f"%{q}%", f"%{q}%"])
         
         if ship_type is not None:
             conditions.append("type = ?")

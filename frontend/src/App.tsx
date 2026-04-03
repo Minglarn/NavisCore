@@ -1408,8 +1408,8 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
     return (
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 3000, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
-                width: '95vw', 
-                height: '92vh',
+                width: isMobile ? '100vw' : '95vw', 
+                height: isMobile ? '100vh' : '92vh',
                 maxWidth: '1400px',
                 padding: '0',
                 display: 'flex',
@@ -1420,10 +1420,10 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                 overflow: 'hidden'
             }}>
                 {/* Header Area */}
-                <div style={{ padding: '30px 40px', background: colors.bgCard, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div className="modal-header" style={{ background: colors.bgCard, borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
-                        <h1 style={{ margin: 0, fontSize: '2rem', fontWeight: 900, color: colors.textMain, letterSpacing: '-0.5px' }}>Statistics & Analysis</h1>
-                        <div style={{ color: colors.textMuted, fontSize: '1rem', marginTop: '4px' }}>Analyze historical data and system performance metrics.</div>
+                        <h1 className="modal-title" style={{ margin: 0, fontWeight: 900, color: colors.textMain, letterSpacing: '-0.5px' }}>Statistics & Analysis</h1>
+                        <div className="modal-sub-title" style={{ color: colors.textMuted, fontSize: '1rem', marginTop: '4px' }}>Analyze historical data and system performance metrics.</div>
                     </div>
                     
                     <button onClick={onClose} style={{ background: colors.bgMain, border: `1px solid ${colors.border}`, cursor: 'pointer', padding: '12px', borderRadius: '12px', color: colors.textMuted, transition: 'all 0.2s' }}>
@@ -1432,13 +1432,13 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                 </div>
                 
                 {/* Dashboard Scroll View */}
-                <div style={{ flex: 1, padding: '30px 40px', overflowY: 'auto' }}>
+                <div className="modal-body" style={{ flex: 1, overflowY: 'auto' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '30px' }}>
                         
                         {/* Controls Row */}
-                        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px' }}>
+                        <div className="stats-controls-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)', gap: '20px' }}>
                             {/* Time Range Selector */}
-                            <div style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <div className="stats-control-card" style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                                 <div>
                                     <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: colors.textMain }}>History Range</h2>
                                     <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: colors.textMuted }}>For trending charts</p>
@@ -1462,7 +1462,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                             </div>
 
                             {/* Select Date Card */}
-                            <div style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <div className="stats-control-card" style={{ background: colors.bgCard, padding: '24px', borderRadius: '16px', border: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                                 <div>
                                     <h2 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: colors.textMain }}>Select Date</h2>
                                     <p style={{ margin: '4px 0 0 0', fontSize: '0.9rem', color: colors.textMuted }}>Viewing data for {selectedDate}</p>
@@ -1494,7 +1494,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                         ) : (
                             <>
                                 {/* Middle Row Grid */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '30px' }}>
+                                <div className="stats-charts-grid" style={{ display: 'grid', gridTemplateColumns: '1.8fr 1.2fr', gap: '30px' }}>
                                     <ChartCard title="Messages & Vessels History" colors={colors}>
                                         <Bar data={historyData} options={historyOptions} />
                                     </ChartCard>
@@ -1511,7 +1511,7 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                                 </div>
 
                                 {/* Bottom Row Wide Charts */}
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', minHeight: '350px' }}>
+                                <div className="stats-charts-grid-equal" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', minHeight: '350px' }}>
                                     <ChartCard title="Station Range History (nm)" colors={colors} style={{ height: '350px' }}>
                                         <Line data={rangeData} options={rangeOptions} />
                                     </ChartCard>
@@ -1524,8 +1524,8 @@ function StatisticsModal({ isOpen, onClose, colors }: any) {
                                 {/* Range per Channel */}
                                 <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr)', gap: '30px' }}>
                                     <ChartCard title="Maximum Range per AIS Channel (All-time Record)" colors={colors}>
-                                        <div style={{ padding: '0 0' }}>
-                                            <table style={{ width: '100%', borderCollapse: 'collapse', color: colors.textMain }}>
+                                        <div className="stats-table-container" style={{ padding: '0 0', overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', color: colors.textMain, minWidth: '600px' }}>
                                                 <thead>
                                                     <tr style={{ borderBottom: `2px solid ${colors.border}`, textAlign: 'left' }}>
                                                         <th style={{ padding: '12px 8px', fontSize: '0.85rem', textTransform: 'uppercase', letterSpacing: '1px' }}>Channel</th>
@@ -2155,29 +2155,29 @@ function VesselDatabaseModal({
         <>
         <div className="settings-modal-overlay" onClick={onClose} style={{ zIndex: 1500 }}>
             <div className="settings-modal" onClick={e => e.stopPropagation()} style={{ 
-                height: '92vh', 
-                width: '85vw', 
+                height: isMobile ? '100vh' : '92vh', 
+                width: isMobile ? '100vw' : '85vw', 
                 maxWidth: '1600px',
-                borderRadius: '16px', 
+                borderRadius: isMobile ? '0' : '16px', 
                 overflow: 'hidden', 
                 display: 'flex', 
                 flexDirection: 'column', 
                 boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
                 background: colors.bgCard 
             }}>
-                <div style={{ padding: '20px 30px', borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgApp }}>
+                <div className="modal-header" style={{ borderBottom: `1px solid ${colors.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: colors.bgApp }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                         <div style={{ background: 'rgba(68, 170, 255, 0.15)', color: '#44aaff', padding: '10px', borderRadius: '12px' }}>
                             <Database size={24} />
                         </div>
                         <div>
-                            <h2 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 800 }}>Vessel Database</h2>
-                            <p style={{ margin: 0, fontSize: '0.8rem', color: colors.textMuted }}>Explore archive • Double-click a row to edit</p>
+                            <h2 className="modal-title" style={{ margin: 0, fontWeight: 800 }}>Vessel Database</h2>
+                            <p className="modal-sub-title" style={{ margin: 0, fontSize: '0.8rem', color: colors.textMuted }}>Explore archive • Double-click a row to edit</p>
                         </div>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         {/* Filter Section */}
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div className="modal-toolbar" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                             <div style={{ position: 'relative', width: '180px' }}>
                                 <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: colors.textMuted }} />
                                 <input 
@@ -2261,9 +2261,10 @@ function VesselDatabaseModal({
                 </div>
 
                 <div 
+                    className="modal-body"
                     ref={scrollRef}
                     onScroll={handleScroll}
-                    style={{ flex: 1, overflowY: 'auto', padding: '0' }}
+                    style={{ flex: 1, overflowY: 'auto' }}
                 >
                     <table className="db-table-compact" style={{ borderCollapse: 'collapse', width: '100%', tableLayout: 'fixed' }}>
                         <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: colors.bgCard }}>
@@ -2968,7 +2969,7 @@ function Toggle({ checked, onChange }: { checked: boolean, onChange: (val: boole
     );
 }
 
-function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme, setIsRestarting }: any) {
+function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme, setIsRestarting, isMobile }: any) {
 
     if (!isOpen) return null;
 
@@ -2986,10 +2987,38 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
     const activeTabData = tabs.find(t => t.id === activeTab) || tabs[0];
 
     return (
-        <div className="settings-modal-overlay" onClick={onClose}>
-            <div className={`settings-modal ${theme === 'light' ? 'light-theme' : ''}`} onClick={e => e.stopPropagation()}>
-                {/* Sidebar */}
-                <div className="settings-sidebar">
+        <div className="settings-modal-overlay" onClick={onClose} style={isMobile ? { padding: 0 } : {}}>
+            <div className={`settings-modal ${theme === 'light' ? 'light-theme' : ''}`} onClick={e => e.stopPropagation()} style={isMobile ? { width: '100%', height: '100%', maxWidth: 'none', maxHeight: 'none', borderRadius: 0, flexDirection: 'column' } : {}}>
+                {/* Mobile Tab Switcher */}
+                {isMobile && (
+                    <div style={{ display: 'flex', overflowX: 'auto', background: colors.bgCard, borderBottom: `1px solid ${colors.border}`, padding: '10px 5px' }}>
+                        {tabs.map(t => (
+                            <button
+                                key={t.id}
+                                onClick={() => setActiveTab(t.id)}
+                                style={{
+                                    flexShrink: 0,
+                                    padding: '8px 15px',
+                                    margin: '0 5px',
+                                    borderRadius: '20px',
+                                    border: 'none',
+                                    background: activeTab === t.id ? 'rgba(68,170,255,0.2)' : 'transparent',
+                                    color: activeTab === t.id ? '#44aaff' : colors.textMuted,
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px'
+                                }}
+                            >
+                                {t.icon} {t.label}
+                            </button>
+                        ))}
+                    </div>
+                )}
+                {/* Sidebar - Hidden on Mobile in favor of top switcher */}
+                {!isMobile && (
+                    <div className="settings-sidebar">
                     <div className="settings-sidebar-header">
                         <div className="settings-sidebar-title">Settings</div>
                         <div style={{ fontSize: '0.75rem', color: '#8892b0', marginTop: '6px', textTransform: 'uppercase', letterSpacing: '1px' }}>NavisCore Center</div>
@@ -3010,6 +3039,7 @@ function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeT
                             NavisCore v1.0.0
                         </div>
                     </div>
+                )}
 
                     {/* Main Content */}
                     <div className="settings-main">
@@ -3971,6 +4001,104 @@ const MultiSelect = ({ label, options, selected, onChange, colors, isDark }: {
     );
 };
 
+function VesselMobilePanel({ ship, onClose, colors, isDark, getShipColor, getCountryName, getFlagEmoji, formatSpeed, formatDistance, haversineDistance, originLat, originLon, mqttSettings }: any) {
+    if (!ship) return null;
+
+    const shipColor = getShipColor(String(ship.mmsi), ship.shiptype || ship.ship_type, ship.is_meteo, ship.is_aton, ship.is_emergency);
+
+    return (
+        <div style={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            background: isDark ? '#1a1a2e' : '#fff',
+            zIndex: 10001,
+            borderTopLeftRadius: '24px',
+            borderTopRightRadius: '24px',
+            boxShadow: '0 -10px 40px rgba(0,0,0,0.4)',
+            animation: 'slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            color: isDark ? '#fff' : '#333'
+        }}>
+            <div style={{ width: '40px', height: '5px', background: isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.1)', borderRadius: '3px', margin: '12px auto', flexShrink: 0 }} />
+            
+            <div style={{ overflowY: 'auto', padding: '0 20px 30px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', gap: '15px', alignItems: 'center' }}>
+                        <div style={{ width: '50px', height: '50px', borderRadius: '12px', background: shipColor, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.5rem', boxShadow: `0 4px 12px ${shipColor}44` }}>
+                            <span dangerouslySetInnerHTML={{ __html: getFlagEmoji(String(ship.mmsi), ship.country_code) }} />
+                        </div>
+                        <div>
+                            <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 800 }}>{ship.name || 'Unknown Vessel'}</h2>
+                            <div style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)', fontSize: '0.85rem', fontWeight: 600 }}>
+                                MMSI: {ship.mmsi} • {ship.callsign || 'No Callsign'}
+                            </div>
+                        </div>
+                    </div>
+                    <button onClick={onClose} style={{ background: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.05)', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+                        <X size={20} />
+                    </button>
+                </div>
+
+                {ship.imageUrl && (
+                    <div style={{ width: '100%', height: '180px', borderRadius: '16px', overflow: 'hidden', marginBottom: '20px', border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}` }}>
+                        <img src={ship.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt={ship.name} />
+                    </div>
+                )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px', marginBottom: '25px' }}>
+                    <div style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: '12px', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', fontWeight: 700, marginBottom: '4px' }}>Status</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#44aaff' }}>{ship.status_text || 'Active'}</div>
+                    </div>
+                    <div style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: '12px', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', fontWeight: 700, marginBottom: '4px' }}>Distance</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatDistance(haversineDistance(originLat, originLon, ship.lat, ship.lon), mqttSettings.units)}</div>
+                    </div>
+                    <div style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: '12px', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', fontWeight: 700, marginBottom: '4px' }}>Speed / Course</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{formatSpeed(ship.sog)} / {ship.cog?.toFixed(0)}°</div>
+                    </div>
+                    <div style={{ background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)', padding: '12px', borderRadius: '12px' }}>
+                        <div style={{ fontSize: '0.7rem', textTransform: 'uppercase', color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.4)', fontWeight: 700, marginBottom: '4px' }}>Heading</div>
+                        <div style={{ fontWeight: 700, fontSize: '0.95rem' }}>{ship.heading != null ? `${ship.heading}°` : '--'}</div>
+                    </div>
+                </div>
+
+                <div style={{ borderTop: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`, paddingTop: '20px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.6 }}>Destination</span>
+                            <span style={{ fontWeight: 700 }}>{ship.destination || '--'}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.6 }}>Type</span>
+                            <span style={{ fontWeight: 700 }}>{ship.ship_type_text || (ship.shiptype ? `Type ${ship.shiptype}` : '--')}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.6 }}>Source</span>
+                            <span style={{ fontWeight: 700, color: '#44aaff' }}>{ship.source || 'Local'}</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ opacity: 0.6 }}>Last Seen</span>
+                            <span style={{ fontWeight: 700 }}>{new Date(ship.timestamp).toLocaleTimeString()}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style={{ marginTop: '30px', display: 'flex', gap: '10px' }}>
+                    <button style={{ flex: 1, background: '#44aaff', color: 'white', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 800, fontSize: '0.9rem' }}>Follow Vessel</button>
+                    <button style={{ flex: 1, background: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)', color: isDark ? '#fff' : '#333', border: 'none', padding: '14px', borderRadius: '12px', fontWeight: 700, fontSize: '0.9rem' }}>History</button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function App() {
     const [ships, setShips] = useState<any[]>([]);
     const [status, setStatus] = useState('Connecting...');
@@ -3988,6 +4116,14 @@ export default function App() {
         const saved = localStorage.getItem('naviscore_theme');
         return (saved === 'dark' || saved === 'light') ? saved : 'light';
     });
+    const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+    useEffect(() => {
+        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, []);
+
+    // Set default closed for Sidebar but mobile logic still applies
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSettingsLoaded, setIsSettingsLoaded] = useState(false);
     const [mqttSettings, setMqttSettings] = useState(() => {
@@ -4292,7 +4428,10 @@ export default function App() {
         }).length;
     }, [mapShips]);
 
-    const [isHudExpanded, setIsHudExpanded] = useState(() => localStorage.getItem('naviscore_hud_expanded') !== 'false');
+    const [isHudExpanded, setIsHudExpanded] = useState(() => {
+        if (window.innerWidth <= 768) return false;
+        return localStorage.getItem('naviscore_hud_expanded') !== 'false';
+    });
     useEffect(() => { localStorage.setItem('naviscore_hud_expanded', String(isHudExpanded)); }, [isHudExpanded]);
 
     const vesselStatistics = useMemo(() => {
@@ -4953,7 +5092,7 @@ export default function App() {
     return (
         <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', background: colors.bgMain, color: colors.textMain, overflow: 'hidden' }}>
             {/* Header */}
-            <header style={{
+            <header className="nav-header" style={{
                 position: 'relative',
                 padding: '5px 25px',
                 background: isDark ? '#0f0f1a' : '#ffffff',
@@ -4965,14 +5104,14 @@ export default function App() {
                 boxShadow: isDark ? '0 2px 10px rgba(0,0,0,0.5)' : '0 2px 10px rgba(0,0,0,0.05)',
                 zIndex: 1000
             }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                <div className="nav-header-left" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <Anchor size={24} />
                         <h1 style={{ margin: 0, fontSize: '1.4rem', fontWeight: 600, letterSpacing: '1px' }}>NavisCore</h1>
                     </div>
 
                     {/* Activity Indicators */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '0 15px', borderLeft: `1px solid ${colors.border}` }}>
+                    <div className="nav-header-indicators" style={{ display: 'flex', alignItems: 'center', gap: '15px', padding: '0 15px', borderLeft: `1px solid ${colors.border}` }}>
                         <div title="SDR Activity" style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: (Date.now() - lastSdrTime < 3000) ? 1 : 0.4, transition: 'all 0.3s' }}>
                             <Radio size={18} color={Date.now() - lastSdrTime < 3000 ? '#00ff80' : colors.textMuted} className={Date.now() - lastSdrTime < 500 ? 'blink-source' : ''} />
                             <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>SDR</span>
@@ -4988,9 +5127,9 @@ export default function App() {
                     </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                <div className="nav-header-right" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
 
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '15px', color: colors.textMain, fontSize: '0.9rem', fontWeight: 600, paddingLeft: '10px', borderLeft: `1px solid ${colors.border}` }}>
+                    <div className="nav-header-vessels" style={{ display: 'flex', alignItems: 'center', gap: '15px', color: colors.textMain, fontSize: '0.9rem', fontWeight: 600, paddingLeft: '10px', borderLeft: `1px solid ${colors.border}` }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <Ship size={16} color={isDark ? '#44aaff' : '#00838f'} />
                             <span>Vessels: {vesselCount}</span>
@@ -5698,8 +5837,8 @@ export default function App() {
                                             </Tooltip>
                                         )}
 
-                                        {/* Detailed Popup on Click - NOT for meteo markers */}
-                                        {(selectedShipMmsi === mmsiStr && !s.is_meteo) && <Popup className="custom-detailed-popup" offset={[0, -20]}>
+                                        {/* Detailed Popup on Click - NOT for meteo markers (Disabled on mobile in favor of VesselMobilePanel) */}
+                                        {(selectedShipMmsi === mmsiStr && !s.is_meteo && !isMobile) && <Popup className="custom-detailed-popup" offset={[0, -20]}>
                                             <div style={{ display: 'flex', flexDirection: 'column', width: '460px' }}>
                                                 {/* SHIP NAME HEADER */}
                                                 <div style={{ padding: '10px 15px', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'flex-start', gap: '12px', background: 'var(--bg-card)' }}>
@@ -5902,8 +6041,8 @@ export default function App() {
                             id="vessel-status-hud"
                             style={{
                                 position: 'absolute',
-                                top: '12px',
-                                left: '50px',
+                                top: isMobile ? '70px' : '12px',
+                                left: isMobile ? '12px' : '50px',
                                 zIndex: 1000,
                                 background: isDark ? 'rgba(10, 10, 20, 0.85)' : 'rgba(255, 255, 255, 0.9)',
                                 backdropFilter: 'blur(12px)',
@@ -6007,33 +6146,42 @@ export default function App() {
                 {/* Expandable Right Sidebar */}
                 {isSidebarOpen && (
                     <>
-                        {/* Resize Handle */}
-                        <div
-                            onMouseDown={() => setIsResizing(true)}
-                            style={{
-                                width: '6px',
-                                cursor: 'col-resize',
-                                background: isResizing ? '#44aaff' : 'transparent',
-                                zIndex: 1001,
-                                transition: 'background 0.2s',
-                                borderLeft: `1px solid ${colors.border}`,
-                                height: '100%',
-                                position: 'relative'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.background = '#44aaff'}
-                            onMouseLeave={e => !isResizing && (e.currentTarget.style.background = 'transparent')}
-                        />
+                        {/* Resize Handle - Hidden on Mobile */}
+                        {!isMobile && (
+                            <div
+                                onMouseDown={() => setIsResizing(true)}
+                                style={{
+                                    width: '6px',
+                                    cursor: 'col-resize',
+                                    background: isResizing ? '#44aaff' : 'transparent',
+                                    zIndex: 1001,
+                                    transition: 'background 0.2s',
+                                    borderLeft: `1px solid ${colors.border}`,
+                                    height: '100%',
+                                    position: 'relative'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.background = '#44aaff'}
+                                onMouseLeave={e => !isResizing && (e.currentTarget.style.background = 'transparent')}
+                            />
+                        )}
                         <div style={{
-                            width: `${sidebarWidth}px`,
-                            minWidth: '250px',
-                            maxWidth: '800px',
+                            width: isMobile ? '100%' : `${sidebarWidth}px`,
+                            height: '100%',
+                            position: isMobile ? 'fixed' : 'relative',
+                            top: 0,
+                            right: 0,
+                            bottom: 0,
+                            left: isMobile ? 0 : 'auto',
+                            minWidth: isMobile ? '100%' : '250px',
+                            maxWidth: isMobile ? '100%' : '800px',
                             background: colors.bgSidebar,
                             display: 'flex',
                             flexDirection: 'column',
-                            zIndex: 1000,
+                            zIndex: 2000,
                             boxShadow: isDark ? '-5px 0 20px rgba(0,0,0,0.5)' : '-5px 0 20px rgba(0,0,0,0.05)',
-                            transition: isResizing ? 'none' : 'width 0.3s ease',
-                            overflow: 'hidden'
+                            transition: isResizing ? 'none' : 'width 0.3s ease, transform 0.3s ease',
+                            overflow: 'hidden',
+                            animation: isMobile ? 'slideInRight 0.3s ease-out' : 'none'
                         }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '15px 20px', borderBottom: `1px solid ${colors.border}` }}>
                                 <h1 style={{ margin: 0, fontSize: '1.1rem', color: colors.textMain, fontWeight: 700 }}>
@@ -6088,7 +6236,7 @@ export default function App() {
                                         </button>
                                     )}
                                 </div>
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <div className="seen-objects-filters" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                                     <MultiSelect 
                                         label="Any Source"
                                         isDark={isDark}
@@ -6310,7 +6458,52 @@ export default function App() {
                 colors={colors}
                 theme={theme}
                 setIsRestarting={setIsRestarting}
+                isMobile={isMobile}
             />
+
+            {isMobile && selectedShipMmsi && (
+                <VesselMobilePanel
+                    ship={ships.find(s => String(s.mmsi) === selectedShipMmsi)}
+                    onClose={() => setSelectedShipMmsi(null)}
+                    colors={colors}
+                    isDark={isDark}
+                    getShipColor={getShipColor}
+                    getCountryName={getCountryName}
+                    getFlagEmoji={getFlagEmoji}
+                    formatSpeed={formatSpeed}
+                    formatDistance={formatDistance}
+                    haversineDistance={haversineDistance}
+                    originLat={originLat}
+                    originLon={originLon}
+                    mqttSettings={mqttSettings}
+                />
+            )}
+
+            {isMobile && !isSidebarOpen && !selectedShipMmsi && (
+                <button
+                    onClick={() => setIsSidebarOpen(true)}
+                    style={{
+                        position: 'fixed',
+                        bottom: '100px',
+                        right: '25px',
+                        zIndex: 1000,
+                        width: '60px',
+                        height: '60px',
+                        borderRadius: '30px',
+                        background: 'linear-gradient(135deg, #44aaff 0%, #0066cc 100%)',
+                        border: 'none',
+                        color: 'white',
+                        boxShadow: '0 8px 25px rgba(0,102,204,0.4)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer',
+                        transition: 'transform 0.2s active',
+                    }}
+                >
+                    <Rows size={28} />
+                </button>
+            )}
 
             <VesselDatabaseModal
                 isOpen={isDatabaseModalOpen}
@@ -6584,7 +6777,7 @@ export default function App() {
             )}
 
             {/* Bottom Console Bar */}
-            {lastUpdatedShip && (
+            {!isMobile && lastUpdatedShip && (
                 <div style={{
                     position: 'fixed',
                     bottom: 0,
@@ -6611,27 +6804,36 @@ export default function App() {
                             {eventLog.slice(1, 30).map((ev, i) => (
                                 <div key={`${ev.mmsi}-${ev.time}-${i}`} style={{
                                     display: 'grid',
-                                    gridTemplateColumns: '75px 50px 240px 95px 1fr',
+                                    gridTemplateColumns: isMobile ? '70px auto 1fr' : '75px 50px 240px 95px 1fr',
                                     alignItems: 'center',
                                     padding: '3px 20px',
                                     fontSize: '0.8rem',
                                     color: colors.textMuted,
                                     opacity: Math.max(0.3, 1 - i * 0.05),
                                     borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)'}`,
-                                    gap: '12px'
+                                    gap: isMobile ? '8px' : '12px'
                                 }}>
                                     <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: '0.75rem' }}>
-                                        {new Date(ev.time).toLocaleTimeString([], { hour12: false })}
+                                        {new Date(ev.time).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}
                                     </span>
-                                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isDark ? 'rgba(68,170,255,0.7)' : 'rgba(0,112,128,0.7)' }}>
-                                        {ev.msgType != null ? `Type ${ev.msgType}` : '—'}
-                                    </span>
-                                    <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isDark ? 'rgba(68,170,255,0.5)' : 'rgba(0,112,128,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                        {ev.msgType != null ? getAisMsgTypeName(ev.msgType) : ''}
-                                    </span>
-                                    <span style={{ fontSize: '0.75rem', opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>
-                                        {ev.mmsi}
-                                    </span>
+                                    {!isMobile && (
+                                        <>
+                                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: isDark ? 'rgba(68,170,255,0.7)' : 'rgba(0,112,128,0.7)' }}>
+                                                {ev.msgType != null ? `Type ${ev.msgType}` : '—'}
+                                            </span>
+                                            <span style={{ fontSize: '0.72rem', fontWeight: 600, color: isDark ? 'rgba(68,170,255,0.5)' : 'rgba(0,112,128,0.5)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {ev.msgType != null ? getAisMsgTypeName(ev.msgType) : ''}
+                                            </span>
+                                            <span style={{ fontSize: '0.75rem', opacity: 0.6, fontVariantNumeric: 'tabular-nums' }}>
+                                                {ev.mmsi}
+                                            </span>
+                                        </>
+                                    )}
+                                    {isMobile && (
+                                        <span style={{ fontSize: '0.7rem', fontWeight: 700, color: isDark ? 'rgba(68,170,255,0.5)' : 'rgba(0,112,128,0.5)' }}>
+                                            {ev.msgType != null ? `T${ev.msgType}` : ''}
+                                        </span>
+                                    )}
                                     <span style={{ fontWeight: 600, color: isDark ? 'rgba(68,170,255,0.7)' : 'rgba(0,112,128,0.7)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                         {ev.name}
                                     </span>
@@ -6645,10 +6847,10 @@ export default function App() {
                         onClick={() => setConsoleExpanded(prev => !prev)}
                         style={{
                             display: 'grid',
-                            gridTemplateColumns: '8px auto 75px 50px 240px 95px 1fr 70px 24px',
+                            gridTemplateColumns: isMobile ? '8px auto 65px 1fr 24px' : '8px auto 75px 50px 240px 95px 1fr 70px 24px',
                             alignItems: 'center',
-                            padding: '8px 20px',
-                            gap: '12px',
+                            padding: isMobile ? '8px 12px' : '8px 20px',
+                            gap: isMobile ? '8px' : '12px',
                             cursor: 'pointer',
                             minHeight: '36px',
                             userSelect: 'none'
@@ -6660,47 +6862,42 @@ export default function App() {
                         <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', animation: 'pulse 2s infinite', flexShrink: 0 }} />
 
                         {/* Label */}
-                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Latest Event</span>
+                        <span style={{ fontSize: '0.72rem', fontWeight: 700, color: colors.textMuted, letterSpacing: '0.5px', textTransform: 'uppercase', whiteSpace: 'nowrap' }}>Latest</span>
 
                         {/* Timestamp */}
-                        <span style={{ fontSize: '0.8rem', color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                            {new Date(lastUpdatedShip.time).toLocaleTimeString([], { hour12: false })}
+                        <span style={{ fontSize: '0.75rem', color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                            {new Date(lastUpdatedShip.time).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' })}
                         </span>
 
-                        {/* Type number */}
-                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isDark ? '#44aaff' : '#007080', whiteSpace: 'nowrap' }}>
-                            {lastUpdatedShip.msgType != null ? `Type ${lastUpdatedShip.msgType}` : '\u2014'}
-                        </span>
+                        {!isMobile && (
+                            <>
+                                {/* Type number */}
+                                <span style={{ fontSize: '0.8rem', fontWeight: 700, color: isDark ? '#44aaff' : '#007080', whiteSpace: 'nowrap' }}>
+                                    {lastUpdatedShip.msgType != null ? `Type ${lastUpdatedShip.msgType}` : '\u2014'}
+                                </span>
+                                {/* Type text */}
+                                <span style={{ fontSize: '0.75rem', color: colors.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', opacity: 0.8 }}>
+                                    {lastUpdatedShip.msgType != null ? getAisMsgTypeName(lastUpdatedShip.msgType) : ''}
+                                </span>
 
-                        {/* Type name */}
-                        <span style={{
-                            fontSize: '0.78rem',
-                            fontWeight: 600,
-                            color: isDark ? '#44aaff' : '#007080',
-                            background: isDark ? 'rgba(68,170,255,0.1)' : 'rgba(0,112,128,0.08)',
-                            padding: '3px 10px',
-                            borderRadius: '4px',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap'
-                        }}>
-                            {lastUpdatedShip.msgType != null ? getAisMsgTypeName(lastUpdatedShip.msgType) : '\u2014'}
-                        </span>
-
-                        {/* MMSI */}
-                        <span style={{ fontSize: '0.8rem', color: colors.textMuted, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
-                            {lastUpdatedShip.mmsi}
-                        </span>
+                                {/* MMSI (hidden on mobile) */}
+                                <span style={{ fontSize: '0.8rem', opacity: 0.5, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>
+                                    {lastUpdatedShip.mmsi}
+                                </span>
+                            </>
+                        )}
 
                         {/* Ship name */}
                         <span style={{ fontSize: '0.88rem', fontWeight: 600, color: isDark ? '#44aaff' : '#007080', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                             {lastUpdatedShip.name}
                         </span>
 
-                        {/* Event count */}
-                        <span style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.6, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                            {eventLog.length} events
-                        </span>
+                        {/* Event count (hidden on mobile to fit the 5 column mobile grid) */}
+                        {!isMobile && (
+                            <span style={{ fontSize: '0.7rem', color: colors.textMuted, opacity: 0.6, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                {eventLog.length} events
+                            </span>
+                        )}
 
                         {/* Expand/collapse chevron */}
                         {consoleExpanded ? <ChevronDown size={14} color={colors.textMuted} /> : <ChevronUp size={14} color={colors.textMuted} />}
