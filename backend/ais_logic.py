@@ -305,6 +305,51 @@ def decode_6bit_string(bitstr: str, start: int, num_chars: int) -> str:
             result.append(chr(val))  # space, 0-9, etc.
     return "".join(result).rstrip("@ ").strip()
 
+def analyze_safety_text(text: str) -> int:
+    """
+    Analyzes safety text for keywords and returns an alarm_level (0-3).
+    0: Normal
+    1: Information (Yellow/Blue)
+    2: High Priority (Orange)
+    3: Critical Priority (Red)
+    """
+    if not text:
+        return 0
+    
+    t = text.upper()
+    
+    # 1. Critical (Level 3)
+    critical_keywords = [
+        "SINKING", "FIRE", "EXPLOSION", "COLLISION", "GROUNDING", "AGROUND", 
+        "LISTING", "ABANDONING", "MAYDAY", "MOB", "MAN OVERBOARD"
+    ]
+    
+    # 2. High (Level 2)
+    high_keywords = [
+        "DANGER", "HAZARD", "WRECK", "DRIFTING", "DISABLED", 
+        "NOT UNDER COMMAND", "EXPLOSIVES", "ORDNANCE", "RESTRICTED"
+    ]
+    
+    # 3. Information (Level 1)
+    info_keywords = [
+        "SART", "PILOT", "TOWING", "WEATHER", "GALE", "ICE", "ICEBERGS"
+    ]
+    
+    level = 0
+    
+    if any(kw in t for kw in critical_keywords):
+        level = 3
+    elif any(kw in t for kw in high_keywords):
+        level = 2
+    elif any(kw in t for kw in info_keywords):
+        level = 1
+        
+    # Downgrade if TEST, DRILL or EXERCISE is present
+    if level > 0 and any(kw in t for kw in ["TEST", "DRILL", "EXERCISE"]):
+        level = 1
+        
+    return level
+
 
 # ═══════════════════════════════════════════════════════
 # TYPE-SPECIFIC DECODERS
@@ -416,7 +461,13 @@ def _decode_type_7_13(bitstr: str, data: dict):
     """Type 7: Binary Acknowledge / Type 13: Safety Acknowledge."""
     if len(bitstr) < 72:
         return
-    data["ack_mmsi_1"] = get_int_from_bits(bitstr, 40, 30)
+    data["ack_mmsi"] = get_int_from_bits(bitstr, 40, 30)
+    if len(bitstr) >= 72:
+        data["ack_seq_num"] = get_int_from_bits(bitstr, 70, 2)
+    
+    if data["type"] == 13:
+        data["is_ack"] = True
+        logger.info(f"[AIS ACK] MMSI {data['mmsi']} acknowledged safety msg for {data['ack_mmsi']} (Seq {data.get('ack_seq_num')})")
 
 
 def _decode_type_8(bitstr: str, data: dict):
@@ -576,7 +627,8 @@ def _decode_type_12(bitstr: str, data: dict):
         text = decode_6bit_string(bitstr, 72, min(avail_chars, 157))
         data["safety_text"] = text
         data["is_safety"] = True
-        logger.warning(f"[AIS Safety Msg] MMSI={data['mmsi']} -> {data['dest_mmsi']}: {text}")
+        data["alarm_level"] = analyze_safety_text(text)
+        logger.warning(f"[AIS Safety Msg] MMSI={data['mmsi']} -> {data['dest_mmsi']} (Level {data['alarm_level']}): {text}")
 
 
 def _decode_type_14(bitstr: str, data: dict):
@@ -589,15 +641,18 @@ def _decode_type_14(bitstr: str, data: dict):
         data["safety_text"] = text
         data["is_safety"] = True
         data["is_broadcast_alert"] = True
-        logger.warning(f"[AIS Broadcast Alert] MMSI={data['mmsi']}: {text}")
+        data["alarm_level"] = analyze_safety_text(text)
+        logger.warning(f"[AIS Broadcast Alert] MMSI={data['mmsi']} (Level {data['alarm_level']}): {text}")
 
         # Detect SART status strings
         text_upper = text.upper().strip()
         if "SART ACTIVE" in text_upper:
             data["sart_mode"] = "active"
+            if data["alarm_level"] < 3: data["alarm_level"] = 3
             logger.critical(f"[SART ACTIVE] MMSI={data['mmsi']}: {text}")
         elif "SART TEST" in text_upper:
             data["sart_mode"] = "test"
+            if data["alarm_level"] > 1: data["alarm_level"] = 1
             logger.info(f"[SART TEST] MMSI={data['mmsi']}: {text}")
 
 

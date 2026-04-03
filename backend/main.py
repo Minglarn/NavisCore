@@ -621,18 +621,23 @@ async def process_ais_data(data: dict):
             "dest_mmsi": str(data.get("dest_mmsi", "")) if data.get("dest_mmsi") else None, 
             "is_broadcast": data.get("is_broadcast_alert", False), 
             "msg_type": data.get("type", 0), 
+            "alarm_level": data.get("alarm_level", 0),
             "timestamp": int(datetime.now().timestamp() * 1000)
         }
-        # Persist to database & enrich with name
+        # Persist to database & enrich with name and position
         try:
             async with db_session() as db:
-                # Try to get ship name and category
-                async with db.execute('SELECT name, type FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
+                # Try to get ship name, type and LAST KNOWN POSITION
+                async with db.execute('SELECT name, type, latitude, longitude FROM ships WHERE mmsi = ?', (mmsi_str,)) as cursor:
                     row = await cursor.fetchone()
                     if row:
                         safety_msg["name"] = row[0]
                         if row[1] is not None:
                             safety_msg["ship_category"] = get_ship_category(row[1])
+                        # Geographical Coupling: Add position if found in local cache/DB
+                        if row[2] is not None and row[3] is not None:
+                            safety_msg["lat"] = row[2]
+                            safety_msg["lon"] = row[3]
 
                 await db.execute('INSERT INTO safety_alerts (mmsi, dest_mmsi, text, is_broadcast, msg_type) VALUES (?, ?, ?, ?, ?)',
                     (mmsi_str, safety_msg.get("dest_mmsi"), safety_msg["text"], 1 if safety_msg["is_broadcast"] else 0, safety_msg.get("msg_type", 0)))
@@ -647,6 +652,20 @@ async def process_ais_data(data: dict):
             
         for ws in list(connected_clients):
             try: await ws.send_json(safety_msg)
+            except Exception: pass
+
+    if data.get("is_ack"):
+        # Log acknowledge event and broadcast to UI
+        ack_info = {
+            "type": "safety_ack",
+            "mmsi": mmsi_str,
+            "ack_mmsi": str(data.get("ack_mmsi")),
+            "seq_num": data.get("ack_seq_num"),
+            "timestamp": int(datetime.now().timestamp() * 1000)
+        }
+        logger.info(f"Broadcasting ACK: {ack_info}")
+        for ws in list(connected_clients):
+            try: await ws.send_json(ack_info)
             except Exception: pass
         return
 
