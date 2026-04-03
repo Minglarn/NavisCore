@@ -1230,7 +1230,7 @@ function ChartCard({ title, children, colors }: any) {
 }
 
 
-function StatisticsModal({ isOpen, onClose, colors }: any) {
+function StatisticsModal({ isOpen, onClose, colors, isMobile }: any) {
     const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
     const [timeRange, setTimeRange] = useState<'7d' | '30d' | '1y'>('30d');
     const [stats, setStats] = useState<any>(null);
@@ -2070,7 +2070,7 @@ function VesselDatabaseModal({
     dbFilterType, setDbFilterType, 
     dbFilterSource, setDbFilterSource,
     databaseShips, fetchMore, hasMore, loading, 
-    dbSort, setDbSort, dbTotal, onRefresh, isDark
+    dbSort, setDbSort, dbTotal, onRefresh, isDark, isMobile
 }: any) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -6540,6 +6540,7 @@ export default function App() {
                 setDbSort={setDbSort}
                 dbTotal={dbTotal}
                 onRefresh={() => fetchDatabaseShips(true)}
+                isMobile={isMobile}
             />
 
             {mqttSettings.vessel_detail_view === 'sidebar' ? (
@@ -6565,6 +6566,7 @@ export default function App() {
                 isOpen={isStatsModalOpen}
                 onClose={() => setIsStatsModalOpen(false)}
                 colors={colors}
+                isMobile={isMobile}
             />
 
             <NmeaConsoleModal
