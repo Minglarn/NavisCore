@@ -1998,6 +1998,25 @@ export default function App() {
                                                                         ⚠️ EMERGENCY
                                                                     </div>
                                                                 )}
+                                                                {(() => {
+                                                                    const vesselAlerts = safetyAlerts.filter((a: any) => a.mmsi === mmsiStr && !a.dismissed && (Date.now() - (a.timestamp_ms || 0)) < 3600000);
+                                                                    if (vesselAlerts.length === 0) return null;
+                                                                    const levelColors: Record<string, string> = { 'MAYDAY': '#ff0000', 'FIRE': '#ff0000', 'SINKING': '#ff0000', 'MAN OVERBOARD': '#ff0000', 'DANGER': '#ff6600', 'WRECK': '#ff6600', 'RESTRICTED': '#ff6600', 'WEATHER': '#f59e0b', 'STORM': '#f59e0b', 'ICE': '#f59e0b', 'GALE': '#f59e0b' };
+                                                                    return vesselAlerts.map((alert: any, ai: number) => {
+                                                                        const text = (alert.text || '').toUpperCase();
+                                                                        let bgColor = '#6b7280';
+                                                                        for (const [kw, color] of Object.entries(levelColors)) { if (text.includes(kw)) { bgColor = color; break; } }
+                                                                        return (
+                                                                            <div key={ai} style={{ gridColumn: 'span 2', background: bgColor, color: '#fff', padding: '6px 10px', borderRadius: '4px', fontWeight: 'bold', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '8px', animation: bgColor === '#ff0000' ? 'emergency-flash 1s infinite alternate' : undefined }}>
+                                                                                <span style={{ fontSize: '1.1rem' }}>🔺</span>
+                                                                                <div style={{ flex: 1 }}>
+                                                                                    <div>SAFETY ALERT</div>
+                                                                                    <div style={{ fontWeight: 400, fontSize: '0.7rem', opacity: 0.9 }}>{alert.text || 'Unknown alert'}</div>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    });
+                                                                })()}
                                                                 {s.virtual_aton && (
                                                                     <div style={{ gridColumn: 'span 2', background: '#ff00ff', color: '#fff', padding: '4px', borderRadius: '4px', textAlign: 'center', fontSize: '0.75rem' }}>
                                                                         VIRTUAL AIS STATION
