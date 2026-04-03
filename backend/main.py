@@ -24,6 +24,14 @@ import io
 from ais_logic import AisStreamManager, get_ship_type_name, get_ship_category
 from dotenv import load_dotenv
 
+# Modular imports
+from utils.geo import haversine_distance, calculate_bearing
+from utils.mmsi import get_country_code_from_mmsi
+from utils.images import get_image_bytes, get_image_base64
+from routes.vessel_routes import setup_vessel_routes
+from routes.stats_routes import setup_stats_routes
+from routes.system_routes import setup_system_routes
+
 load_dotenv()
 
 # Configuration
@@ -392,81 +400,19 @@ async def aisstream_loop():
     except asyncio.CancelledError:
         logger.info("AisStream.io task cancelled.")
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    R = 6371.0
-    dLat = math.radians(lat2 - lat1)
-    dLon = math.radians(lon2 - lon1)
-    a = math.sin(dLat/2) * math.sin(dLat/2) + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dLon/2) * math.sin(dLon/2)
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    return R * c
+# haversine_distance -> moved to utils/geo.py
 
-def calculate_bearing(lat1, lon1, lat2, lon2):
-    rlat1 = math.radians(lat1)
-    rlat2 = math.radians(lat2)
-    rdlon = math.radians(lon2 - lon1)
-    y = math.sin(rdlon) * math.cos(rlat2)
-    x = math.cos(rlat1) * math.sin(rlat2) - math.sin(rlat1) * math.cos(rlat2) * math.cos(rdlon)
-    theta = math.atan2(y, x)
-    return (math.degrees(theta) + 360) % 360
+# calculate_bearing -> moved to utils/geo.py
 
-def get_country_code_from_mmsi(mmsi_str: str) -> str:
-    if not mmsi_str or len(mmsi_str) < 3: return None
-    mid = mmsi_str[:3]
-    mid_map = {
-        "201": "al", "202": "ad", "203": "at", "204": "pt", "205": "be", "206": "by", "207": "bg", "208": "va",
-        "209": "cy", "210": "cy", "212": "cy", "229": "mt", "215": "mt", "248": "mt", "249": "mt", "256": "mt",
-        "211": "de", "218": "de", "213": "ge", "214": "md", "216": "am", "219": "dk", "220": "dk", "231": "fo",
-        "224": "es", "225": "es", "226": "fr", "227": "fr", "228": "fr", "230": "fi", "232": "gb", "233": "gb",
-        "234": "gb", "235": "gb", "236": "gi", "237": "gr", "239": "gr", "240": "gr", "241": "gr", "238": "hr",
-        "242": "ma", "243": "hu", "244": "nl", "245": "nl", "246": "nl", "247": "it", "250": "ie", "251": "is",
-        "252": "li", "253": "lu", "254": "mc", "255": "pt", "257": "no", "258": "no", "259": "no", "261": "pl",
-        "262": "me", "263": "pt", "264": "ro", "265": "se", "266": "se", "267": "sk", "268": "sm", "269": "ch",
-        "270": "cz", "271": "tr", "272": "ua", "273": "ru", "274": "mk", "275": "lv", "276": "ee", "277": "lt",
-        "278": "si", "279": "rs", "301": "ai", "303": "us", "304": "ag", "305": "ag", "306": "bq", "307": "aw", 
-        "308": "bs", "309": "bs", "311": "bs", "310": "bm", "312": "bz", "314": "bb", "316": "ca", "319": "ky", 
-        "321": "cr", "323": "cu", "325": "dm", "327": "do", "329": "gp", "330": "gd", "331": "gl", "332": "gt", 
-        "334": "hn", "336": "ht", "338": "us", "366": "us", "367": "us", "368": "us", "369": "us", "339": "jm", 
-        "341": "kn", "343": "lc", "345": "mx", "347": "mq", "348": "ms", "350": "ni", "351": "pa", "352": "pa", 
-        "353": "pa", "354": "pa", "355": "pa", "356": "pa", "357": "pa", "370": "pa", "371": "pa", "372": "pa", 
-        "373": "pa", "358": "pr", "359": "sv", "361": "pm", "362": "tt", "378": "vg", "379": "vi", "401": "af", 
-        "405": "bd", "408": "bh", "410": "bt", "412": "cn", "413": "cn", "414": "cn", "416": "cn", "417": "ck", 
-        "418": "fj", "419": "pf", "421": "in", "423": "az", "427": "ir", "428": "iq", "431": "jp", "432": "jp", 
-        "434": "jp", "436": "jp", "437": "kr", "438": "kp", "440": "mo", "441": "my", "443": "mv", "445": "mu", 
-        "447": "mn", "449": "mm", "451": "np", "453": "om", "455": "pk", "457": "ph", "459": "qa", "461": "sa", 
-        "463": "sg", "466": "lk", "468": "sy", "470": "tw", "471": "th", "473": "tl", "475": "ae", "477": "vn", 
-        "478": "ba", "501": "tf", "503": "au", "508": "bn", "514": "kh", "515": "kh", "536": "mp", "559": "as",
-        "601": "za", "603": "ao", "605": "dz", "608": "sh", "609": "bi", "610": "bj", "611": "bw", "613": "cm",
-        "616": "km", "617": "cv", "618": "cf", "619": "td", "620": "cg", "621": "dj", "622": "eg", "624": "et",
-        "625": "er", "626": "gq", "627": "ga", "629": "gm", "630": "gh", "631": "gn", "632": "gw", "633": "bf",
-        "634": "ke", "635": "ls", "636": "lr", "637": "ly", "642": "mg", "644": "mw", "645": "ml", "647": "mr",
-        "649": "mu", "650": "mz", "654": "na", "655": "ne", "656": "ng", "657": "rw", "659": "sn", "660": "sc",
-        "661": "sl", "662": "so", "663": "sd", "664": "sz", "665": "tz", "666": "tg", "667": "tn", "668": "ug",
-        "669": "cd", "670": "zm", "671": "zw", "672": "na", "674": "tz", "675": "et", "676": "so", "677": "tz",
-        "678": "st", "679": "ci", "701": "ar", "710": "br", "720": "bo", "725": "cl", "730": "co", "735": "ec", 
-        "740": "fk", "745": "gy", "750": "py", "755": "pe", "760": "sr", "765": "uy", "770": "ve"
-    }
-    return mid_map.get(mid)
+# get_country_code_from_mmsi -> moved to utils/mmsi.py
 
+# get_image_bytes -> moved to utils/images.py
 def get_image_bytes(mmsi: str) -> bytes:
-    """Read image file and return its raw binary content."""
-    try:
-        image_path = os.path.join(IMAGES_DIR, f"{mmsi}.jpg")
-        if not os.path.exists(image_path):
-            image_path = os.path.join(IMAGES_DIR, "0.jpg")
-            
-        if os.path.exists(image_path):
-            with open(image_path, "rb") as f:
-                return f.read()
-    except Exception as e:
-        logger.error(f"Error reading image bytes for {mmsi}: {e}")
-    return None
+    return __import__('utils.images', fromlist=['get_image_bytes']).get_image_bytes(IMAGES_DIR, mmsi)
 
+# get_image_base64 -> moved to utils/images.py
 def get_image_base64(mmsi: str) -> str:
-    """Read image file and return its base64 encoded content."""
-    img_bytes = get_image_bytes(mmsi)
-    if img_bytes:
-        return base64.b64encode(img_bytes).decode('utf-8')
-    return None
+    return __import__('utils.images', fromlist=['get_image_base64']).get_image_base64(IMAGES_DIR, mmsi)
 
 async def handle_fallback_image(mmsi: str):
     source_file = os.path.join(IMAGES_DIR, '0.jpg')
