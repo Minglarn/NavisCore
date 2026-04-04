@@ -1884,8 +1884,8 @@ export default function App() {
                                                               </div>
                                                           )}
 
-                                                        {/* Special Indicators (Tropo, Emergency, Altitude) */}
-                                                        {((s.shiptype === 9 || s.is_sar) && s.altitude !== undefined) || s.is_emergency || (haversineDistance(originLat, originLon, s.lat, s.lon) > 74.08) ? (
+                                                        {/* Special Indicators (Tropo, Emergency, Altitude, Safety Alerts) */}
+                                                        {((s.shiptype === 9 || s.is_sar) && s.altitude !== undefined) || s.is_emergency || (haversineDistance(originLat, originLon, s.lat, s.lon) > 74.08) || safetyAlerts.some((a: any) => String(a.mmsi) === String(mmsiStr) && !a.dismissed && (Date.now() - (a.timestamp_ms || a.timestamp || 0)) < 3600000) ? (
                                                             <div style={{ padding: '6px 12px', borderTop: `1px solid ${colors.border}`, background: 'rgba(0,0,0,0.1)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                                                 {Boolean(s.shiptype === 9 || s.is_sar) && s.altitude !== undefined && (
                                                                     <div style={{ fontSize: '0.7rem', color: '#44aaff', fontWeight: 800, textAlign: 'center' }}>
@@ -1897,6 +1897,19 @@ export default function App() {
                                                                         ⚠️ EMERGENCY
                                                                     </div>
                                                                 )}
+                                                                {(() => {
+                                                                    const vesselAlerts = safetyAlerts.filter((a: any) => String(a.mmsi) === String(mmsiStr) && !a.dismissed && (Date.now() - (a.timestamp_ms || a.timestamp || 0)) < 3600000);
+                                                                    if (vesselAlerts.length === 0) return null;
+                                                                    const text = (vesselAlerts[0].text || '').toUpperCase();
+                                                                    const isCrit = ['MAYDAY','FIRE','SINKING','MAN OVERBOARD'].some(k => text.includes(k));
+                                                                    const isHigh = ['DANGER','WRECK','RESTRICTED'].some(k => text.includes(k));
+                                                                    const bg = isCrit ? '#ff0000' : isHigh ? '#ff6600' : '#f59e0b';
+                                                                    return (
+                                                                        <div style={{ background: bg, color: '#fff', padding: '3px 8px', borderRadius: '4px', fontSize: '0.7rem', fontWeight: 800, textAlign: 'center', animation: isCrit ? 'emergency-flash 1s infinite alternate' : undefined }}>
+                                                                            🔺 SAFETY: {vesselAlerts[0].text || 'ALERT'}
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                                 {(() => {
                                                                     const dist = haversineDistance(originLat, originLon, s.lat, s.lon);
                                                                     if (dist > 185.2) {
