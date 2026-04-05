@@ -26,6 +26,7 @@ from core.mqtt import mqtt_stats_reporter
 from routes.vessel_routes import setup_vessel_routes
 from routes.stats_routes import setup_stats_routes
 from routes.system_routes import setup_system_routes
+from routes.debug_routes import setup_debug_routes
 
 logger = logging.getLogger("NavisCore")
 
@@ -93,11 +94,17 @@ class UDPProtocol(asyncio.DatagramProtocol):
             logger.warning("AIS queue full! UDP message dropped.")
 
     def datagram_received(self, data, addr):
-        if MOCK_MODE: return
+        logger.debug(f"UDP packet received from {addr}: {len(data)} bytes")
+
+        if MOCK_MODE: 
+            logger.debug("MOCK_MODE is ON - dropping UDP packet")
+            return
         try:
             msg = data.decode('utf-8', errors='ignore').strip()
-        except Exception:
+        except Exception as e:
+            logger.error(f"UDP decode error: {e}")
             return
+
             
         now_ms = int(datetime.now().timestamp() * 1000)
         lines = msg.splitlines()
@@ -169,6 +176,8 @@ app.include_router(setup_system_routes(
     start_udp_listener, trigger_aisstream_restart, trigger_mqtt_pub_restart, trigger_mqtt_restart,
     DB_PATH, DATA_DIR, IMAGES_DIR, MOCK_MODE, is_true, udp_transport_getter
 ))
+app.include_router(setup_debug_routes(ais_queue, broadcast))
+
 
 
 @app.websocket("/ws")
@@ -185,7 +194,9 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.on_event("startup")
 async def startup_event():
+    logger.info(f"NavisCore starting up... MOCK_MODE={MOCK_MODE}, DB_PATH={DB_PATH}, UDP_PORT={UDP_PORT}")
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+
     if not os.path.exists(os.path.join(IMAGES_DIR, "0.jpg")) and os.path.exists("/app/backend/static/0.jpg"):
         shutil.copy2("/app/backend/static/0.jpg", os.path.join(IMAGES_DIR, "0.jpg"))
     async with db_session() as db:
@@ -213,8 +224,13 @@ async def startup_event():
             ('mqtt_pub_new_topic', os.getenv("MQTT_PUB_NEW_TOPIC", "naviscore/new_detected")),
             ('mqtt_pub_wait_for_name', 'false'),
             ('mqtt_pub_forward_udp', 'true'),
-            ('new_vessel_threshold', '5')
+            ('new_vessel_threshold', '5'),
+            ('ollama_enabled', 'true'),
+            ('ollama_url', 'http://192.168.1.239:11434/api/generate'),
+            ('ollama_model', 'gemma4-nothink2:latest'),
+            ('ollama_prompt', "Du är en maritim assistent. Baserat på denna AIS-data för ett fartyg, skriv en kort informationsmening (max 2 meningar) på svenska.\n\nInkludera detaljer som:\n- Nationalitet/Hemland baserat på {country_code} (t.ex. 'Det cypriska lastfartyget...')\n- Fartygstyp {ship_type_label} (på svenska)\n- Namn {name} och MMSI {mmsi}\n- Destination {destination}, Fart {sog} och Position {lat}, {lon}\n- När fartyget senast sågs. Dagens datum är {current_date}. Utgå från {last_seen_relative}.\n\nSvara endast med informationsmeningen, skippa inledningar som 'Här är...'.")
         ]:
+
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
         await db.execute('CREATE TABLE IF NOT EXISTS coverage_sectors (sector_id INTEGER PRIMARY KEY, range_km_24h REAL DEFAULT 0.0, range_km_alltime REAL DEFAULT 0.0, last_updated DATETIME)')
         await db.execute('CREATE TABLE IF NOT EXISTS daily_stats (date TEXT PRIMARY KEY, unique_ships INTEGER DEFAULT 0, new_ships INTEGER DEFAULT 0, total_messages INTEGER DEFAULT 0, max_range_km REAL DEFAULT 0.0)')

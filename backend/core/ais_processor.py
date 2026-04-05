@@ -79,7 +79,11 @@ async def process_ais_data(data: dict):
     mmsi_val = data.get("mmsi")
     if not mmsi_val: return
     mmsi_str = str(mmsi_val)
+    logger.debug(f"[AIS] Processing message type {data.get('type')} for MMSI {mmsi_str} from {data.get('source', 'unknown')}")
+
+
     lat, lon = data.get("lat"), data.get("lon")
+
     msg_type = data.get("type", 0)
     ship_name = data.get("shipname") or data.get("name")
     source = data.get("source", "local")
@@ -501,9 +505,11 @@ async def process_ais_data(data: dict):
                                     mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
 
                             if event_type == "new":
+                                logger.info(f"[AIS] Triggering NEW vessel notification for {mmsi_str}")
                                 asyncio.create_task(notify_new_vessel(mmsi_str, pub_payload, settings))
                             elif should_send_mqtt:
                                 mqtt_pub_queue.put_nowait(pub_payload)
+
 
                 except Exception as e:
                     logger.error(f"Error queuing MQTT pub message: {e}")

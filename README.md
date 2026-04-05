@@ -21,6 +21,29 @@
 - **Advanced Visualization**: Sleek, high-performance map featuring real-time tracking, COG lines, and persistent user settings (zoom, center, layer preferences).
 - **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, including a **high-precision live timer** that updates every 10 seconds for sub-minute accuracy.
 - **Automated Data Maintenance**: Configurable auto-purge system that cleans up old vessel records and images to maintain peak database performance.
+- **🤖 AI Intelligence (Ollama)**: Integrated local AI summaries for new vessels. NavisCore uses **Ollama** to generate natural language descriptions of ships based on real-time AIS data.
+
+## 🤖 AI Intelligence (Ollama)
+
+NavisCore features a built-in AI enrichment engine that transforms raw AIS data into human-readable summaries.
+
+### 🧠 Local LLM Integration
+Experience maritime situational awareness like never before with local Large Language Models.
+- **Privacy First**: All AI processing happens locally on your hardware via [Ollama](https://ollama.com).
+- **Dynamic Summaries**: Get concise descriptions like *"The Swedish tanker NEPTUNE is heading to Visby. Was last seen today at 14:20."*
+- **Optimized Performance**: Pre-configured to use **reasoning-off** and **minified payloads**, providing responses in under 10-15 seconds.
+
+### 📝 Dynamic Prompt Editor
+Total control over your AI's personality. Access the editor via **Settings -> AI / Ollama**.
+- **Placeholders**: Use any field from the MQTT payload directly in your prompt using `{curly_brackets}`.
+- **Rich Variables**: Access over 30+ variables including `{name}`, `{mmsi}`, `{sog}`, `{destination}`, `{last_seen_relative}`, and many more.
+- **Live Guide**: Built-in variable guide helps you craft the perfect prompt with one-click insertion.
+
+### 🚀 Recommended Models
+For the best balance between speed and quality, we recommend:
+1. **gemma4-nothink2:latest** (Fastest & most stable)
+2. **gemma4-fast:latest** (Great general performance)
+3. **gemma-analytisk:latest** (More detailed analysis)
 
 ## 🧭 UI Visual Indicators
 

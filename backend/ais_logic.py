@@ -954,7 +954,11 @@ class AisStreamManager:
 
         if total_fragments == 1:
             padding = int(parts[6][0]) if len(parts) > 6 and parts[6] else 0
+            logger.debug(f"[AIS Logic] Decoding single-fragment sentence: {payload}")
             self._decode_payload(payload, [sentence], channel=channel, padding=padding)
+
+
+
         else:
             key = (sequence_id, channel)
             if key not in self.buffer:

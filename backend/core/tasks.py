@@ -27,8 +27,10 @@ async def ais_processing_worker():
         try:
             if _ais_queue:
                 data = await _ais_queue.get()
+                logger.debug(f"Worker processing item for MMSI {data.get('mmsi')}")
                 await process_ais_data(data)
                 _ais_queue.task_done()
+
             else:
                 await asyncio.sleep(1)
         except Exception as e:

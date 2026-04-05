@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Activity, AlertTriangle, Anchor, ArrowDownLeft, ArrowUpRight, BarChart2, Bell, Calendar, Check, ChevronDown, ChevronUp, Crosshair, Database, Download, Edit, Globe, Info, LayoutGrid, List, Moon, Navigation, Plus, Radar, Radio, RefreshCw, Rows, Save, Search, Settings, Ship, Signal, Sun, Terminal, Trash2, TrendingUp, Upload, User, Wifi, X } from 'lucide-react';
+import { Activity, AlertTriangle, Anchor, ArrowDownLeft, ArrowUpRight, BarChart2, Bell, Calendar, Check, ChevronDown, ChevronUp, Cpu, Crosshair, Database, Download, Edit, Globe, Info, LayoutGrid, List, Moon, Navigation, Plus, Radar, Radio, RefreshCw, Rows, Save, Search, Settings, Ship, Signal, Sun, Terminal, Trash2, TrendingUp, Upload, User, Wifi, X } from 'lucide-react';
 import Toggle from '../ui/Toggle';
 import { MultiSelect } from '../ui/MultiSelect';
 
@@ -15,6 +15,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
         { id: 'coverage', label: 'Coverage', icon: <Activity size={18} />, title: 'Coverage & Statistics', desc: 'Monitor system range and reset historical performance data.' },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} />, title: 'SDR Hardware Tuning', desc: 'Fine-tune your RTL-SDR frequency and gain settings (requires restart).' },
         { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} />, title: 'Hybrid Data Sources', desc: 'Configure AisStream.io integration and local NMEA UDP ingest.' },
+        { id: 'ai', label: 'AI / Ollama', icon: <Cpu size={18} />, title: 'AI & Ollama Integration', desc: 'Power your vessel descriptions and safety analysis with local AI models.' },
         { id: 'data', label: 'Database & Images', icon: <Database size={18} />, title: 'Database & Image Management', desc: 'Manage stored data, clear history and configure automatic purging rules.' },
     ];
 
@@ -617,6 +618,185 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                 onChange={e => setSettings({ ...settings, udp_port: e.target.value })} 
                                                 style={{ width: '100px' }}
                                             />
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'ai' && (
+                                <div className="settings-grid">
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Cpu size={14} /> AI Processing (Ollama)</div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Enable AI Descriptions</label>
+                                                <div className="description">Use local LLM to generate natural language vessel summaries</div>
+                                            </div>
+                                            <Toggle
+                                                checked={settings.ollama_enabled === 'true'}
+                                                onChange={val => setSettings({ ...settings, ollama_enabled: String(val) })}
+                                            />
+                                        </div>
+
+                                        <div className="form-group-premium vertical">
+                                            <label>Ollama API URL</label>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <input 
+                                                    type="text" 
+                                                    className="input-premium" 
+                                                    placeholder="http://192.168.1.xxx:11434" 
+                                                    value={settings.ollama_url} 
+                                                    onChange={e => setSettings({ ...settings, ollama_url: e.target.value })} 
+                                                    style={{ flex: 1 }} 
+                                                />
+                                                <div 
+                                                    className="status-badge" 
+                                                    style={{ 
+                                                        background: settings.ollama_enabled === 'true' ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
+                                                        color: settings.ollama_enabled === 'true' ? '#10b981' : colors.textMuted,
+                                                        padding: '0 12px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        fontSize: '0.7rem',
+                                                        fontWeight: 700,
+                                                        borderRadius: '6px',
+                                                        border: `1px solid ${settings.ollama_enabled === 'true' ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.1)'}`
+                                                    }}
+                                                >
+                                                    {settings.ollama_enabled === 'true' ? 'ACTIVE' : 'DISABLED'}
+                                                </div>
+                                            </div>
+                                            <div className="description" style={{ marginTop: '5px' }}>
+                                                The local or network address for your Ollama instance.
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group-premium vertical">
+                                            <label>AI Model Name</label>
+                                            <input 
+                                                type="text" 
+                                                className="input-premium" 
+                                                placeholder="gemma4-nothink2:latest" 
+                                                value={settings.ollama_model} 
+                                                onChange={e => setSettings({ ...settings, ollama_model: e.target.value })} 
+                                                style={{ width: '100%' }} 
+                                            />
+                                            <div className="description" style={{ marginTop: '5px' }}>
+                                                We recommend <strong>gemma4-nothink2:latest</strong> for best accuracy and performance.
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                <label>AI Summary Prompt Template</label>
+                                                <button 
+                                                    onClick={() => {
+                                                        const defaultPrompt = "Du är en maritim assistent. Baserat på denna AIS-data för ett fartyg, skriv en kort informationsmening (max 2 meningar) på svenska.\n\nInkludera detaljer som:\n- Nationalitet/Hemland baserat på {country_code} (t.ex. 'Det cypriska lastfartyget...')\n- Fartygstyp {ship_type_label} (på svenska)\n- Namn {name} och MMSI {mmsi}\n- Destination {destination}, Fart {sog} och Position {lat}, {lon}\n- När fartyget senast sågs. Dagens datum är {current_date}. Utgå från {last_seen_relative}.\n\nSvara endast med informationsmeningen, skippa inledningar som 'Här är...'.";
+                                                        setSettings({ ...settings, ollama_prompt: defaultPrompt });
+                                                    }}
+                                                    style={{ 
+                                                        background: 'transparent', 
+                                                        border: 'none', 
+                                                        color: '#44aaff', 
+                                                        fontSize: '0.75rem', 
+                                                        fontWeight: 700, 
+                                                        cursor: 'pointer',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '4px'
+                                                    }}
+                                                >
+                                                    <RefreshCw size={12} /> Reset to Default
+                                                </button>
+                                            </div>
+                                            <textarea 
+                                                className="input-premium" 
+                                                rows={8}
+                                                value={settings.ollama_prompt} 
+                                                onChange={e => setSettings({ ...settings, ollama_prompt: e.target.value })} 
+                                                style={{ 
+                                                    width: '100%', 
+                                                    fontFamily: 'monospace', 
+                                                    fontSize: '0.85rem', 
+                                                    lineHeight: '1.5',
+                                                    resize: 'vertical',
+                                                    padding: '12px'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div style={{ marginTop: '20px' }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: colors.textMuted, marginBottom: '12px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Terminal size={14} /> Available Data Variables
+                                            </div>
+                                            <div style={{ 
+                                                display: 'grid', 
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
+                                                gap: '8px',
+                                                maxHeight: '150px',
+                                                overflowY: 'auto',
+                                                padding: '10px',
+                                                background: 'rgba(0,0,0,0.2)',
+                                                borderRadius: '8px',
+                                                border: `1px solid ${colors.border}`
+                                            }}>
+                                                {[
+                                                    {t:'{name}', d:'Vessel Name'}, {t:'{mmsi}', d:'MMSI Number'}, 
+                                                    {t:'{country_code}', d:'Country Code'}, {t:'{ship_type_label}', d:'Vessel Type'},
+                                                    {t:'{destination}', d:'Destination'}, {t:'{sog}', d:'Speed (knots)'},
+                                                    {t:'{lat}', d:'Latitude'}, {t:'{lon}', d:'Longitude'},
+                                                    {t:'{callsign}', d:'Radio Callsign'}, {t:'{imo}', d:'IMO Number'},
+                                                    {t:'{status_text}', d:'Nav Status'}, {t:'{length}', d:'Length (m)'},
+                                                    {t:'{width}', d:'Width (m)'}, {t:'{draught}', d:'Draught (m)'},
+                                                    {t:'{last_seen_relative}', d:'Relative Time'}, {t:'{current_date}', d:'Today\'s Date'},
+                                                    {t:'{ais_channel}', d:'AIS Ch'}, {t:'{cog}', d:'Course (COG)'},
+                                                    {t:'{wind_speed}', d:'Wind Speed'}, {t:'{air_temp}', d:'Air Temp'}
+                                                ].map(item => (
+                                                    <div 
+                                                        key={item.t} 
+                                                        onClick={() => {
+                                                            const textarea = document.querySelector('textarea');
+                                                            if (textarea) {
+                                                                const start = textarea.selectionStart;
+                                                                const end = textarea.selectionEnd;
+                                                                const text = settings.ollama_prompt || "";
+                                                                const newText = text.substring(0, start) + item.t + text.substring(end);
+                                                                setSettings({ ...settings, ollama_prompt: newText });
+                                                                // Focus back after state update would be better here but slightly complex in one-shot
+                                                            }
+                                                        }}
+                                                        style={{ 
+                                                            fontSize: '0.7rem', 
+                                                            padding: '6px 8px', 
+                                                            background: 'rgba(68,170,255,0.05)', 
+                                                            border: '1px solid rgba(68,170,255,0.1)',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            gap: '2px'
+                                                        }}
+                                                        title={`Click to insert ${item.t}`}
+                                                    >
+                                                        <span style={{ color: '#44aaff', fontWeight: 700 }}>{item.t}</span>
+                                                        <span style={{ color: colors.textMuted, fontSize: '0.6rem' }}>{item.d}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(68,170,255,0.05)', borderRadius: '10px', border: '1px solid rgba(68,170,255,0.1)' }}>
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <div style={{ background: 'rgba(68,170,255,0.1)', padding: '8px', borderRadius: '8px', height: 'fit-content' }}>
+                                                    <Info size={18} color="#44aaff" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#44aaff', marginBottom: '4px' }}>AI Optimization Active</div>
+                                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5 }}>
+                                                        The system is now configured to use <strong>reasoning: False</strong> and <strong>minified payloads</strong>, providing vessel descriptions in under 10 seconds.
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

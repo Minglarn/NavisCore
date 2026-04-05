@@ -10,7 +10,8 @@ async def db_session():
     """
     async with aiosqlite.connect(DB_PATH, timeout=60.0) as db:
         try:
-            await db.execute('PRAGMA journal_mode=WAL')
+            await db.execute('PRAGMA journal_mode=DELETE')
+
         except Exception:
             pass
         await db.execute('PRAGMA busy_timeout=60000')

@@ -9,6 +9,7 @@ from utils.settings import get_all_settings, is_true
 from utils.db import db_session
 from utils.stats import stats_collector
 from utils.images import get_image_bytes
+from utils.ollama import fetch_ollama_short_info
 
 logger = logging.getLogger("NavisCore")
 
@@ -204,30 +205,47 @@ async def mqtt_stats_reporter():
 
 async def notify_new_vessel(mmsi_str, pub_payload, settings):
     """Called by ais_processor to handle deduplication for NEW vessels."""
-    async with mqtt_new_vessel_lock:
-        fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
-        now_ts = time.time()
-        
-        is_already_handled = False
-        if mmsi_str in mqtt_last_sent:
-            time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
-            if time_since < 10:
-                is_already_handled = True
-            elif mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30:
-                is_already_handled = True
+    logger.info(f"[MQTT] Entering notify_new_vessel for MMSI {mmsi_str} (Source: {pub_payload.get('source')})")
+    is_already_handled = False
+    now_ts = time.time()
+    fingerprint = f"{round(pub_payload.get('lat') or 0, 4)}|{round(pub_payload.get('lon') or 0, 4)}|{pub_payload.get('sog')}|{pub_payload.get('cog')}|{pub_payload.get('nav_status')}"
+
+    # Vi kollar databasen för att se om vi redan markerat detta som ett skickat 'nytt' fartyg.
+    db_new_sent = False
+    try:
+        async with db_session() as db:
+            async with db.execute("SELECT mqtt_new_sent FROM ships WHERE mmsi = ?", (mmsi_str,)) as cursor:
+                row_db = await cursor.fetchone()
+                if row_db:
+                    db_new_sent = bool(row_db[0])
+                    logger.debug(f"[MQTT] Found vessel {mmsi_str} in DB, mqtt_new_sent={db_new_sent}")
+                else:
+                    db_new_sent = False # Nytt fartyg
+                    logger.debug(f"[MQTT] Vessel {mmsi_str} NOT found in DB. Treating as NEW.")
+    except Exception as dbe:
+        logger.error(f"[MQTT] Database error in notify_new_vessel for {mmsi_str}: {dbe}")
+        # Vid DB-fel, anta att vi inte skickat den (fail safe för att tillåta triggers)
+        db_new_sent = False
                 
-        if not is_already_handled:
-            async with db_session() as db:
-                async with db.execute("SELECT mqtt_new_sent FROM ships WHERE mmsi = ?", (mmsi_str,)) as cursor:
-                    row_recheck = await cursor.fetchone()
-                    if row_recheck and bool(row_recheck[0]):
-                        is_already_handled = True
+    async with mqtt_new_vessel_lock:
+        if db_new_sent:
+            # Om den redan är skickad som 'ny' enligt DB, kolla cachen för att undvika spam-updates
+            if mmsi_str in mqtt_last_sent:
+                time_since = now_ts - mqtt_last_sent[mmsi_str]["timestamp"]
+                if time_since < 10:
+                    is_already_handled = True
+                    logger.debug(f"[MQTT] Vessel {mmsi_str} handled recently (<10s).")
+                elif mqtt_last_sent[mmsi_str]["fingerprint"] == fingerprint and time_since < 30:
+                    is_already_handled = True
+                    logger.debug(f"[MQTT] Vessel {mmsi_str} identical state handled recently (<30s).")
 
         if is_already_handled:
             if is_true(settings.get("mqtt_pub_only_new")):
                 return
-                
+            
+            logger.info(f"[MQTT] Sending UPDATE instead of NEW for MMSI {mmsi_str}")
             pub_payload["event_type"] = "update"
+
             should_send_mqtt = True
             
             if mmsi_str in mqtt_last_sent:
@@ -238,21 +256,59 @@ async def notify_new_vessel(mmsi_str, pub_payload, settings):
             if should_send_mqtt:
                 mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
                 mqtt_pub_queue.put_nowait(pub_payload)
-        else:
-            mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
-            
-            base_topic = settings.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
-            prefix = base_topic.rsplit("/", 1)[0] if base_topic.endswith("/objects") else base_topic
-            new_topic = f"{prefix}/new_detected"
-            
-            img_bytes = get_image_bytes(mmsi_str)
-            if img_bytes:
-                mqtt_pub_queue.put_nowait((new_topic, img_bytes))
-            else:
-                mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
-            
-            await asyncio.sleep(5) # Let the frontend fetch image first
-            mqtt_pub_queue.put_nowait(pub_payload)
+            return
+
+        # Not handled yet - we are sending as 'new'
+        # Om vi inte har ett namn ännu, så vill vi inte låsa detta som "skickat" i DB.
+        # Genom att inte sätta mqtt_new_sent = 1 så tillåter vi nästa meddelande (t.ex. Typ 5 som har namnet)
+        # att trigga denna funktion som 'new' igen, vilket då inkluderar Ollama-anropet.
+        has_name = pub_payload.get("name") and pub_payload.get("name").upper() != "UNKNOWN"
+        
+        mqtt_last_sent[mmsi_str] = {"timestamp": now_ts, "fingerprint": fingerprint}
+        
+        if has_name:
             async with db_session() as db:
                 await db.execute("UPDATE ships SET mqtt_new_sent = 1 WHERE mmsi = ?", (mmsi_str,))
                 await db.commit()
+        else:
+            logger.debug(f"[MQTT] New vessel {mmsi_str} detected but lacks name. Not marking as 'sent' in DB yet to allow Ollama trigger later.")
+
+
+    # -- UTANFÖR LÅSET (för asynkrona time-consuming tasks) --
+    base_topic = settings.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
+    prefix = base_topic.rsplit("/", 1)[0] if base_topic.endswith("/objects") else base_topic
+    new_topic = f"{prefix}/new_detected"
+    
+    # Hämtar ev. bild tidigt
+    img_bytes = get_image_bytes(mmsi_str)
+    
+    # Hämta Ollama sammanfattning (om aktiverat)
+    ollama_enabled = is_true(settings.get("ollama_enabled", "true"))
+    ollama_url = settings.get("ollama_url")
+    ollama_model = settings.get("ollama_model")
+    ollama_prompt = settings.get("ollama_prompt")
+    
+    short_info_task = None
+    if ollama_enabled and ollama_url and ollama_model:
+        short_info_task = asyncio.create_task(fetch_ollama_short_info(pub_payload, ollama_url, ollama_model, ollama_prompt))
+        # Vi väntar en kort stund för att ge Ollama chansen att svara
+        await asyncio.sleep(2)
+        
+    try:
+        if short_info_task:
+            # Ge Ollama chansen att svara innan vi skickar ut de publika meddelandena
+            short_info = await asyncio.wait_for(short_info_task, timeout=120.0)
+            if short_info:
+                pub_payload["short_info"] = short_info
+    except Exception as e:
+        logger.error(f"[MQTT] Ollama fetch failed or timed out: {e}")
+
+
+
+    # NU publicerar vi (en gång per händelse, med AI-infon inbakad om den hann bli klar)
+    if img_bytes:
+        mqtt_pub_queue.put_nowait((new_topic, img_bytes))
+    else:
+        mqtt_pub_queue.put_nowait((new_topic, json.dumps({"mmsi": mmsi_str, "event": "new_detected"})))
+        
+    mqtt_pub_queue.put_nowait(pub_payload)
