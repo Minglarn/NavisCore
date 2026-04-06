@@ -8,9 +8,10 @@ import random
 from datetime import datetime
 
 # Inställningar
-MODEL = "gemma-analytisk:latest"
+MODEL = "gemma-4-26b-a4b-moe"
 ITERATIONS = 10
 # Uppdaterad URL för OpenAI-kompatibelt API i Ollama
+# http://192.168.1.239:11434/api/generate <-- Om vi använder OLLAMA!!!
 OLLAMA_API_URL = "http://192.168.1.239:11434/v1/chat/completions"
 
 # Data-pooler för slumpmässiga fartyg
@@ -52,7 +53,7 @@ async def call_ollama(session, payload, current_date):
     # OpenAI-format kräver meddelanden i en lista
     system_prompt = (
         "Du är en maritim assistent. Baserat på AIS-data för ett fartyg, "
-        "skriv en kort informationsmening (max 2 meningar) på svenska."
+        "skriv en kort informationsmening (max 2 meningar) på engelska."
     )
     
     user_content = (
@@ -62,6 +63,7 @@ async def call_ollama(session, payload, current_date):
         f"- Destination, Fart och Position\n"
         f"- Senast sedd relativt till dagens datum ({current_date}).\n\n"
         f"Data: {json.dumps(payload)}"
+        "Respond only with the information sentence, skip introductions like 'Here is...'."
     )
 
     # Payload enligt OpenAI API standard

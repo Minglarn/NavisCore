@@ -296,21 +296,20 @@ async def notify_new_vessel(mmsi_str, pub_payload, settings):
     # Hämta Ollama sammanfattning (om aktiverat)
     ollama_enabled = is_true(settings.get("ollama_enabled", "true"))
     ollama_url = settings.get("ollama_url")
-    ollama_model = settings.get("ollama_model")
-    ollama_prompt = settings.get("ollama_prompt")
+    ollama_api_type = settings.get("ollama_api_type", "native")
     
     short_info_task = None
     if ollama_enabled and ollama_url and ollama_model:
-        short_info_task = asyncio.create_task(fetch_ollama_short_info(pub_payload, ollama_url, ollama_model, ollama_prompt))
+        short_info_task = asyncio.create_task(fetch_ollama_short_info(pub_payload, ollama_url, ollama_model, ollama_prompt, ollama_api_type))
         # Vi väntar en kort stund för att ge Ollama chansen att svara
         await asyncio.sleep(2)
         
     try:
         if short_info_task:
             # Ge Ollama chansen att svara innan vi skickar ut de publika meddelandena
-            short_info = await asyncio.wait_for(short_info_task, timeout=120.0)
-            if short_info:
-                pub_payload["short_info"] = short_info
+            ai_data = await asyncio.wait_for(short_info_task, timeout=120.0)
+            if ai_data and isinstance(ai_data, dict):
+                pub_payload["short_info"] = ai_data.get("response", "")
     except Exception as e:
         logger.error(f"[MQTT] Ollama fetch failed or timed out: {e}")
 

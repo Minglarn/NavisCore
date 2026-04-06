@@ -8,7 +8,7 @@ import random
 from datetime import datetime
 
 # Settings
-MODEL = "gemma4-nothink2:latest"
+MODEL = "gemma4:latest"
 ITERATIONS = 10
 DB_PATH = "backend/data/naviscore.db"
 

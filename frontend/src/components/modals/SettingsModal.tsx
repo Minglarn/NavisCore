@@ -5,31 +5,36 @@ import { MultiSelect } from '../ui/MultiSelect';
 
 export default function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme, setIsRestarting, isMobile }: any) {
     const [isTestingAI, setIsTestingAI] = useState(false);
-    const [testAIResponse, setTestAIResponse] = useState<string | null>(null);
+    const [testAIResponse, setTestAIResponse] = useState<any | null>(null);
 
     const handleTestAI = async () => {
         setIsTestingAI(true);
         setTestAIResponse(null);
         try {
-            const isDev = window.location.port === '5173';
-            const url = isDev ? 'http://127.0.0.1:8080/api/settings/test_ollama' : '/api/settings/test_ollama';
-            const res = await fetch(url, {
+            const API_BASE = window.location.port === '5173' ? 'http://127.0.0.1:8080' : '';
+            const response = await fetch(`${API_BASE}/api/settings/test_ollama`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     url: settings.ollama_url,
                     model: settings.ollama_model,
-                    prompt: settings.ollama_prompt
+                    prompt: settings.ollama_prompt,
+                    api_type: settings.ollama_api_type || 'native'
                 })
             });
-            const data = await res.json();
+            const data = await response.json();
+            setIsTestingAI(false);
+            
             if (data.success) {
-                setTestAIResponse(data.response);
+                setTestAIResponse({
+                    text: data.response,
+                    stats: data.stats
+                });
             } else {
-                setTestAIResponse("Error: " + (data.error || "Unknown error"));
+                setTestAIResponse({ error: data.error || 'Unknown error occurred' });
             }
         } catch (err) {
-            setTestAIResponse("Failed to connect to backend test endpoint.");
+            setTestAIResponse({ error: "Failed to connect to backend test endpoint." });
         } finally {
             setIsTestingAI(false);
         }
@@ -45,7 +50,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
         { id: 'coverage', label: 'Coverage', icon: <Activity size={18} />, title: 'Coverage & Statistics', desc: 'Monitor system range and reset historical performance data.' },
         { id: 'sdr', label: 'SDR Tuning', icon: <Radio size={18} />, title: 'SDR Hardware Tuning', desc: 'Fine-tune your RTL-SDR frequency and gain settings (requires restart).' },
         { id: 'hybrid', label: 'Hybrid Data', icon: <Globe size={18} />, title: 'Hybrid Data Sources', desc: 'Configure AisStream.io integration and local NMEA UDP ingest.' },
-        { id: 'ai', label: 'AI / Ollama', icon: <Cpu size={18} />, title: 'AI & Ollama Integration', desc: 'Power your vessel descriptions and safety analysis with local AI models.' },
+        { id: 'ai', label: 'Local AI', icon: <Cpu size={18} />, title: 'Local AI Integration', desc: 'Power your vessel descriptions and safety analysis with local AI models (Ollama, LM Studio).' },
         { id: 'data', label: 'Database & Images', icon: <Database size={18} />, title: 'Database & Image Management', desc: 'Manage stored data, clear history and configure automatic purging rules.' },
     ];
 
@@ -656,7 +661,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                             {activeTab === 'ai' && (
                                 <div className="settings-grid">
                                     <div className="settings-card">
-                                        <div className="settings-card-title"><Cpu size={14} /> AI Processing (Ollama)</div>
+                                        <div className="settings-card-title"><Cpu size={14} /> Local AI Integration</div>
                                         <div className="form-group-premium">
                                             <div>
                                                 <label>Enable AI Descriptions</label>
@@ -669,7 +674,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                         </div>
 
                                         <div className="form-group-premium vertical">
-                                            <label>Ollama API URL</label>
+                                            <label>Service API URL</label>
                                             <div style={{ display: 'flex', gap: '10px' }}>
                                                 <input 
                                                     type="text" 
@@ -679,25 +684,25 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                     onChange={e => setSettings({ ...settings, ollama_url: e.target.value })} 
                                                     style={{ flex: 1 }} 
                                                 />
-                                                <div 
-                                                    className="status-badge" 
-                                                    style={{ 
-                                                        background: settings.ollama_enabled === 'true' ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.05)',
-                                                        color: settings.ollama_enabled === 'true' ? '#10b981' : colors.textMuted,
-                                                        padding: '0 12px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        fontSize: '0.7rem',
-                                                        fontWeight: 700,
-                                                        borderRadius: '6px',
-                                                        border: `1px solid ${settings.ollama_enabled === 'true' ? 'rgba(16,185,129,0.2)' : 'rgba(255,255,255,0.1)'}`
-                                                    }}
-                                                >
-                                                    {settings.ollama_enabled === 'true' ? 'ACTIVE' : 'DISABLED'}
-                                                </div>
                                             </div>
                                             <div className="description" style={{ marginTop: '5px' }}>
-                                                The local or network address for your Ollama instance.
+                                                The base URL for your AI service. For LM Studio, usually ends in <code>/v1</code>.
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group-premium vertical">
+                                            <label>AI API Type</label>
+                                            <select 
+                                                className="input-premium"
+                                                value={settings.ollama_api_type || 'native'}
+                                                onChange={e => setSettings({ ...settings, ollama_api_type: e.target.value })}
+                                                style={{ width: '100%', background: 'rgba(255,255,255,0.05)', color: colors.text }}
+                                            >
+                                                <option value="native">Ollama (Native /api/generate)</option>
+                                                <option value="openai">OpenAI / LM Studio (/v1/chat/completions)</option>
+                                            </select>
+                                            <div className="description" style={{ marginTop: '5px' }}>
+                                                Choose <strong>Ollama Native</strong> for default Ollama installs, or <strong>OpenAI</strong> for LM Studio, LocalAI, or Ollama's compatibility mode.
                                             </div>
                                         </div>
 
@@ -764,17 +769,52 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                 <div style={{ 
                                                     marginBottom: '12px', 
                                                     padding: '12px', 
-                                                    background: testAIResponse.startsWith('Error') ? 'rgba(255,68,68,0.1)' : 'rgba(16,185,129,0.1)', 
-                                                    border: `1px solid ${testAIResponse.startsWith('Error') ? 'rgba(255,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                                                    background: testAIResponse.error ? 'rgba(255,68,68,0.1)' : 'rgba(16,185,129,0.1)', 
+                                                    border: `1px solid ${testAIResponse.error ? 'rgba(255,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
                                                     borderRadius: '8px',
                                                     fontSize: '0.8rem',
                                                     color: colors.textMain,
                                                     lineHeight: '1.4'
                                                 }}>
-                                                    <div style={{ fontWeight: 800, fontSize: '0.65rem', textTransform: 'uppercase', marginBottom: '5px', opacity: 0.7 }}>
-                                                        {testAIResponse.startsWith('Error') ? 'Test Failed' : 'AI Response Preview'}
+                                                    <div style={{ fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '8px', opacity: 0.9, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span>{testAIResponse.error ? 'Test Failed' : 'AI Response Preview'}</span>
+                                                        {testAIResponse.stats && (
+                                                            <span style={{ 
+                                                                color: '#10b981', 
+                                                                background: 'rgba(16,185,129,0.2)', 
+                                                                padding: '2px 8px', 
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.75rem'
+                                                            }}>
+                                                                {(testAIResponse.stats.duration_ms / 1000).toFixed(2)}s
+                                                            </span>
+                                                        )}
                                                     </div>
-                                                    {testAIResponse}
+                                                    
+                                                    {testAIResponse.error ? (
+                                                        <div style={{ color: '#ff4444' }}>{testAIResponse.error}</div>
+                                                    ) : (
+                                                        <>
+                                                            <div style={{ marginBottom: testAIResponse.stats ? '10px' : '0' }}>{testAIResponse.text}</div>
+                                                            {testAIResponse.stats && (
+                                                                <div style={{ 
+                                                                    display: 'flex', 
+                                                                    gap: '15px', 
+                                                                    fontSize: '0.65rem', 
+                                                                    paddingTop: '8px', 
+                                                                    borderTop: '1px solid rgba(255,255,255,0.05)',
+                                                                    color: colors.textMuted 
+                                                                }}>
+                                                                    {testAIResponse.stats.total_tokens && (
+                                                                        <span>Tokens: <strong>{testAIResponse.stats.total_tokens}</strong> ({testAIResponse.stats.prompt_tokens}p + {testAIResponse.stats.completion_tokens}r)</span>
+                                                                    )}
+                                                                    {testAIResponse.stats.eval_count && (
+                                                                        <span>Eval: <strong>{testAIResponse.stats.eval_count}</strong> tokens ({testAIResponse.stats.prompt_eval_count}p)</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
                                             <textarea 

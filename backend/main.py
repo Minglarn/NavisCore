@@ -227,6 +227,7 @@ async def startup_event():
             ('new_vessel_threshold', '5'),
             ('ollama_enabled', 'true'),
             ('ollama_url', 'http://192.168.1.239:11434/api/generate'),
+            ('ollama_api_type', 'native'),
             ('ollama_model', 'gemma4-nothink2:latest'),
             ('ollama_prompt', "You are a maritime assistant. Based on this AIS data for a vessel in JSON format, write a short information sentence (max 2 sentences) in English.\n\nInclude details such as:\n- Nationality/Home country based on 'country_adjective' and 'country_code'. Put the country code in parentheses after the country name.\n- Vessel type {ship_type_label} and Status '{status_text}'\n- Name {name} and MMSI {mmsi}\n- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n- When the vessel was last seen. Today's date is {current_date}. Base it on {last_seen_relative}.\n\nRespond only with the information sentence, skip introductions like 'Here is...'.")
         ]:

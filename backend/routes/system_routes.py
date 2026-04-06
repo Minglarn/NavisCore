@@ -173,11 +173,12 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
         url = config.get("url")
         model = config.get("model")
         prompt = config.get("prompt")
+        api_type = config.get("api_type", "native")
         
         try:
-            result = await fetch_ollama_short_info(test_payload, url, model, prompt)
+            result = await fetch_ollama_short_info(test_payload, url, model, prompt, api_type)
             if result:
-                return {"success": True, "response": result}
+                return {"success": True, **result}
             else:
                 return {"success": False, "error": "No response from AI model. Check URL/Model or Logs."}
         except Exception as e:

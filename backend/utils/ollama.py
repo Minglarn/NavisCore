@@ -2,6 +2,7 @@ import aiohttp
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime
 
 logger = logging.getLogger("NavisCore")
@@ -37,10 +38,10 @@ def get_relative_time_string(timestamp_ms):
     except Exception:
         return "unknown time"
 
-async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_template: str = None) -> str:
+async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native') -> dict:
     """
-    Anropar lokala OLLAMA för att skapa en kort sammanfattning av AIS-datan.
-    Returnerar texten från modellen, eller None om det misslyckas.
+    Calls the local AI service (Ollama or OpenAI-compatible) and returns a summary plus metrics.
+    Returns: {"response": "...", "stats": {"duration_ms": ..., "tokens": ...}}
     """
     if not url or not model:
         logger.error("[Ollama] Saknas URL eller modell-namn i inställningarna.")
@@ -103,32 +104,76 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
                 val_str = str(value) if value is not None else ""
                 final_prompt = final_prompt.replace(placeholder, val_str)
 
-        request_data = {
-            "model": model,
-            "prompt": final_prompt,
-            "stream": False,
-            "reasoning": False,
-            "think": False,
-            "options": {
-                "num_ctx": 8192,
+        if api_type == 'openai':
+            # Auto-adjust URL if it looks like a base URL
+            final_url = url
+            if not final_url.endswith('/chat/completions') and not final_url.endswith('/completions'):
+                base = final_url.rstrip('/')
+                if not base.endswith('/v1'):
+                    base += '/v1'
+                final_url = base + '/chat/completions'
+            
+            request_data = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful maritime assistant."},
+                    {"role": "user", "content": final_prompt}
+                ],
+                "stream": False,
                 "temperature": 0.2,
-                "num_predict": 300
+                "max_tokens": 300
             }
-        }
+        else:
+            final_url = url
+            request_data = {
+                "model": model,
+                "prompt": final_prompt,
+                "stream": False,
+                "options": {
+                    "num_ctx": 8192,
+                    "temperature": 0.2,
+                    "num_predict": 300
+                }
+            }
 
+        start_time = time.time()
         try:
             connector = aiohttp.TCPConnector(limit=10)
             async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.post(url, json=request_data, timeout=aiohttp.ClientTimeout(total=45)) as response:
+                async with session.post(final_url, json=request_data, timeout=aiohttp.ClientTimeout(total=45)) as response:
+                    duration_ms = int((time.time() - start_time) * 1000)
+                    
                     if response.status == 200:
                         result = await response.json()
-                        ai_response = result.get("response", "").strip()
-                        logger.info(f"Ollama svar för {payload.get('name', 'okänt fartyg')}: {ai_response}")
-                        return ai_response
+                        stats = {"duration_ms": duration_ms}
+                        
+                        if api_type == 'openai':
+                            # OpenAI format: choices[0].message.content
+                            ai_response = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                            usage = result.get("usage", {})
+                            stats.update({
+                                "prompt_tokens": usage.get("prompt_tokens"),
+                                "completion_tokens": usage.get("completion_tokens"),
+                                "total_tokens": usage.get("total_tokens")
+                            })
+                        else:
+                            # Ollama format: response
+                            ai_response = result.get("response", "").strip()
+                            stats.update({
+                                "total_duration_ms": int(result.get("total_duration", 0) / 1_000_000) if result.get("total_duration") else duration_ms,
+                                "prompt_eval_count": result.get("prompt_eval_count"),
+                                "eval_count": result.get("eval_count")
+                            })
+                            # Use internal duration if available for more precision
+                            if "total_duration_ms" in stats:
+                                stats["duration_ms"] = stats["total_duration_ms"]
+                            
+                        logger.info(f"AI response for {payload.get('name', 'unknown vessel')} ({duration_ms}ms): {ai_response}")
+                        return {"response": ai_response, "stats": stats}
                     else:
                         error_text = await response.text()
-                        logger.error(f"Ollama API fel: {response.status} - {error_text}")
+                        logger.error(f"Local AI API error: {response.status} - {error_text}")
         except Exception as e:
-            logger.error(f"Kunde inte kontakta Ollama på {url}: {str(e)}")
+            logger.error(f"Could not connect to AI service at {url}: {str(e)}")
         
         return None
