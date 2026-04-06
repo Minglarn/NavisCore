@@ -10,6 +10,7 @@ from utils.db import db_session
 from utils.stats import stats_collector
 from utils.images import get_image_bytes
 from utils.ollama import fetch_ollama_short_info
+from utils.mmsi import get_country_adjective, get_country_name
 
 logger = logging.getLogger("NavisCore")
 
@@ -281,6 +282,16 @@ async def notify_new_vessel(mmsi_str, pub_payload, settings):
     
     # Hämtar ev. bild tidigt
     img_bytes = get_image_bytes(mmsi_str)
+    
+    # Lägg till landets namn (Sverige) och adjektiv (svenska) i payloaden
+    country_code = pub_payload.get("country_code")
+    if country_code:
+        c_name = get_country_name(country_code)
+        c_adj = get_country_adjective(country_code)
+        if c_name:
+            pub_payload["country_name"] = c_name
+        if c_adj:
+            pub_payload["country_adjective"] = c_adj
     
     # Hämta Ollama sammanfattning (om aktiverat)
     ollama_enabled = is_true(settings.get("ollama_enabled", "true"))

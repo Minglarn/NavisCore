@@ -228,7 +228,7 @@ async def startup_event():
             ('ollama_enabled', 'true'),
             ('ollama_url', 'http://192.168.1.239:11434/api/generate'),
             ('ollama_model', 'gemma4-nothink2:latest'),
-            ('ollama_prompt', "Du är en maritim assistent. Baserat på denna AIS-data för ett fartyg, skriv en kort informationsmening (max 2 meningar) på svenska.\n\nInkludera detaljer som:\n- Nationalitet/Hemland baserat på {country_code} (t.ex. 'Det cypriska lastfartyget...')\n- Fartygstyp {ship_type_label} (på svenska)\n- Namn {name} och MMSI {mmsi}\n- Destination {destination}, Fart {sog} och Position {lat}, {lon}\n- När fartyget senast sågs. Dagens datum är {current_date}. Utgå från {last_seen_relative}.\n\nSvara endast med informationsmeningen, skippa inledningar som 'Här är...'.")
+            ('ollama_prompt', "You are a maritime assistant. Based on this AIS data for a vessel in JSON format, write a short information sentence (max 2 sentences) in English.\n\nInclude details such as:\n- Nationality/Home country based on 'country_adjective' and 'country_code'. Put the country code in parentheses after the country name.\n- Vessel type {ship_type_label} and Status '{status_text}'\n- Name {name} and MMSI {mmsi}\n- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n- When the vessel was last seen. Today's date is {current_date}. Base it on {last_seen_relative}.\n\nRespond only with the information sentence, skip introductions like 'Here is...'.")
         ]:
 
             await db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))

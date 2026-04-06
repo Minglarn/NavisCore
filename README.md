@@ -22,6 +22,7 @@
 - **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, including a **high-precision live timer** that updates every 10 seconds for sub-minute accuracy.
 - **Automated Data Maintenance**: Configurable auto-purge system that cleans up old vessel records and images to maintain peak database performance.
 - **🤖 AI Intelligence (Ollama)**: Integrated local AI summaries for new vessels. NavisCore uses **Ollama** to generate natural language descriptions of ships based on real-time AIS data.
+- **Global Localization**: Full English translation of backend AI prompt generation, country mappings, and UI elements.
 
 ## 🤖 AI Intelligence (Ollama)
 
@@ -44,6 +45,12 @@ For the best balance between speed and quality, we recommend:
 1. **gemma4-nothink2:latest** (Fastest & most stable)
 2. **gemma4-fast:latest** (Great general performance)
 3. **gemma-analytisk:latest** (More detailed analysis)
+
+### 🧪 Live AI Diagnostics
+Ensure your AI models and prompts are working flawlessly without waiting for a new vessel to appear.
+- **Real-Time Testing**: Click **Test AI Integration** in the settings panel to simulate a vessel event and trigger an instant test run.
+- **Live Preview**: Read the exact output your model generates directly in the UI, making prompt engineering seamless and immediate.
+- **Built-in Stress Testing**: A dedicated `stress_test_ollama.py` tool allows sequential bulk testing of your model's stability and speed.
 
 ## 🧭 UI Visual Indicators
 

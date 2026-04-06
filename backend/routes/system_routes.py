@@ -9,6 +9,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Response
 import aiosqlite
+from utils.ollama import fetch_ollama_short_info
 
 logger = logging.getLogger("NavisCore")
 
@@ -147,5 +148,40 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
             os._exit(0)
         asyncio.create_task(exit_later())
         return {"status": "success", "message": "Restarting system... UI will reconnect shortly."}
+
+    @router.post("/api/settings/test_ollama")
+    async def test_ollama_api(config: dict):
+        """Test Ollama integration with a dummy payload."""
+        logger.info(f"Ollama test triggered via API with model: {config.get('model')}")
+        
+        # Create a realistic test payload
+        test_payload = {
+            "mmsi": "265123456",
+            "name": "TEST VESSEL 1",
+            "country_code": "SE",
+            "country_name": "Sweden",
+            "country_adjective": "Swedish",
+            "ship_type_label": "Pilot Vessel",
+            "status_text": "Engaged in Pilotage",
+            "destination": "STOCKHOLM",
+            "sog": 12.5,
+            "lat": 59.3293,
+            "lon": 18.0686,
+            "last_seen": int(datetime.now().timestamp() * 1000) - (10 * 60 * 1000) # 10 mins ago
+        }
+        
+        url = config.get("url")
+        model = config.get("model")
+        prompt = config.get("prompt")
+        
+        try:
+            result = await fetch_ollama_short_info(test_payload, url, model, prompt)
+            if result:
+                return {"success": True, "response": result}
+            else:
+                return {"success": False, "error": "No response from AI model. Check URL/Model or Logs."}
+        except Exception as e:
+            logger.error(f"Ollama test API error: {e}")
+            return {"success": False, "error": str(e)}
 
     return router

@@ -10,7 +10,7 @@ _ollama_lock = asyncio.Lock()
 
 def get_relative_time_string(timestamp_ms):
     if not timestamp_ms:
-        return "okänd tid"
+        return "unknown time"
     
     try:
         now = datetime.now()
@@ -24,18 +24,18 @@ def get_relative_time_string(timestamp_ms):
         time_str = dt.strftime("%H:%M")
         
         if minutes < 1:
-            return "just nu"
+            return "just now"
         elif minutes < 60:
-            return f"för {minutes} minuter sedan kl {time_str}"
+            return f"{minutes} minutes ago at {time_str}"
         elif hours < 24:
             if dt.date() == now.date():
-                return f"idag kl {time_str} (för {hours} timmar sedan)"
+                return f"today at {time_str} ({hours} hours ago)"
             else:
-                return f"igår kl {time_str}"
+                return f"yesterday at {time_str}"
         else:
-            return f"för {days} dagar sedan kl {time_str}"
+            return f"{days} days ago at {time_str}"
     except Exception:
-        return "okänd tid"
+        return "unknown time"
 
 async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_template: str = None) -> str:
     """
@@ -74,17 +74,18 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
         current_date = datetime.now().strftime("%Y-%m-%d")
         last_seen_rel = get_relative_time_string(payload.get("last_seen"))
         
-        # Om ingen mall skickas med (fallback), använd vår beprövade standardmall
+        # Om ingen mall skickas med (fallback), använd användarens föreslagna stil
         if not prompt_template:
             prompt_template = (
-                "Du är en maritim assistent. Baserat på denna AIS-data för ett fartyg, skriv en kort informationsmening (max 2 meningar) på svenska.\n\n"
-                "Inkludera detaljer som:\n"
-                "- Nationalitet/Hemland baserat på {country_code} (t.ex. 'Det cypriska lastfartyget...')\n"
-                "- Fartygstyp {ship_type_label} (på svenska)\n"
-                "- Namn {name} och MMSI {mmsi}\n"
-                "- Destination {destination}, Fart {sog} och Position {lat}, {lon}\n"
-                f"- När fartyget senast sågs. Dagens datum är {current_date}. Utgå från {last_seen_relative}.\n\n"
-                "Svara endast med informationsmeningen, skippa inledningar som 'Här är...'."
+                "You are a maritime assistant. Based on this AIS data for a vessel in JSON format, "
+                "write a short information sentence (max 2 sentences) in English.\n\n"
+                "Include details such as:\n"
+                "- Nationality/Home country based on 'country_adjective' and 'country_code'. Put the country code in parentheses after the country name.\n"
+                "- Vessel type {ship_type_label} and Status '{status_text}'\n"
+                "- Name {name} and MMSI {mmsi}\n"
+                "- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n"
+                "- When the vessel was last seen. Today's date is {current_date}. Base it on {last_seen_relative}.\n\n"
+                "Respond only with the information sentence, skip introductions like 'Here is...'."
             )
 
         # Ersätt placeholders dynamiskt från payload

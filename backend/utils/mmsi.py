@@ -37,3 +37,35 @@ def get_country_code_from_mmsi(mmsi_str: str) -> str:
         "740": "fk", "745": "gy", "750": "py", "755": "pe", "760": "sr", "765": "uy", "770": "ve"
     }
     return mid_map.get(mid)
+
+COUNTRY_ADJECTIVES = {
+    "se": "Swedish", "fi": "Finnish", "no": "Norwegian", "dk": "Danish", "de": "German",
+    "ee": "Estonian", "lv": "Latvian", "lt": "Lithuanian", "pl": "Polish", "ru": "Russian",
+    "gb": "British", "nl": "Dutch", "be": "Belgian", "fr": "French", "es": "Spanish",
+    "pt": "Portuguese", "it": "Italian", "gr": "Greek", "tr": "Turkish", "cy": "Cypriot",
+    "mt": "Maltese", "ie": "Irish", "is": "Icelandic", "fo": "Faroese", "gl": "Greenlandic",
+    "us": "American", "ca": "Canadian", "pa": "Panamanian", "bs": "Bahamian", "ky": "Caymanian",
+    "bm": "Bermudian", "gi": "Gibraltarian", "ua": "Ukrainian", "hr": "Croatian",
+    "ma": "Moroccan", "dz": "Algerian", "tn": "Tunisian", "ly": "Libyan", "eg": "Egyptian",
+    "in": "Indian", "cn": "Chinese", "jp": "Japanese", "kr": "South Korean", "sg": "Singaporean"
+}
+
+def get_country_adjective(code: str) -> str:
+    if not code: return ""
+    return COUNTRY_ADJECTIVES.get(code.lower(), "")
+
+COUNTRY_NAMES = {
+    "se": "Sweden", "fi": "Finland", "no": "Norway", "dk": "Denmark", "de": "Germany",
+    "ee": "Estonia", "lv": "Latvia", "lt": "Lithuania", "pl": "Poland", "ru": "Russia",
+    "gb": "United Kingdom", "nl": "Netherlands", "be": "Belgium", "fr": "France", "es": "Spain",
+    "pt": "Portugal", "it": "Italy", "gr": "Greece", "tr": "Turkey", "cy": "Cyprus",
+    "mt": "Malta", "ie": "Ireland", "is": "Iceland", "fo": "Faroe Islands", "gl": "Greenland",
+    "us": "USA", "ca": "Canada", "pa": "Panama", "bs": "Bahamas", "ky": "Cayman Islands",
+    "bm": "Bermuda", "gi": "Gibraltar", "ua": "Ukraine", "hr": "Croatia",
+    "ma": "Morocco", "dz": "Algeria", "tn": "Tunisia", "ly": "Libya", "eg": "Egypt",
+    "in": "India", "cn": "China", "jp": "Japan", "kr": "South Korea", "sg": "Singapore"
+}
+
+def get_country_name(code: str) -> str:
+    if not code: return ""
+    return COUNTRY_NAMES.get(code.lower(), "")

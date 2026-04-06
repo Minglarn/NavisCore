@@ -4,6 +4,36 @@ import Toggle from '../ui/Toggle';
 import { MultiSelect } from '../ui/MultiSelect';
 
 export default function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme, setIsRestarting, isMobile }: any) {
+    const [isTestingAI, setIsTestingAI] = useState(false);
+    const [testAIResponse, setTestAIResponse] = useState<string | null>(null);
+
+    const handleTestAI = async () => {
+        setIsTestingAI(true);
+        setTestAIResponse(null);
+        try {
+            const isDev = window.location.port === '5173';
+            const url = isDev ? 'http://127.0.0.1:8080/api/settings/test_ollama' : '/api/settings/test_ollama';
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: settings.ollama_url,
+                    model: settings.ollama_model,
+                    prompt: settings.ollama_prompt
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setTestAIResponse(data.response);
+            } else {
+                setTestAIResponse("Error: " + (data.error || "Unknown error"));
+            }
+        } catch (err) {
+            setTestAIResponse("Failed to connect to backend test endpoint.");
+        } finally {
+            setIsTestingAI(false);
+        }
+    };
 
     if (!isOpen) return null;
 
@@ -685,30 +715,68 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                 We recommend <strong>gemma4-nothink2:latest</strong> for best accuracy and performance.
                                             </div>
                                         </div>
-
                                         <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                                                 <label>AI Summary Prompt Template</label>
-                                                <button 
-                                                    onClick={() => {
-                                                        const defaultPrompt = "Du är en maritim assistent. Baserat på denna AIS-data för ett fartyg, skriv en kort informationsmening (max 2 meningar) på svenska.\n\nInkludera detaljer som:\n- Nationalitet/Hemland baserat på {country_code} (t.ex. 'Det cypriska lastfartyget...')\n- Fartygstyp {ship_type_label} (på svenska)\n- Namn {name} och MMSI {mmsi}\n- Destination {destination}, Fart {sog} och Position {lat}, {lon}\n- När fartyget senast sågs. Dagens datum är {current_date}. Utgå från {last_seen_relative}.\n\nSvara endast med informationsmeningen, skippa inledningar som 'Här är...'.";
-                                                        setSettings({ ...settings, ollama_prompt: defaultPrompt });
-                                                    }}
-                                                    style={{ 
-                                                        background: 'transparent', 
-                                                        border: 'none', 
-                                                        color: '#44aaff', 
-                                                        fontSize: '0.75rem', 
-                                                        fontWeight: 700, 
-                                                        cursor: 'pointer',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '4px'
-                                                    }}
-                                                >
-                                                    <RefreshCw size={12} /> Reset to Default
-                                                </button>
+                                                <div style={{ display: 'flex', gap: '15px' }}>
+                                                    <button 
+                                                        disabled={isTestingAI}
+                                                        onClick={handleTestAI}
+                                                        style={{ 
+                                                            background: 'transparent', 
+                                                            border: 'none', 
+                                                            color: '#10b981', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            cursor: isTestingAI ? 'not-allowed' : 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            opacity: isTestingAI ? 0.5 : 1
+                                                        }}
+                                                    >
+                                                        <Radar size={12} className={isTestingAI ? 'animate-spin' : ''} /> 
+                                                        {isTestingAI ? 'Testing...' : 'Test AI Integration'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const defaultPrompt = "You are a maritime assistant. Based on this AIS data for a vessel in JSON format, write a short information sentence (max 2 sentences) in English.\n\nInclude details such as:\n- Nationality/Home country based on 'country_adjective' and 'country_code'. Put the country code in parentheses after the country name.\n- Vessel type {ship_type_label} and Status '{status_text}'\n- Name {name} and MMSI {mmsi}\n- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n- When the vessel was last seen. Today's date is {current_date}. Base it on {last_seen_relative}.\n\nRespond only with the information sentence, skip introductions like 'Here is...'.";
+                                                            setSettings({ ...settings, ollama_prompt: defaultPrompt });
+                                                            setTestAIResponse(null);
+                                                        }}
+                                                        style={{ 
+                                                            background: 'transparent', 
+                                                            border: 'none', 
+                                                            color: '#44aaff', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                    >
+                                                        <RefreshCw size={12} /> Reset to Default
+                                                    </button>
+                                                </div>
                                             </div>
+                                            {testAIResponse && (
+                                                <div style={{ 
+                                                    marginBottom: '12px', 
+                                                    padding: '12px', 
+                                                    background: testAIResponse.startsWith('Error') ? 'rgba(255,68,68,0.1)' : 'rgba(16,185,129,0.1)', 
+                                                    border: `1px solid ${testAIResponse.startsWith('Error') ? 'rgba(255,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                                                    borderRadius: '8px',
+                                                    fontSize: '0.8rem',
+                                                    color: colors.textMain,
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.65rem', textTransform: 'uppercase', marginBottom: '5px', opacity: 0.7 }}>
+                                                        {testAIResponse.startsWith('Error') ? 'Test Failed' : 'AI Response Preview'}
+                                                    </div>
+                                                    {testAIResponse}
+                                                </div>
+                                            )}
                                             <textarea 
                                                 className="input-premium" 
                                                 rows={8}
@@ -733,16 +801,13 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                 display: 'grid', 
                                                 gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', 
                                                 gap: '8px',
-                                                maxHeight: '150px',
-                                                overflowY: 'auto',
-                                                padding: '10px',
-                                                background: 'rgba(0,0,0,0.2)',
-                                                borderRadius: '8px',
-                                                border: `1px solid ${colors.border}`
+                                                padding: '2px',
+                                                background: 'transparent'
                                             }}>
                                                 {[
                                                     {t:'{name}', d:'Vessel Name'}, {t:'{mmsi}', d:'MMSI Number'}, 
-                                                    {t:'{country_code}', d:'Country Code'}, {t:'{ship_type_label}', d:'Vessel Type'},
+                                                    {t:'{country_code}', d:'ISO Code'}, {t:'{country_name}', d:'Country Name'},
+                                                    {t:'{country_adjective}', d:'Country Adj'}, {t:'{ship_type_label}', d:'Vessel Type'},
                                                     {t:'{destination}', d:'Destination'}, {t:'{sog}', d:'Speed (knots)'},
                                                     {t:'{lat}', d:'Latitude'}, {t:'{lon}', d:'Longitude'},
                                                     {t:'{callsign}', d:'Radio Callsign'}, {t:'{imo}', d:'IMO Number'},
@@ -762,24 +827,25 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                                 const text = settings.ollama_prompt || "";
                                                                 const newText = text.substring(0, start) + item.t + text.substring(end);
                                                                 setSettings({ ...settings, ollama_prompt: newText });
-                                                                // Focus back after state update would be better here but slightly complex in one-shot
                                                             }
                                                         }}
                                                         style={{ 
                                                             fontSize: '0.7rem', 
-                                                            padding: '6px 8px', 
-                                                            background: 'rgba(68,170,255,0.05)', 
-                                                            border: '1px solid rgba(68,170,255,0.1)',
-                                                            borderRadius: '4px',
+                                                            padding: '8px 10px', 
+                                                            background: 'rgba(255,255,255,0.03)', 
+                                                            border: `1px solid rgba(68,170,255,0.2)`,
+                                                            borderRadius: '6px',
                                                             cursor: 'pointer',
                                                             display: 'flex',
                                                             flexDirection: 'column',
-                                                            gap: '2px'
+                                                            gap: '2px',
+                                                            transition: 'all 0.2s ease'
                                                         }}
+                                                        className="hover-bright"
                                                         title={`Click to insert ${item.t}`}
                                                     >
-                                                        <span style={{ color: '#44aaff', fontWeight: 700 }}>{item.t}</span>
-                                                        <span style={{ color: colors.textMuted, fontSize: '0.6rem' }}>{item.d}</span>
+                                                        <span style={{ color: '#44aaff', fontWeight: 800, fontSize: '0.75rem' }}>{item.t}</span>
+                                                        <span style={{ color: colors.textMuted, fontSize: '0.6rem', opacity: 0.8 }}>{item.d}</span>
                                                     </div>
                                                 ))}
                                             </div>
