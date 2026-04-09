@@ -2,10 +2,14 @@ from ais_logic import get_ship_type_name
 
 class StatsCollector:
     def __init__(self):
+        self.previous_hourly_snapshot = None
         self.reset_hourly()
         self.daily_new_vessels = 0
         
     def reset_hourly(self):
+        # Spara föregående timmens snapshot innan vi nollställer
+        if hasattr(self, 'hourly_messages'):
+            self.previous_hourly_snapshot = self.get_hourly_snapshot()
         self.hourly_messages = 0
         self.hourly_new_vessels = 0
         self.hourly_mmsis = set()

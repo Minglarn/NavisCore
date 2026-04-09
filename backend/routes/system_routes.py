@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Response
 import aiosqlite
-from utils.ollama import fetch_ollama_short_info
+from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary
 
 logger = logging.getLogger("NavisCore")
 
@@ -183,6 +183,56 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
                 return {"success": False, "error": "No response from AI model. Check URL/Model or Logs."}
         except Exception as e:
             logger.error(f"Ollama test API error: {e}")
+            return {"success": False, "error": str(e)}
+
+    @router.post("/api/settings/test_ollama_hourly")
+    async def test_ollama_hourly_api(config: dict):
+        """Test hourly AI summary with simulated statistics."""
+        logger.info(f"Hourly AI summary test triggered via API with model: {config.get('model')}")
+        
+        # Create a realistic test statistics payload
+        test_stats = {
+            "messages_received": 634,
+            "new_vessels": 12,
+            "max_vessels": 47,
+            "max_range_km": 38.72,
+            "max_range_nm": 20.91,
+            "shiptypes": {
+                "Cargo": 18,
+                "Tanker": 8,
+                "Passenger": 5,
+                "Fishing": 4,
+                "Tug": 3,
+                "Sailing": 3,
+                "Pilot Vessel": 2,
+                "Pleasure Craft": 2,
+                "High Speed Craft": 1,
+                "Search and Rescue": 1
+            }
+        }
+        
+        # Simulated previous hour for trend comparison
+        test_prev_stats = {
+            "messages_received": 512,
+            "new_vessels": 8,
+            "max_vessels": 39,
+            "max_range_km": 34.15,
+            "max_range_nm": 18.44
+        }
+        
+        url = config.get("url")
+        model = config.get("model")
+        prompt = config.get("prompt")
+        api_type = config.get("api_type", "native")
+        
+        try:
+            result = await fetch_ollama_hourly_summary(test_stats, url, model, prompt or None, api_type, test_prev_stats)
+            if result:
+                return {"success": True, **result}
+            else:
+                return {"success": False, "error": "No response from AI model. Check URL/Model or Logs."}
+        except Exception as e:
+            logger.error(f"Hourly AI summary test API error: {e}")
             return {"success": False, "error": str(e)}
 
     return router

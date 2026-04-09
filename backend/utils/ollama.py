@@ -177,3 +177,188 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
             logger.error(f"Could not connect to AI service at {url}: {str(e)}")
         
         return None
+
+
+async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native', prev_stats: dict = None) -> dict:
+    """
+    Calls the local AI service to generate a comprehensive hourly summary
+    based on aggregated AIS statistics, optionally including trend data from the previous hour.
+    Returns: {"response": "...", "stats": {"duration_ms": ...}} or None
+    """
+    if not url or not model:
+        logger.error("[Ollama] Missing URL or model for hourly summary.")
+        return None
+
+    async with _ollama_lock:
+        logger.info(f"[Ollama] Preparing hourly summary prompt with model {model}...")
+
+        current_date = datetime.now().strftime("%Y-%m-%d")
+        current_time = datetime.now().strftime("%H:%M")
+        current_hour = datetime.now().hour
+
+        # Format the ship type distribution into readable text
+        shiptypes = stats_payload.get("shiptypes", {})
+        active_types = {k: v for k, v in shiptypes.items() if v > 0}
+        if active_types:
+            sorted_types = sorted(active_types.items(), key=lambda x: x[1], reverse=True)
+            shiptype_summary = ", ".join([f"{label}: {count}" for label, count in sorted_types])
+        else:
+            shiptype_summary = "No vessel types recorded"
+
+        # Calculate trend data compared to previous hour
+        def calc_change(current, previous):
+            """Returns change percentage string like '+25%' or '-10%' or 'N/A'."""
+            if previous is None or previous == 0:
+                return "N/A (no previous data)"
+            change = ((current - previous) / previous) * 100
+            sign = "+" if change >= 0 else ""
+            return f"{sign}{change:.0f}%"
+
+        if prev_stats:
+            prev_messages = prev_stats.get("messages_received", 0)
+            prev_new_vessels = prev_stats.get("new_vessels", 0)
+            prev_max_vessels = prev_stats.get("max_vessels", 0)
+            prev_max_range_km = prev_stats.get("max_range_km", 0)
+            prev_max_range_nm = prev_stats.get("max_range_nm", 0)
+            
+            change_messages = calc_change(stats_payload.get("messages_received", 0), prev_messages)
+            change_new_vessels = calc_change(stats_payload.get("new_vessels", 0), prev_new_vessels)
+            change_max_vessels = calc_change(stats_payload.get("max_vessels", 0), prev_max_vessels)
+            change_range = calc_change(stats_payload.get("max_range_km", 0), prev_max_range_km)
+            
+            trend_section = (
+                f"\n\nComparison with previous hour:\n"
+                f"- Messages: {prev_messages} → {stats_payload.get('messages_received', 0)} ({change_messages})\n"
+                f"- New vessels: {prev_new_vessels} → {stats_payload.get('new_vessels', 0)} ({change_new_vessels})\n"
+                f"- Unique vessels: {prev_max_vessels} → {stats_payload.get('max_vessels', 0)} ({change_max_vessels})\n"
+                f"- Max range: {prev_max_range_km} km → {stats_payload.get('max_range_km', 0)} km ({change_range})"
+            )
+            has_prev = True
+        else:
+            prev_messages = 0
+            prev_new_vessels = 0
+            prev_max_vessels = 0
+            prev_max_range_km = 0.0
+            prev_max_range_nm = 0.0
+            change_messages = "N/A"
+            change_new_vessels = "N/A"
+            change_max_vessels = "N/A"
+            change_range = "N/A"
+            trend_section = "\n\nNo previous hour data available for comparison."
+            has_prev = False
+
+        if not prompt_template:
+            prompt_template = (
+                "You are a maritime traffic analyst. Based on the following hourly AIS statistics, "
+                "write a comprehensive summary (3-5 sentences) in English.\n\n"
+                "Statistics for the past hour:\n"
+                "- Date: {current_date}, Time: {current_time} (hour {current_hour})\n"
+                "- Total AIS messages received: {messages_received}\n"
+                "- New vessels detected this hour: {new_vessels}\n"
+                "- Maximum unique vessels observed: {max_vessels}\n"
+                "- Maximum reception range: {max_range_km} km ({max_range_nm} nm)\n"
+                "- Vessel type distribution: {shiptype_summary}\n"
+                "{trend_section}\n\n"
+                "Provide an insightful analysis of the maritime traffic patterns. "
+                "Compare with the previous hour if data is available and highlight significant changes. "
+                "Note any interesting trends such as increasing/decreasing traffic, unusual vessel types, or notable range performance. "
+                "Respond only with the summary text, no introductions."
+            )
+
+        # Build template variables
+        template_vars = {**stats_payload}
+        template_vars["current_date"] = current_date
+        template_vars["current_time"] = current_time
+        template_vars["current_hour"] = str(current_hour)
+        template_vars["shiptype_summary"] = shiptype_summary
+        template_vars["trend_section"] = trend_section
+        # Previous hour values (for custom prompts)
+        template_vars["prev_messages_received"] = str(prev_messages)
+        template_vars["prev_new_vessels"] = str(prev_new_vessels)
+        template_vars["prev_max_vessels"] = str(prev_max_vessels)
+        template_vars["prev_max_range_km"] = str(prev_max_range_km)
+        template_vars["prev_max_range_nm"] = str(prev_max_range_nm)
+        # Change percentages (for custom prompts)
+        template_vars["change_messages"] = change_messages
+        template_vars["change_new_vessels"] = change_new_vessels
+        template_vars["change_max_vessels"] = change_max_vessels
+        template_vars["change_range"] = change_range
+        template_vars["has_previous_data"] = "yes" if has_prev else "no"
+
+        # Safe placeholder replacement
+        final_prompt = prompt_template
+        for key, value in template_vars.items():
+            placeholder = "{" + str(key) + "}"
+            if placeholder in final_prompt:
+                val_str = str(value) if value is not None else ""
+                final_prompt = final_prompt.replace(placeholder, val_str)
+
+        if api_type == 'openai':
+            final_url = url
+            if not final_url.endswith('/chat/completions') and not final_url.endswith('/completions'):
+                base = final_url.rstrip('/')
+                if not base.endswith('/v1'):
+                    base += '/v1'
+                final_url = base + '/chat/completions'
+
+            request_data = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful maritime traffic analyst."},
+                    {"role": "user", "content": final_prompt}
+                ],
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 500
+            }
+        else:
+            final_url = url
+            request_data = {
+                "model": model,
+                "prompt": final_prompt,
+                "stream": False,
+                "options": {
+                    "num_ctx": 8192,
+                    "temperature": 0.3,
+                    "num_predict": 500
+                }
+            }
+
+        start_time = time.time()
+        try:
+            connector = aiohttp.TCPConnector(limit=10)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.post(final_url, json=request_data, timeout=aiohttp.ClientTimeout(total=120)) as response:
+                    duration_ms = int((time.time() - start_time) * 1000)
+
+                    if response.status == 200:
+                        result = await response.json()
+                        stats = {"duration_ms": duration_ms}
+
+                        if api_type == 'openai':
+                            ai_response = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                            usage = result.get("usage", {})
+                            stats.update({
+                                "prompt_tokens": usage.get("prompt_tokens"),
+                                "completion_tokens": usage.get("completion_tokens"),
+                                "total_tokens": usage.get("total_tokens")
+                            })
+                        else:
+                            ai_response = result.get("response", "").strip()
+                            stats.update({
+                                "total_duration_ms": int(result.get("total_duration", 0) / 1_000_000) if result.get("total_duration") else duration_ms,
+                                "prompt_eval_count": result.get("prompt_eval_count"),
+                                "eval_count": result.get("eval_count")
+                            })
+                            if "total_duration_ms" in stats:
+                                stats["duration_ms"] = stats["total_duration_ms"]
+
+                        logger.info(f"[Ollama] Hourly summary generated ({duration_ms}ms): {ai_response[:100]}...")
+                        return {"response": ai_response, "stats": stats}
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"[Ollama] Hourly summary API error: {response.status} - {error_text}")
+        except Exception as e:
+            logger.error(f"[Ollama] Could not generate hourly summary: {str(e)}")
+
+        return None

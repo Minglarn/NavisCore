@@ -6,6 +6,8 @@ import { MultiSelect } from '../ui/MultiSelect';
 export default function SettingsModal({ isOpen, onClose, settings, setSettings, onSave, activeTab, setActiveTab, colors, theme, setIsRestarting, isMobile }: any) {
     const [isTestingAI, setIsTestingAI] = useState(false);
     const [testAIResponse, setTestAIResponse] = useState<any | null>(null);
+    const [isTestingHourlyAI, setIsTestingHourlyAI] = useState(false);
+    const [testHourlyAIResponse, setTestHourlyAIResponse] = useState<any | null>(null);
 
     const handleTestAI = async () => {
         setIsTestingAI(true);
@@ -37,6 +39,39 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
             setTestAIResponse({ error: "Failed to connect to backend test endpoint." });
         } finally {
             setIsTestingAI(false);
+        }
+    };
+
+    const handleTestHourlyAI = async () => {
+        setIsTestingHourlyAI(true);
+        setTestHourlyAIResponse(null);
+        try {
+            const API_BASE = window.location.port === '5173' ? 'http://127.0.0.1:8080' : '';
+            const response = await fetch(`${API_BASE}/api/settings/test_ollama_hourly`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: settings.ollama_url,
+                    model: settings.ollama_model,
+                    prompt: settings.ollama_hourly_prompt_template,
+                    api_type: settings.ollama_api_type || 'native'
+                })
+            });
+            const data = await response.json();
+            setIsTestingHourlyAI(false);
+            
+            if (data.success) {
+                setTestHourlyAIResponse({
+                    text: data.response,
+                    stats: data.stats
+                });
+            } else {
+                setTestHourlyAIResponse({ error: data.error || 'Unknown error occurred' });
+            }
+        } catch (err) {
+            setTestHourlyAIResponse({ error: "Failed to connect to backend test endpoint." });
+        } finally {
+            setIsTestingHourlyAI(false);
         }
     };
 
@@ -902,6 +937,175 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                         The system is now configured to use <strong>reasoning: False</strong> and <strong>minified payloads</strong>, providing vessel descriptions in under 10 seconds.
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><BarChart2 size={14} /> AI Hourly Traffic Summary</div>
+                                        <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5, marginBottom: '15px' }}>
+                                            Configure a separate AI prompt used to generate a comprehensive hourly summary of all maritime traffic.
+                                            This summary is included in the <code style={{ color: '#44aaff', fontSize: '0.75rem' }}>objects_stat_hourly</code> MQTT payload every hour.
+                                        </div>
+                                        <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                <label>Hourly Summary Prompt Template</label>
+                                                <div style={{ display: 'flex', gap: '15px' }}>
+                                                    <button 
+                                                        disabled={isTestingHourlyAI}
+                                                        onClick={handleTestHourlyAI}
+                                                        style={{ 
+                                                            background: 'transparent', 
+                                                            border: 'none', 
+                                                            color: '#10b981', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            cursor: isTestingHourlyAI ? 'not-allowed' : 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            opacity: isTestingHourlyAI ? 0.5 : 1
+                                                        }}
+                                                    >
+                                                        <Radar size={12} className={isTestingHourlyAI ? 'animate-spin' : ''} /> 
+                                                        {isTestingHourlyAI ? 'Testing...' : 'Test Hourly Summary'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const defaultPrompt = "You are a maritime traffic analyst. Based on the following hourly AIS statistics, write a comprehensive summary (3-5 sentences) in English.\n\nStatistics for the past hour:\n- Date: {current_date}, Time: {current_time} (hour {current_hour})\n- Total AIS messages received: {messages_received}\n- New vessels detected this hour: {new_vessels}\n- Maximum unique vessels observed: {max_vessels}\n- Maximum reception range: {max_range_km} km ({max_range_nm} nm)\n- Vessel type distribution: {shiptype_summary}\n{trend_section}\n\nProvide an insightful analysis of the maritime traffic patterns. Compare with the previous hour if data is available and highlight significant changes. Note any interesting trends such as increasing/decreasing traffic, unusual vessel types, or notable range performance. Respond only with the summary text, no introductions.";
+                                                            setSettings({ ...settings, ollama_hourly_prompt_template: defaultPrompt });
+                                                            setTestHourlyAIResponse(null);
+                                                        }}
+                                                        style={{ 
+                                                            background: 'transparent', 
+                                                            border: 'none', 
+                                                            color: '#44aaff', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                    >
+                                                        <RefreshCw size={12} /> Reset to Default
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {testHourlyAIResponse && (
+                                                <div style={{ 
+                                                    marginBottom: '12px', 
+                                                    padding: '12px', 
+                                                    background: testHourlyAIResponse.error ? 'rgba(255,68,68,0.1)' : 'rgba(16,185,129,0.1)', 
+                                                    border: `1px solid ${testHourlyAIResponse.error ? 'rgba(255,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                                                    borderRadius: '8px',
+                                                    fontSize: '0.8rem',
+                                                    color: colors.textMain,
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '8px', opacity: 0.9, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span>{testHourlyAIResponse.error ? 'Test Failed' : 'Hourly Summary Preview'}</span>
+                                                        {testHourlyAIResponse.stats && (
+                                                            <span style={{ 
+                                                                color: '#10b981', 
+                                                                background: 'rgba(16,185,129,0.2)', 
+                                                                padding: '2px 8px', 
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.75rem'
+                                                            }}>
+                                                                {(testHourlyAIResponse.stats.duration_ms / 1000).toFixed(2)}s
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {testHourlyAIResponse.error ? (
+                                                        <div style={{ color: '#ff4444' }}>{testHourlyAIResponse.error}</div>
+                                                    ) : (
+                                                        <div>{testHourlyAIResponse.text}</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <textarea 
+                                                className="input-premium" 
+                                                id="hourly-prompt-textarea"
+                                                rows={8}
+                                                placeholder="Leave empty to use the built-in default prompt. Click 'Reset to Default' to see and customize it."
+                                                value={settings.ollama_hourly_prompt_template || ''} 
+                                                onChange={e => setSettings({ ...settings, ollama_hourly_prompt_template: e.target.value })} 
+                                                style={{ 
+                                                    width: '100%', 
+                                                    fontFamily: 'monospace', 
+                                                    fontSize: '0.85rem', 
+                                                    lineHeight: '1.5',
+                                                    resize: 'vertical',
+                                                    padding: '12px'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div style={{ marginTop: '20px' }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: colors.textMuted, marginBottom: '12px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Terminal size={14} /> Available Hourly Variables
+                                            </div>
+                                            <div style={{ 
+                                                display: 'grid', 
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', 
+                                                gap: '8px',
+                                                padding: '2px',
+                                                background: 'transparent'
+                                            }}>
+                                                {[
+                                                    {t:'{messages_received}', d:'AIS Messages'},
+                                                    {t:'{new_vessels}', d:'New Vessels'},
+                                                    {t:'{max_vessels}', d:'Unique Vessels'},
+                                                    {t:'{max_range_km}', d:'Max Range (km)'},
+                                                    {t:'{max_range_nm}', d:'Max Range (nm)'},
+                                                    {t:'{shiptype_summary}', d:'Type Distribution'},
+                                                    {t:'{current_date}', d:'Today\'s Date'},
+                                                    {t:'{current_time}', d:'Current Time'},
+                                                    {t:'{current_hour}', d:'Hour Number'},
+                                                    {t:'{trend_section}', d:'Full Trend Block'},
+                                                    {t:'{prev_messages_received}', d:'Prev Messages'},
+                                                    {t:'{prev_new_vessels}', d:'Prev New Vessels'},
+                                                    {t:'{prev_max_vessels}', d:'Prev Unique'},
+                                                    {t:'{prev_max_range_km}', d:'Prev Range (km)'},
+                                                    {t:'{change_messages}', d:'Msg Change %'},
+                                                    {t:'{change_new_vessels}', d:'New Vessels Change %'},
+                                                    {t:'{change_max_vessels}', d:'Vessels Change %'},
+                                                    {t:'{change_range}', d:'Range Change %'},
+                                                    {t:'{has_previous_data}', d:'Has Prev Data'}
+                                                ].map(item => (
+                                                    <div 
+                                                        key={item.t} 
+                                                        onClick={() => {
+                                                            const textarea = document.getElementById('hourly-prompt-textarea') as HTMLTextAreaElement;
+                                                            if (textarea) {
+                                                                const start = textarea.selectionStart;
+                                                                const end = textarea.selectionEnd;
+                                                                const text = settings.ollama_hourly_prompt_template || "";
+                                                                const newText = text.substring(0, start) + item.t + text.substring(end);
+                                                                setSettings({ ...settings, ollama_hourly_prompt_template: newText });
+                                                            }
+                                                        }}
+                                                        style={{ 
+                                                            fontSize: '0.7rem', 
+                                                            padding: '8px 10px', 
+                                                            background: 'rgba(255,255,255,0.03)', 
+                                                            border: `1px solid rgba(68,170,255,0.2)`,
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column' as const,
+                                                            gap: '2px',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        className="hover-bright"
+                                                        title={`Click to insert ${item.t}`}
+                                                    >
+                                                        <span style={{ color: '#44aaff', fontWeight: 800, fontSize: '0.75rem' }}>{item.t}</span>
+                                                        <span style={{ color: colors.textMuted, fontSize: '0.6rem', opacity: 0.8 }}>{item.d}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>

@@ -9,7 +9,7 @@ from utils.settings import get_all_settings, is_true
 from utils.db import db_session
 from utils.stats import stats_collector
 from utils.images import get_image_bytes
-from utils.ollama import fetch_ollama_short_info
+from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary
 from utils.mmsi import get_country_adjective, get_country_name
 
 logger = logging.getLogger("NavisCore")
@@ -148,13 +148,45 @@ async def mqtt_stats_reporter():
                 prefix = base_topic.rsplit("/", 1)[0] if base_topic.endswith("/objects") else base_topic
                 hourly_topic = f"{prefix}/objects_stat_hourly"
                 
-                mqtt_pub_queue.put_nowait({
+                # Generate AI hourly summary if enabled
+                prev_snapshot = stats_collector.previous_hourly_snapshot
+                hourly_payload = {
                     "_topic": hourly_topic,
                     **snapshot,
                     "hour": last_hour,
                     "date": now.strftime('%Y-%m-%d'),
                     "timestamp": int(now.timestamp() * 1000)
-                })
+                }
+                
+                # Inkludera föregående timmens data i payloaden om den finns
+                if prev_snapshot:
+                    hourly_payload["previous_hour"] = {
+                        "messages_received": prev_snapshot.get("messages_received", 0),
+                        "new_vessels": prev_snapshot.get("new_vessels", 0),
+                        "max_vessels": prev_snapshot.get("max_vessels", 0),
+                        "max_range_km": prev_snapshot.get("max_range_km", 0),
+                        "max_range_nm": prev_snapshot.get("max_range_nm", 0)
+                    }
+                
+                ollama_enabled = is_true(s.get("ollama_enabled", "true"))
+                ollama_url = s.get("ollama_url")
+                ollama_model = s.get("ollama_model", "")
+                ollama_api_type = s.get("ollama_api_type", "native")
+                ollama_hourly_prompt = s.get("ollama_hourly_prompt_template", "")
+                
+                if ollama_enabled and ollama_url and ollama_model:
+                    try:
+                        ai_result = await asyncio.wait_for(
+                            fetch_ollama_hourly_summary(snapshot, ollama_url, ollama_model, ollama_hourly_prompt or None, ollama_api_type, prev_snapshot),
+                            timeout=120.0
+                        )
+                        if ai_result and isinstance(ai_result, dict):
+                            hourly_payload["ai_hourly_summary"] = ai_result.get("response", "")
+                            logger.info(f"[MQTT] AI hourly summary included in payload.")
+                    except Exception as e:
+                        logger.error(f"[MQTT] AI hourly summary failed or timed out: {e}")
+                
+                mqtt_pub_queue.put_nowait(hourly_payload)
                 
                 async with db_session() as db:
                     today_str = now.strftime('%Y-%m-%d')
