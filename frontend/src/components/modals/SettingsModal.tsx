@@ -10,6 +10,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
     const [testHourlyAIResponse, setTestHourlyAIResponse] = useState<any | null>(null);
     const [isTestingDailyAI, setIsTestingDailyAI] = useState(false);
     const [testDailyAIResponse, setTestDailyAIResponse] = useState<any | null>(null);
+    const [aiSubTab, setAiSubTab] = useState<'config' | 'vessel' | 'hourly' | 'daily'>('config');
 
     const handleTestAI = async () => {
         setIsTestingAI(true);
@@ -730,8 +731,55 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
 
                             {activeTab === 'ai' && (
                                 <div className="settings-grid">
+                                    {/* AI Sub-tab Navigation */}
+                                    <div style={{ 
+                                        display: 'flex', 
+                                        gap: '4px', 
+                                        padding: '4px',
+                                        background: 'rgba(255,255,255,0.03)',
+                                        borderRadius: '12px',
+                                        border: '1px solid rgba(255,255,255,0.06)'
+                                    }}>
+                                        {([
+                                            { id: 'config' as const, label: 'Configuration', icon: <Settings size={13} /> },
+                                            { id: 'vessel' as const, label: 'Vessel Prompt', icon: <Ship size={13} /> },
+                                            { id: 'hourly' as const, label: 'Hourly Prompt', icon: <BarChart2 size={13} /> },
+                                            { id: 'daily' as const, label: 'Daily Prompt', icon: <Calendar size={13} /> },
+                                        ]).map(tab => (
+                                            <button
+                                                key={tab.id}
+                                                onClick={() => setAiSubTab(tab.id)}
+                                                style={{
+                                                    flex: 1,
+                                                    padding: '10px 12px',
+                                                    borderRadius: '9px',
+                                                    border: 'none',
+                                                    background: aiSubTab === tab.id 
+                                                        ? 'linear-gradient(135deg, rgba(68,170,255,0.15), rgba(68,170,255,0.08))'
+                                                        : 'transparent',
+                                                    color: aiSubTab === tab.id ? '#44aaff' : colors.textMuted,
+                                                    fontSize: '0.78rem',
+                                                    fontWeight: aiSubTab === tab.id ? 700 : 500,
+                                                    cursor: 'pointer',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '6px',
+                                                    transition: 'all 0.2s ease',
+                                                    boxShadow: aiSubTab === tab.id 
+                                                        ? '0 2px 8px rgba(68,170,255,0.1), inset 0 0 0 1px rgba(68,170,255,0.15)' 
+                                                        : 'none'
+                                                }}
+                                            >
+                                                {tab.icon} {tab.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Sub-tab: Configuration */}
+                                    {aiSubTab === 'config' && (
                                     <div className="settings-card">
-                                        <div className="settings-card-title"><Cpu size={14} /> Local AI Integration</div>
+                                        <div className="settings-card-title"><Cpu size={14} /> AI Service Configuration</div>
                                         <div className="form-group-premium">
                                             <div>
                                                 <label>Enable AI Descriptions</label>
@@ -789,6 +837,31 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                             <div className="description" style={{ marginTop: '5px' }}>
                                                 We recommend <strong>google/gemma-4-e4b</strong> for best accuracy and performance.
                                             </div>
+                                        </div>
+
+                                        <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(68,170,255,0.05)', borderRadius: '10px', border: '1px solid rgba(68,170,255,0.1)' }}>
+                                            <div style={{ display: 'flex', gap: '12px' }}>
+                                                <div style={{ background: 'rgba(68,170,255,0.1)', padding: '8px', borderRadius: '8px', height: 'fit-content' }}>
+                                                    <Info size={18} color="#44aaff" />
+                                                </div>
+                                                <div>
+                                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#44aaff', marginBottom: '4px' }}>AI Optimization Active</div>
+                                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5 }}>
+                                                        The system is now configured to use <strong>reasoning: False</strong> and <strong>minified payloads</strong>, providing vessel descriptions in under 10 seconds.
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    )}
+
+                                    {/* Sub-tab: Vessel Prompt */}
+                                    {aiSubTab === 'vessel' && (
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Ship size={14} /> Vessel Description Prompt</div>
+                                        <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5, marginBottom: '15px' }}>
+                                            Configure the AI prompt used to generate short natural language descriptions for individual vessels.
+                                            This summary is included in the <code style={{ color: '#44aaff', fontSize: '0.75rem' }}>new_detected</code> MQTT payload.
                                         </div>
                                         <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
@@ -960,22 +1033,11 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                 ))}
                                             </div>
                                         </div>
-
-                                        <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(68,170,255,0.05)', borderRadius: '10px', border: '1px solid rgba(68,170,255,0.1)' }}>
-                                            <div style={{ display: 'flex', gap: '12px' }}>
-                                                <div style={{ background: 'rgba(68,170,255,0.1)', padding: '8px', borderRadius: '8px', height: 'fit-content' }}>
-                                                    <Info size={18} color="#44aaff" />
-                                                </div>
-                                                <div>
-                                                    <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#44aaff', marginBottom: '4px' }}>AI Optimization Active</div>
-                                                    <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5 }}>
-                                                        The system is now configured to use <strong>reasoning: False</strong> and <strong>minified payloads</strong>, providing vessel descriptions in under 10 seconds.
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
+                                    )}
 
+                                    {/* Sub-tab: Hourly Prompt */}
+                                    {aiSubTab === 'hourly' && (
                                     <div className="settings-card">
                                         <div className="settings-card-title"><BarChart2 size={14} /> AI Hourly Traffic Summary</div>
                                         <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5, marginBottom: '15px' }}>
@@ -1144,7 +1206,10 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                             </div>
                                         </div>
                                     </div>
+                                    )}
 
+                                    {/* Sub-tab: Daily Prompt */}
+                                    {aiSubTab === 'daily' && (
                                     <div className="settings-card">
                                         <div className="settings-card-title"><Calendar size={14} /> AI Daily Traffic Summary</div>
                                         <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5, marginBottom: '15px' }}>
@@ -1301,6 +1366,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                             </div>
                                         </div>
                                     </div>
+                                    )}
                                 </div>
                             )}
 
