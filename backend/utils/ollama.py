@@ -362,3 +362,133 @@ async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str,
             logger.error(f"[Ollama] Could not generate hourly summary: {str(e)}")
 
         return None
+
+
+async def fetch_ollama_daily_summary(stats_payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native') -> dict:
+    """
+    Calls the local AI service to generate a comprehensive daily summary
+    based on aggregated AIS statistics for the entire day.
+    Returns: {"response": "...", "stats": {"duration_ms": ...}} or None
+    """
+    if not url or not model:
+        logger.error("[Ollama] Missing URL or model for daily summary.")
+        return None
+
+    async with _ollama_lock:
+        logger.info(f"[Ollama] Preparing daily summary prompt with model {model}...")
+
+        report_date = stats_payload.get("date", datetime.now().strftime("%Y-%m-%d"))
+
+        # Format the ship type distribution into readable text
+        shiptype_json = stats_payload.get("shiptype_json", "")
+        if shiptype_json and isinstance(shiptype_json, str):
+            try:
+                shiptype_list = json.loads(shiptype_json)
+                if shiptype_list:
+                    sorted_types = sorted(shiptype_list, key=lambda x: x.get("count", 0), reverse=True)
+                    shiptype_summary = ", ".join([f"{t.get('label', 'Unknown')}: {t.get('count', 0)}" for t in sorted_types if t.get("count", 0) > 0])
+                else:
+                    shiptype_summary = "No vessel types recorded"
+            except (json.JSONDecodeError, TypeError):
+                shiptype_summary = "No vessel types recorded"
+        else:
+            shiptype_summary = "No vessel types recorded"
+
+        if not prompt_template:
+            prompt_template = (
+                "You are a maritime traffic analyst. Based on the following daily AIS statistics, "
+                "write a comprehensive summary (3-5 sentences) in English.\n\n"
+                "Daily statistics for {report_date}:\n"
+                "- Total AIS messages received: {total_messages}\n"
+                "- Unique vessels observed: {unique_ships}\n"
+                "- New vessels detected: {new_ships}\n"
+                "- Maximum reception range: {max_range_km} km ({max_range_nm} nm)\n"
+                "- Vessel type distribution: {shiptype_summary}\n\n"
+                "Provide an insightful analysis of the day's maritime traffic patterns. "
+                "Highlight interesting trends such as vessel diversity, traffic volume, "
+                "or notable range performance. "
+                "Respond only with the summary text, no introductions."
+            )
+
+        # Build template variables
+        template_vars = {**stats_payload}
+        template_vars["report_date"] = report_date
+        template_vars["shiptype_summary"] = shiptype_summary
+
+        # Safe placeholder replacement
+        final_prompt = prompt_template
+        for key, value in template_vars.items():
+            placeholder = "{" + str(key) + "}"
+            if placeholder in final_prompt:
+                val_str = str(value) if value is not None else ""
+                final_prompt = final_prompt.replace(placeholder, val_str)
+
+        if api_type == 'openai':
+            final_url = url
+            if not final_url.endswith('/chat/completions') and not final_url.endswith('/completions'):
+                base = final_url.rstrip('/')
+                if not base.endswith('/v1'):
+                    base += '/v1'
+                final_url = base + '/chat/completions'
+
+            request_data = {
+                "model": model,
+                "messages": [
+                    {"role": "system", "content": "You are a helpful maritime traffic analyst."},
+                    {"role": "user", "content": final_prompt}
+                ],
+                "stream": False,
+                "temperature": 0.3,
+                "max_tokens": 500
+            }
+        else:
+            final_url = url
+            request_data = {
+                "model": model,
+                "prompt": final_prompt,
+                "stream": False,
+                "options": {
+                    "num_ctx": 8192,
+                    "temperature": 0.3,
+                    "num_predict": 500
+                }
+            }
+
+        start_time = time.time()
+        try:
+            connector = aiohttp.TCPConnector(limit=10)
+            async with aiohttp.ClientSession(connector=connector) as session:
+                async with session.post(final_url, json=request_data, timeout=aiohttp.ClientTimeout(total=120)) as response:
+                    duration_ms = int((time.time() - start_time) * 1000)
+
+                    if response.status == 200:
+                        result = await response.json()
+                        stats = {"duration_ms": duration_ms}
+
+                        if api_type == 'openai':
+                            ai_response = result.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
+                            usage = result.get("usage", {})
+                            stats.update({
+                                "prompt_tokens": usage.get("prompt_tokens"),
+                                "completion_tokens": usage.get("completion_tokens"),
+                                "total_tokens": usage.get("total_tokens")
+                            })
+                        else:
+                            ai_response = result.get("response", "").strip()
+                            stats.update({
+                                "total_duration_ms": int(result.get("total_duration", 0) / 1_000_000) if result.get("total_duration") else duration_ms,
+                                "prompt_eval_count": result.get("prompt_eval_count"),
+                                "eval_count": result.get("eval_count")
+                            })
+                            if "total_duration_ms" in stats:
+                                stats["duration_ms"] = stats["total_duration_ms"]
+
+                        logger.info(f"[Ollama] Daily summary generated ({duration_ms}ms): {ai_response[:100]}...")
+                        return {"response": ai_response, "stats": stats}
+                    else:
+                        error_text = await response.text()
+                        logger.error(f"[Ollama] Daily summary API error: {response.status} - {error_text}")
+        except Exception as e:
+            logger.error(f"[Ollama] Could not generate daily summary: {str(e)}")
+
+        return None

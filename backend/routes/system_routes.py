@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Response
 import aiosqlite
-from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary
+from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary, fetch_ollama_daily_summary
 
 logger = logging.getLogger("NavisCore")
 
@@ -233,6 +233,49 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
                 return {"success": False, "error": "No response from AI model. Check URL/Model or Logs."}
         except Exception as e:
             logger.error(f"Hourly AI summary test API error: {e}")
+            return {"success": False, "error": str(e)}
+
+    @router.post("/api/settings/test_ollama_daily")
+    async def test_ollama_daily_api(config: dict):
+        """Test daily AI summary with simulated statistics."""
+        logger.info(f"Daily AI summary test triggered via API with model: {config.get('model')}")
+        
+        # Create a realistic test daily statistics payload
+        test_stats = {
+            "date": datetime.now().strftime("%Y-%m-%d"),
+            "unique_ships": 142,
+            "new_ships": 23,
+            "total_messages": 48750,
+            "max_range_km": 52.38,
+            "max_range_nm": 28.28,
+            "shiptype_json": json.dumps([
+                {"type": 70, "label": "Cargo", "count": 42},
+                {"type": 80, "label": "Tanker", "count": 28},
+                {"type": 60, "label": "Passenger", "count": 15},
+                {"type": 30, "label": "Fishing", "count": 12},
+                {"type": 52, "label": "Tug", "count": 8},
+                {"type": 36, "label": "Sailing", "count": 7},
+                {"type": 37, "label": "Pleasure Craft", "count": 9},
+                {"type": 50, "label": "Pilot Vessel", "count": 5},
+                {"type": 40, "label": "High Speed Craft", "count": 3},
+                {"type": 51, "label": "SAR", "count": 2},
+                {"type": 90, "label": "Other Type", "count": 11}
+            ])
+        }
+        
+        url = config.get("url")
+        model = config.get("model")
+        prompt = config.get("prompt")
+        api_type = config.get("api_type", "native")
+        
+        try:
+            result = await fetch_ollama_daily_summary(test_stats, url, model, prompt or None, api_type)
+            if result:
+                return {"success": True, **result}
+            else:
+                return {"success": False, "error": "No response from AI model. Check URL/Model or Logs."}
+        except Exception as e:
+            logger.error(f"Daily AI summary test API error: {e}")
             return {"success": False, "error": str(e)}
 
     return router

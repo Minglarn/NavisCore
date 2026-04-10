@@ -9,7 +9,7 @@ from utils.settings import get_all_settings, is_true
 from utils.db import db_session
 from utils.stats import stats_collector
 from utils.images import get_image_bytes
-from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary
+from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary, fetch_ollama_daily_summary
 from utils.mmsi import get_country_adjective, get_country_name
 
 logger = logging.getLogger("NavisCore")
@@ -221,6 +221,25 @@ async def mqtt_stats_reporter():
                         base_topic = s.get("mqtt_pub_topic", "naviscore/objects").rstrip("/")
                         prefix = base_topic.rsplit("/", 1)[0] if base_topic.endswith("/objects") else base_topic
                         daily_topic = f"{prefix}/objects_stat_daily"
+                        
+                        # Generate AI daily summary if enabled
+                        ollama_enabled = is_true(s.get("ollama_enabled", "true"))
+                        ollama_url = s.get("ollama_url")
+                        ollama_model = s.get("ollama_model", "")
+                        ollama_api_type = s.get("ollama_api_type", "native")
+                        ollama_daily_prompt = s.get("ollama_daily_prompt_template", "")
+                        
+                        if ollama_enabled and ollama_url and ollama_model:
+                            try:
+                                ai_result = await asyncio.wait_for(
+                                    fetch_ollama_daily_summary(daily_payload, ollama_url, ollama_model, ollama_daily_prompt or None, ollama_api_type),
+                                    timeout=120.0
+                                )
+                                if ai_result and isinstance(ai_result, dict):
+                                    daily_payload["ai_daily_summary"] = ai_result.get("response", "")
+                                    logger.info(f"[MQTT] AI daily summary included in payload.")
+                            except Exception as e:
+                                logger.error(f"[MQTT] AI daily summary failed or timed out: {e}")
                         
                         mqtt_pub_queue.put_nowait({
                             "_topic": daily_topic,

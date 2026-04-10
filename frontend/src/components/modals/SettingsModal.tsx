@@ -8,6 +8,8 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
     const [testAIResponse, setTestAIResponse] = useState<any | null>(null);
     const [isTestingHourlyAI, setIsTestingHourlyAI] = useState(false);
     const [testHourlyAIResponse, setTestHourlyAIResponse] = useState<any | null>(null);
+    const [isTestingDailyAI, setIsTestingDailyAI] = useState(false);
+    const [testDailyAIResponse, setTestDailyAIResponse] = useState<any | null>(null);
 
     const handleTestAI = async () => {
         setIsTestingAI(true);
@@ -72,6 +74,39 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
             setTestHourlyAIResponse({ error: "Failed to connect to backend test endpoint." });
         } finally {
             setIsTestingHourlyAI(false);
+        }
+    };
+
+    const handleTestDailyAI = async () => {
+        setIsTestingDailyAI(true);
+        setTestDailyAIResponse(null);
+        try {
+            const API_BASE = window.location.port === '5173' ? 'http://127.0.0.1:8080' : '';
+            const response = await fetch(`${API_BASE}/api/settings/test_ollama_daily`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    url: settings.ollama_url,
+                    model: settings.ollama_model,
+                    prompt: settings.ollama_daily_prompt_template,
+                    api_type: settings.ollama_api_type || 'native'
+                })
+            });
+            const data = await response.json();
+            setIsTestingDailyAI(false);
+            
+            if (data.success) {
+                setTestDailyAIResponse({
+                    text: data.response,
+                    stats: data.stats
+                });
+            } else {
+                setTestDailyAIResponse({ error: data.error || 'Unknown error occurred' });
+            }
+        } catch (err) {
+            setTestDailyAIResponse({ error: "Failed to connect to backend test endpoint." });
+        } finally {
+            setIsTestingDailyAI(false);
         }
     };
 
@@ -746,13 +781,13 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                             <input 
                                                 type="text" 
                                                 className="input-premium" 
-                                                placeholder="gemma4-nothink2:latest" 
+                                                placeholder="google/gemma-4-e4b" 
                                                 value={settings.ollama_model} 
                                                 onChange={e => setSettings({ ...settings, ollama_model: e.target.value })} 
                                                 style={{ width: '100%' }} 
                                             />
                                             <div className="description" style={{ marginTop: '5px' }}>
-                                                We recommend <strong>gemma4-nothink2:latest</strong> for best accuracy and performance.
+                                                We recommend <strong>google/gemma-4-e4b</strong> for best accuracy and performance.
                                             </div>
                                         </div>
                                         <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
@@ -1085,6 +1120,163 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                                                 const text = settings.ollama_hourly_prompt_template || "";
                                                                 const newText = text.substring(0, start) + item.t + text.substring(end);
                                                                 setSettings({ ...settings, ollama_hourly_prompt_template: newText });
+                                                            }
+                                                        }}
+                                                        style={{ 
+                                                            fontSize: '0.7rem', 
+                                                            padding: '8px 10px', 
+                                                            background: 'rgba(255,255,255,0.03)', 
+                                                            border: `1px solid rgba(68,170,255,0.2)`,
+                                                            borderRadius: '6px',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column' as const,
+                                                            gap: '2px',
+                                                            transition: 'all 0.2s ease'
+                                                        }}
+                                                        className="hover-bright"
+                                                        title={`Click to insert ${item.t}`}
+                                                    >
+                                                        <span style={{ color: '#44aaff', fontWeight: 800, fontSize: '0.75rem' }}>{item.t}</span>
+                                                        <span style={{ color: colors.textMuted, fontSize: '0.6rem', opacity: 0.8 }}>{item.d}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
+                                        <div className="settings-card-title"><Calendar size={14} /> AI Daily Traffic Summary</div>
+                                        <div style={{ fontSize: '0.8rem', color: colors.textMuted, lineHeight: 1.5, marginBottom: '15px' }}>
+                                            Configure a separate AI prompt used to generate a comprehensive daily summary of all maritime traffic.
+                                            This summary is included in the <code style={{ color: '#44aaff', fontSize: '0.75rem' }}>objects_stat_daily</code> MQTT payload at midnight.
+                                        </div>
+                                        <div className="form-group-premium vertical" style={{ marginTop: '10px' }}>
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                                <label>Daily Summary Prompt Template</label>
+                                                <div style={{ display: 'flex', gap: '15px' }}>
+                                                    <button 
+                                                        disabled={isTestingDailyAI}
+                                                        onClick={handleTestDailyAI}
+                                                        style={{ 
+                                                            background: 'transparent', 
+                                                            border: 'none', 
+                                                            color: '#10b981', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            cursor: isTestingDailyAI ? 'not-allowed' : 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px',
+                                                            opacity: isTestingDailyAI ? 0.5 : 1
+                                                        }}
+                                                    >
+                                                        <Radar size={12} className={isTestingDailyAI ? 'animate-spin' : ''} /> 
+                                                        {isTestingDailyAI ? 'Testing...' : 'Test Daily Summary'}
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            const defaultPrompt = "You are a maritime traffic analyst. Based on the following daily AIS statistics, write a comprehensive summary (3-5 sentences) in English.\n\nDaily statistics for {report_date}:\n- Total AIS messages received: {total_messages}\n- Unique vessels observed: {unique_ships}\n- New vessels detected: {new_ships}\n- Maximum reception range: {max_range_km} km ({max_range_nm} nm)\n- Vessel type distribution: {shiptype_summary}\n\nProvide an insightful analysis of the day's maritime traffic patterns. Highlight interesting trends such as vessel diversity, traffic volume, or notable range performance. Respond only with the summary text, no introductions.";
+                                                            setSettings({ ...settings, ollama_daily_prompt_template: defaultPrompt });
+                                                            setTestDailyAIResponse(null);
+                                                        }}
+                                                        style={{ 
+                                                            background: 'transparent', 
+                                                            border: 'none', 
+                                                            color: '#44aaff', 
+                                                            fontSize: '0.75rem', 
+                                                            fontWeight: 700, 
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '4px'
+                                                        }}
+                                                    >
+                                                        <RefreshCw size={12} /> Reset to Default
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {testDailyAIResponse && (
+                                                <div style={{ 
+                                                    marginBottom: '12px', 
+                                                    padding: '12px', 
+                                                    background: testDailyAIResponse.error ? 'rgba(255,68,68,0.1)' : 'rgba(16,185,129,0.1)', 
+                                                    border: `1px solid ${testDailyAIResponse.error ? 'rgba(255,68,68,0.2)' : 'rgba(16,185,129,0.2)'}`,
+                                                    borderRadius: '8px',
+                                                    fontSize: '0.8rem',
+                                                    color: colors.textMain,
+                                                    lineHeight: '1.4'
+                                                }}>
+                                                    <div style={{ fontWeight: 800, fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '8px', opacity: 0.9, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span>{testDailyAIResponse.error ? 'Test Failed' : 'Daily Summary Preview'}</span>
+                                                        {testDailyAIResponse.stats && (
+                                                            <span style={{ 
+                                                                color: '#10b981', 
+                                                                background: 'rgba(16,185,129,0.2)', 
+                                                                padding: '2px 8px', 
+                                                                borderRadius: '4px',
+                                                                fontSize: '0.75rem'
+                                                            }}>
+                                                                {(testDailyAIResponse.stats.duration_ms / 1000).toFixed(2)}s
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    
+                                                    {testDailyAIResponse.error ? (
+                                                        <div style={{ color: '#ff4444' }}>{testDailyAIResponse.error}</div>
+                                                    ) : (
+                                                        <div>{testDailyAIResponse.text}</div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            <textarea 
+                                                className="input-premium" 
+                                                id="daily-prompt-textarea"
+                                                rows={8}
+                                                placeholder="Leave empty to use the built-in default prompt. Click 'Reset to Default' to see and customize it."
+                                                value={settings.ollama_daily_prompt_template || ''} 
+                                                onChange={e => setSettings({ ...settings, ollama_daily_prompt_template: e.target.value })} 
+                                                style={{ 
+                                                    width: '100%', 
+                                                    fontFamily: 'monospace', 
+                                                    fontSize: '0.85rem', 
+                                                    lineHeight: '1.5',
+                                                    resize: 'vertical',
+                                                    padding: '12px'
+                                                }}
+                                            />
+                                        </div>
+
+                                        <div style={{ marginTop: '20px' }}>
+                                            <div style={{ fontSize: '0.75rem', fontWeight: 800, color: colors.textMuted, marginBottom: '12px', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <Terminal size={14} /> Available Daily Variables
+                                            </div>
+                                            <div style={{ 
+                                                display: 'grid', 
+                                                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', 
+                                                gap: '8px',
+                                                padding: '2px',
+                                                background: 'transparent'
+                                            }}>
+                                                {[
+                                                    {t:'{report_date}', d:'Report Date'},
+                                                    {t:'{total_messages}', d:'Total Messages'},
+                                                    {t:'{unique_ships}', d:'Unique Vessels'},
+                                                    {t:'{new_ships}', d:'New Vessels'},
+                                                    {t:'{max_range_km}', d:'Max Range (km)'},
+                                                    {t:'{max_range_nm}', d:'Max Range (nm)'},
+                                                    {t:'{shiptype_summary}', d:'Type Distribution'}
+                                                ].map(item => (
+                                                    <div 
+                                                        key={item.t} 
+                                                        onClick={() => {
+                                                            const textarea = document.getElementById('daily-prompt-textarea') as HTMLTextAreaElement;
+                                                            if (textarea) {
+                                                                const start = textarea.selectionStart;
+                                                                const end = textarea.selectionEnd;
+                                                                const text = settings.ollama_daily_prompt_template || "";
+                                                                const newText = text.substring(0, start) + item.t + text.substring(end);
+                                                                setSettings({ ...settings, ollama_daily_prompt_template: newText });
                                                             }
                                                         }}
                                                         style={{ 
