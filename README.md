@@ -46,7 +46,7 @@ Total control over your AI's personality. Access the editor via **Settings -> AI
 
 ### Recommended Model
 For the best balance between speed and quality, we recommend:
-**gemma-4-e4b-it**
+**gemma-4-e4b-it
 
 ### Live AI Diagnostics
 Ensure your AI models and prompts are working flawlessly without waiting for a new vessel to appear.

@@ -1,0 +1,141 @@
+# Complete MID to Country mapping from Wikipedia
+mids = {
+    "201": "al", "202": "ad", "203": "at", "204": "pt", "205": "be", "206": "by", "207": "bg", "208": "va",
+    "209": "cy", "210": "cy", "211": "de", "212": "cy", "213": "ge", "214": "md", "215": "mt", "218": "de",
+    "219": "dk", "220": "dk", "224": "es", "225": "es", "226": "fr", "227": "fr", "228": "fr", "229": "mt",
+    "230": "fi", "231": "fo", "232": "gb", "233": "gb", "234": "gb", "235": "gb", "236": "gi", "237": "gr",
+    "238": "gr", "239": "gr", "240": "gr", "241": "gr", "242": "ma", "243": "hu", "244": "nl", "245": "nl",
+    "246": "nl", "247": "it", "248": "mt", "249": "mt", "250": "ie", "251": "is", "252": "mc", "253": "lu",
+    "254": "mc", "255": "pt", "256": "mt", "257": "no", "258": "no", "259": "no", "261": "pl", "262": "me",
+    "263": "pt", "264": "ro", "265": "se", "266": "se", "267": "sk", "268": "sm", "269": "ch", "270": "cz",
+    "271": "tr", "272": "ua", "273": "ru", "274": "lt", "275": "lv", "276": "ee", "277": "lt", "278": "si",
+    "279": "rs", "301": "ai", "303": "us", "304": "ag", "305": "ag", "306": "bq", "307": "aw", "308": "bs",
+    "309": "bs", "310": "bm", "311": "bs", "312": "bz", "314": "bb", "316": "ca", "319": "ky", "321": "cr",
+    "323": "cu", "325": "dm", "327": "do", "329": "gp", "330": "gd", "331": "gl", "332": "gt", "334": "hn",
+    "336": "ht", "338": "us", "339": "jm", "341": "kn", "343": "lc", "345": "mx", "347": "mq", "348": "ms",
+    "350": "ni", "351": "pa", "352": "pa", "353": "pa", "354": "pa", "355": "pa", "356": "pa", "357": "pa",
+    "358": "pr", "359": "sv", "361": "pm", "362": "tt", "364": "tc", "366": "us", "367": "us", "368": "us",
+    "369": "us", "370": "pa", "371": "pa", "372": "pa", "373": "pa", "374": "pa", "375": "vc", "376": "vc",
+    "377": "vc", "378": "vg", "379": "vi", "401": "af", "403": "sa", "405": "bd", "408": "bh", "410": "bt",
+    "412": "cn", "413": "cn", "414": "cn", "416": "tw", "417": "lk", "419": "in", "422": "ir", "423": "az",
+    "425": "iq", "428": "il", "431": "jp", "432": "jp", "434": "tm", "436": "uz", "437": "uz", "438": "jo",
+    "440": "kr", "441": "kr", "443": "ps", "445": "kp", "447": "kw", "450": "lb", "451": "kg", "453": "mo",
+    "455": "mv", "457": "mn", "459": "np", "461": "om", "463": "pk", "466": "qa", "468": "sy", "470": "ae",
+    "471": "ae", "472": "tj", "473": "ye", "475": "ye", "477": "hk", "478": "ba", "501": "tf", "503": "au",
+    "506": "mm", "508": "bn", "510": "fm", "512": "fj", "514": "cx", "515": "cc", "516": "ck", "518": "sb",
+    "520": "gu", "523": "id", "525": "id", "529": "ki", "531": "la", "533": "my", "536": "mp", "538": "mh",
+    "540": "nc", "542": "nu", "544": "nr", "546": "pf", "548": "ph", "550": "tl", "553": "pg", "555": "pn",
+    "557": "sb", "559": "as", "561": "ws", "563": "sg", "564": "sg", "565": "sg", "566": "sg", "567": "th",
+    "570": "to", "572": "tv", "574": "vn", "576": "vu", "577": "vu", "578": "wf", "601": "za", "603": "ao",
+    "605": "dz", "607": "sh", "608": "ac", "609": "bi", "610": "bj", "611": "bw", "612": "cf", "613": "cm",
+    "615": "cg", "616": "km", "617": "cv", "618": "tf", "619": "ci", "620": "km", "621": "dj", "622": "eg",
+    "624": "et", "625": "er", "626": "ga", "627": "gh", "629": "gm", "630": "gw", "631": "gq", "632": "gn",
+    "633": "bf", "634": "ke", "635": "tf", "636": "lr", "637": "lr", "638": "lr", "642": "ly", "644": "ls",
+    "645": "mu", "647": "mg", "649": "ml", "650": "mr", "654": "mw", "655": "mz", "656": "ne", "657": "ng",
+    "659": "na", "660": "re", "661": "rw", "662": "sn", "663": "sc", "664": "sl", "665": "so", "666": "sd",
+    "667": "sz", "668": "st", "669": "tf", "670": "td", "671": "tg", "672": "tn", "674": "tz", "675": "ug",
+    "676": "cd", "677": "tz", "678": "zm", "679": "zw", "701": "ar", "710": "br", "720": "cl", "725": "co",
+    "730": "ec", "735": "fk", "740": "gf", "745": "gy", "750": "py", "755": "pe", "760": "sr", "765": "gs",
+    "770": "uy", "775": "ve"
+}
+
+names = {
+    "al": "Albania", "ad": "Andorra", "at": "Austria", "pt": "Portugal", "be": "Belgium", "by": "Belarus",
+    "bg": "Bulgaria", "va": "Vatican City", "cy": "Cyprus", "de": "Germany", "ge": "Georgia", "md": "Moldova",
+    "am": "Armenia", "mt": "Malta", "fo": "Faroe Islands", "es": "Spain", "fr": "France", "fi": "Finland",
+    "gb": "United Kingdom", "gi": "Gibraltar", "gr": "Greece", "ma": "Morocco", "hu": "Hungary", "nl": "Netherlands",
+    "it": "Italy", "ie": "Ireland", "is": "Iceland", "mc": "Monaco", "lu": "Luxembourg", "no": "Norway",
+    "pl": "Poland", "me": "Montenegro", "ro": "Romania", "se": "Sweden", "sk": "Slovakia", "sm": "San Marino",
+    "ch": "Switzerland", "cz": "Czech Republic", "tr": "Turkey", "ua": "Ukraine", "ru": "Russia", "lt": "Lithuania",
+    "lv": "Latvia", "ee": "Estonia", "si": "Slovenia", "rs": "Serbia", "ai": "Anguilla", "us": "USA",
+    "ag": "Antigua and Barbuda", "bq": "Curaçao", "aw": "Aruba", "bs": "Bahamas", "bm": "Bermuda", "bz": "Belize",
+    "bb": "Barbados", "ca": "Canada", "ky": "Cayman Islands", "cr": "Costa Rica", "cu": "Cuba", "dm": "Dominica",
+    "do": "Dominican Republic", "gp": "Guadeloupe", "gd": "Grenada", "gl": "Greenland", "gt": "Guatemala",
+    "hn": "Honduras", "ht": "Haiti", "jm": "Jamaica", "kn": "Saint Kitts and Nevis", "lc": "Saint Lucia",
+    "mx": "Mexico", "mq": "Martinique", "ms": "Montserrat", "ni": "Nicaragua", "pa": "Panama", "pr": "Puerto Rico",
+    "sv": "El Salvador", "pm": "Saint Pierre and Miquelon", "tt": "Trinidad and Tobago", "tc": "Turks and Caicos",
+    "vc": "Saint Vincent and the Grenadines", "vg": "British Virgin Islands", "vi": "US Virgin Islands",
+    "af": "Afghanistan", "sa": "Saudi Arabia", "bd": "Bangladesh", "bh": "Bahrain", "bt": "Bhutan", "cn": "China",
+    "tw": "Taiwan", "lk": "Sri Lanka", "in": "India", "ir": "Iran", "az": "Azerbaijan", "iq": "Iraq",
+    "il": "Israel", "jp": "Japan", "tm": "Turkmenistan", "uz": "Uzbekistan", "jo": "Jordan", "kr": "South Korea",
+    "ps": "Palestine", "kp": "North Korea", "kw": "Kuwait", "lb": "Lebanon", "kg": "Kyrgyzstan", "mo": "Macao",
+    "mv": "Maldives", "mn": "Mongolia", "np": "Nepal", "om": "Oman", "pk": "Pakistan", "qa": "Qatar",
+    "sy": "Syria", "ae": "United Arab Emirates", "tj": "Tajikistan", "ye": "Yemen", "hk": "Hong Kong",
+    "ba": "Bosnia and Herzegovina", "tf": "French Southern Territories", "au": "Australia", "mm": "Myanmar",
+    "bn": "Brunei", "fm": "Micronesia", "fj": "Fiji", "cx": "Christmas Island", "cc": "Cocos Islands",
+    "ck": "Cook Islands", "sb": "Solomon Islands", "gu": "Guam", "id": "Indonesia", "ki": "Kiribati",
+    "la": "Laos", "my": "Malaysia", "mp": "Northern Mariana Islands", "mh": "Marshall Islands", "nc": "New Caledonia",
+    "nu": "Niue", "nr": "Nauru", "pf": "French Polynesia", "ph": "Philippines", "tl": "Timor-Leste",
+    "pg": "Papua New Guinea", "pn": "Pitcairn", "as": "American Samoa", "ws": "Samoa", "sg": "Singapore",
+    "th": "Thailand", "to": "Tonga", "tv": "Tuvalu", "vn": "Vietnam", "vu": "Vanuatu", "wf": "Wallis and Futuna",
+    "za": "South Africa", "ao": "Angola", "dz": "Algeria", "sh": "Saint Helena", "ac": "Ascension", "bi": "Burundi",
+    "bj": "Benin", "bw": "Botswana", "cf": "Central African Republic", "cm": "Cameroon", "cg": "Congo",
+    "km": "Comoros", "cv": "Cabo Verde", "ci": "Côte d'Ivoire", "dj": "Djibouti", "eg": "Egypt", "et": "Ethiopia",
+    "er": "Eritrea", "ga": "Gabon", "gh": "Ghana", "gm": "Gambia", "gw": "Guinea-Bissau", "gq": "Equatorial Guinea",
+    "gn": "Guinea", "bf": "Burkina Faso", "ke": "Kenya", "lr": "Liberia", "ly": "Libya", "ls": "Lesotho",
+    "mu": "Mauritius", "mg": "Madagascar", "ml": "Mali", "mr": "Mauritania", "mw": "Malawi", "mz": "Mozambique",
+    "ne": "Niger", "ng": "Nigeria", "na": "Namibia", "re": "Reunion", "rw": "Rwanda", "sn": "Senegal",
+    "sc": "Seychelles", "sl": "Sierra Leone", "so": "Somalia", "sd": "Sudan", "sz": "Eswatini", "st": "Sao Tome and Principe",
+    "td": "Chad", "tg": "Togo", "tn": "Tunisia", "tz": "Tanzania", "ug": "Uganda", "cd": "DR Congo", "zm": "Zambia",
+    "zw": "Zimbabwe", "ar": "Argentina", "br": "Brazil", "cl": "Chile", "co": "Colombia", "ec": "Ecuador",
+    "fk": "Falkland Islands", "gf": "French Guiana", "gy": "Guyana", "py": "Paraguay", "pe": "Peru", "sr": "Suriname",
+    "gs": "South Georgia", "uy": "Uruguay", "ve": "Venezuela"
+}
+
+adjectives = {
+    "al": "Albanian", "ad": "Andorran", "at": "Austrian", "pt": "Portuguese", "be": "Belgian", "by": "Belarusian",
+    "bg": "Bulgarian", "va": "Vatican", "cy": "Cypriot", "de": "German", "ge": "Georgian", "md": "Moldovan",
+    "am": "Armenian", "mt": "Maltese", "fo": "Faroese", "es": "Spanish", "fr": "French", "fi": "Finnish",
+    "gb": "British", "gi": "Gibraltarian", "gr": "Greek", "ma": "Moroccan", "hu": "Hungarian", "nl": "Dutch",
+    "it": "Italian", "ie": "Irish", "is": "Icelandic", "mc": "Monegasque", "lu": "Luxembourg", "no": "Norwegian",
+    "pl": "Polish", "me": "Montenegrin", "ro": "Romanian", "se": "Swedish", "sk": "Slovak", "sm": "San Marinese",
+    "ch": "Swiss", "cz": "Czech", "tr": "Turkish", "ua": "Ukrainian", "ru": "Russian", "lt": "Lithuanian",
+    "lv": "Latvian", "ee": "Estonian", "si": "Slovenian", "rs": "Serbian", "ai": "Anguillan", "us": "American",
+    "ag": "Antiguan", "bq": "Curaçaoan", "aw": "Aruban", "bs": "Bahamian", "bm": "Bermudian", "bz": "Belizean",
+    "bb": "Barbadian", "ca": "Canadian", "ky": "Caymanian", "cr": "Costa Rican", "cu": "Cuban", "dm": "Dominican",
+    "do": "Dominican", "gp": "Guadeloupean", "gd": "Grenadian", "gl": "Greenlandic", "gt": "Guatemalan",
+    "hn": "Honduran", "ht": "Haitian", "jm": "Jamaican", "kn": "Kittitian", "lc": "Saint Lucian",
+    "mx": "Mexican", "mq": "Martinican", "ms": "Montserratian", "ni": "Nicaraguan", "pa": "Panamanian", "pr": "Puerto Rican",
+    "sv": "Salvadoran", "pm": "Saint-Pierrais", "tt": "Trinidadian", "tc": "Turks and Caicos",
+    "vc": "Vincentian", "vg": "British Virgin Islander", "vi": "US Virgin Islander",
+    "af": "Afghan", "sa": "Saudi", "bd": "Bangladeshi", "bh": "Bahraini", "bt": "Bhutanese", "cn": "Chinese",
+    "tw": "Taiwanese", "lk": "Sri Lankan", "in": "Indian", "ir": "Iranian", "az": "Azerbaijani", "iq": "Iraqi",
+    "il": "Israeli", "jp": "Japanese", "tm": "Turkmen", "uz": "Uzbek", "jo": "Jordanian", "kr": "South Korean",
+    "ps": "Palestinian", "kp": "North Korean", "kw": "Kuwaiti", "lb": "Lebanese", "kg": "Kyrgyz", "mo": "Macanese",
+    "mv": "Maldivian", "mn": "Mongolian", "np": "Nepalese", "om": "Omani", "pk": "Pakistani", "qa": "Qatari",
+    "sy": "Syrian", "ae": "Emirati", "tj": "Tajik", "ye": "Yemeni", "hk": "Hong Kong",
+    "ba": "Bosnian", "tf": "French", "au": "Australian", "mm": "Burmese",
+    "bn": "Bruneian", "fm": "Micronesian", "fj": "Fijian", "cx": "Christmas Islander", "cc": "Cocos Islander",
+    "ck": "Cook Islander", "sb": "Solomon Islander", "gu": "Guamanian", "id": "Indonesian", "ki": "Kiribati",
+    "la": "Lao", "my": "Malaysian", "mp": "Northern Marianan", "mh": "Marshallese", "nc": "New Caledonian",
+    "nu": "Niuean", "nr": "Nauruan", "pf": "French Polynesian", "ph": "Philippine", "tl": "Timorese",
+    "pg": "Papua New Guinean", "pn": "Pitcairn Islander", "as": "American Samoan", "ws": "Samoan", "sg": "Singaporean",
+    "th": "Thai", "to": "Tongan", "tv": "Tuvaluan", "vn": "Vietnamese", "vu": "Vanuatu", "wf": "Wallis and Futuna",
+    "za": "South African", "ao": "Angolan", "dz": "Algerian", "sh": "Saint Helenian", "ac": "Ascension", "bi": "Burundian",
+    "bj": "Beninese", "bw": "Botswanan", "cf": "Central African", "cm": "Cameroonian", "cg": "Congolese",
+    "km": "Comoran", "cv": "Cabo Verdean", "ci": "Ivorian", "dj": "Djiboutian", "eg": "Egyptian", "et": "Ethiopian",
+    "er": "Eritrean", "ga": "Gabonese", "gh": "Ghanaian", "gm": "Gambian", "gw": "Bissau-Guinean", "gq": "Equatorial Guinean",
+    "gn": "Guinean", "bf": "Burkinabé", "ke": "Kenyan", "lr": "Liberian", "ly": "Libyan", "ls": "Lesotho",
+    "mu": "Mauritian", "mg": "Malagasy", "ml": "Malian", "mr": "Mauritanian", "mw": "Malawian", "mz": "Mozambican",
+    "ne": "Nigerien", "ng": "Nigerian", "na": "Namibian", "re": "Reunionese", "rw": "Rwandan", "sn": "Senegalese",
+    "sc": "Seychellois", "sl": "Sierra Leonean", "so": "Somali", "sd": "Sudanese", "sz": "Swazi", "st": "Santomean",
+    "td": "Chadian", "tg": "Togolese", "tn": "Tunisian", "tz": "Tanzanian", "ug": "Ugandan", "cd": "Congolese", "zm": "Zambian",
+    "zw": "Zimbabwean", "ar": "Argentine", "br": "Brazilian", "cl": "Chilean", "co": "Colombian", "ec": "Ecuadorean",
+    "fk": "Falkland Islander", "gf": "French Guianese", "gy": "Guyanese", "py": "Paraguayan", "pe": "Peruvian", "sr": "Surinamese",
+    "gs": "South Georgian", "uy": "Uruguayan", "ve": "Venezuelan"
+}
+
+print('mids = {')
+for k, v in sorted(mids.items()):
+    print(f'    "{k}": "{v}",')
+print('}')
+
+print('\nnames = {')
+for k, v in sorted(names.items()):
+    print(f'    "{k}": "{v}",')
+print('}')
+
+print('\nadjectives = {')
+for k, v in sorted(adjectives.items()):
+    print(f'    "{k}": "{v}",')
+print('}')

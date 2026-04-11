@@ -16,7 +16,8 @@ def _replace_placeholders(template: str, variables: dict) -> str:
             if isinstance(value, float):
                 val_str = str(round(value, 4))
             else:
-                val_str = str(value) if value is not None else ""
+                # Use "unknown" if the value is missing to prevent AI hallucinations
+                val_str = str(value) if value and str(value).strip() != "" else "unknown"
             final_text = final_text.replace(placeholder, val_str)
     return final_text
 
