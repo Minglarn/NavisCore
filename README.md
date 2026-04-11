@@ -44,11 +44,9 @@ Total control over your AI's personality. Access the editor via **Settings -> AI
 - **Rich Variables**: Access over 30+ variables including `{name}`, `{mmsi}`, `{sog}`, `{destination}`, `{last_seen_relative}`, and many more.
 - **Live Guide**: Built-in variable guide helps you craft the perfect prompt with one-click insertion.
 
-### Recommended Models
+### Recommended Model
 For the best balance between speed and quality, we recommend:
-1. **gemma4-nothink2:latest** (Fastest & most stable)
-2. **gemma4-fast:latest** (Great general performance)
-3. **gemma-analytisk:latest** (More detailed analysis)
+**gemma-4-e4b-it**
 
 ### Live AI Diagnostics
 Ensure your AI models and prompts are working flawlessly without waiting for a new vessel to appear.
