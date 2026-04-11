@@ -44,7 +44,8 @@ MID_MAP = {
 def get_country_code_from_mmsi(mmsi_str: str) -> str:
     if not mmsi_str or len(mmsi_str) < 3: return None
     mid = mmsi_str[:3]
-    return MID_MAP.get(mid)
+    res = MID_MAP.get(mid)
+    return res.lower() if res else None
 
 COUNTRY_NAMES = {
     "ac": "Ascension", "ad": "Andorra", "ae": "United Arab Emirates", "af": "Afghanistan", "ag": "Antigua and Barbuda",

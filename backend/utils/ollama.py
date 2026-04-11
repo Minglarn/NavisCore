@@ -18,6 +18,8 @@ def _replace_placeholders(template: str, variables: dict) -> str:
             else:
                 # Use "unknown" if the value is missing to prevent AI hallucinations
                 val_str = str(value) if value and str(value).strip() != "" else "unknown"
+                if key == 'country_code' and val_str != "unknown":
+                    val_str = val_str.lower()
             final_text = final_text.replace(placeholder, val_str)
     return final_text
 

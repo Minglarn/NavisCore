@@ -196,7 +196,7 @@ async def process_ais_data(data: dict):
             ship_data = {
                 "mmsi": mmsi_str, "lat": lat, "lon": lon, "sog": data.get("speed") or data.get("sog"), "cog": data.get("course") or data.get("cog"),
                 "heading": data.get("heading"), "name": ship_name, "callsign": data.get("callsign"), "shiptype": current_shiptype,
-                "status_text": data.get("status_text") or data.get("status"), "country_code": data.get("country_code") or get_country_code_from_mmsi(mmsi_str),
+                "status_text": data.get("status_text") or data.get("status"), "country_code": (data.get("country_code") or get_country_code_from_mmsi(mmsi_str) or "").lower() or None,
                 "timestamp": int(datetime.now().timestamp() * 1000), "is_meteo": is_meteo, "is_aton": is_aton,
                 "is_sar": final_is_sar, "altitude": data.get("altitude"), "aton_type": data.get("aton_type"), "aton_type_text": data.get("aton_type_text"),
                 "destination": data.get("destination"), "draught": data.get("draught"), "is_emergency": data.get("is_emergency", False),
@@ -298,7 +298,7 @@ async def process_ais_data(data: dict):
                     if not ship_name and r[1]: ship_data["name"] = r[1]
                     if ship_data["shiptype"] is None: ship_data["shiptype"] = r[2]
                     if not ship_data["status_text"]: ship_data["status_text"] = r[3]
-                    if not ship_data["country_code"]: ship_data["country_code"] = r[4]
+                    if not ship_data["country_code"]: ship_data["country_code"] = r[4].lower() if r[4] else None
                     ship_data["length"], ship_data["width"] = r[5], r[6]
                     if not ship_data["destination"]: ship_data["destination"] = r[7]
                     if not ship_data["draught"]: ship_data["draught"] = r[8]
@@ -424,7 +424,7 @@ async def process_ais_data(data: dict):
                             "msg_type": msg_type,
                             "imo": ship_data.get("imo"),
                             "callsign": ship_data.get("callsign"),
-                            "country_code": ship_data.get("country_code"),
+                            "country_code": ship_data.get("country_code").lower() if ship_data.get("country_code") else None,
                             "ais_channel": ship_data.get("ais_channel"),
                             "sog": ship_data.get("sog"),
                             "cog": ship_data.get("cog"),
