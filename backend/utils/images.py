@@ -8,7 +8,8 @@ from datetime import datetime
 
 from config import IMAGES_DIR
 from .db import db_session
-
+from .settings import get_all_settings
+from .vessel_scraper import get_scraper
 logger = logging.getLogger("NavisCore")
 
 _broadcast_callback = None
@@ -94,7 +95,7 @@ async def try_marinetraffic_image(mmsi: str) -> bool:
     except Exception as e: logger.error(f"[Enrichment] MarineTraffic error for {mmsi}: {str(e)}")
     return False
 
-async def enrich_ship_data(mmsi: str):
+async def enrich_ship_data(mmsi: str, force: bool = False):
     if mmsi in active_lookups: return
     active_lookups.add(mmsi)
     try:
@@ -105,58 +106,86 @@ async def enrich_ship_data(mmsi: str):
                 
                 image_fetched_at, image_url, manual_image, is_meteo, is_aton, is_base_station, name = row
                 
-                if is_meteo or is_aton or is_base_station or not name or name.strip() == "":
-                    active_lookups.remove(mmsi)
-                    return
+                if not force:
+                    if is_meteo or is_aton or is_base_station or not name or name.strip() == "":
+                        active_lookups.remove(mmsi)
+                        return
 
-                name_upper = name.upper()
-                if any(x in name_upper for x in ["METEO", "WEATHER", "BASE STATION", "ATON"]):
-                    active_lookups.remove(mmsi)
-                    return
+                    name_upper = name.upper()
+                    if any(x in name_upper for x in ["METEO", "WEATHER", "BASE STATION", "ATON"]):
+                        active_lookups.remove(mmsi)
+                        return
 
-                if manual_image: active_lookups.remove(mmsi); return
-                if image_fetched_at:
-                    fetch_date = datetime.strptime(image_fetched_at, "%Y-%m-%d %H:%M:%S")
-                    if image_url and image_url != "/images/0.jpg":
-                        if (datetime.now() - fetch_date).days < 30: active_lookups.remove(mmsi); return
-                    else:
-                        if (datetime.now() - fetch_date).days < 1: active_lookups.remove(mmsi); return
+                    if manual_image: active_lookups.remove(mmsi); return
+                    if image_fetched_at:
+                        fetch_date = datetime.strptime(image_fetched_at, "%Y-%m-%d %H:%M:%S")
+                        if image_url and image_url != "/images/0.jpg":
+                            if (datetime.now() - fetch_date).days < 30: active_lookups.remove(mmsi); return
+                        else:
+                            if (datetime.now() - fetch_date).days < 1: active_lookups.remove(mmsi); return
 
         local_path = os.path.join(IMAGES_DIR, f"{mmsi}.jpg")
         if os.path.exists(local_path):
-            async with db_session() as db:
-                await db.execute('UPDATE ships SET image_url = ?, image_fetched_at = CURRENT_TIMESTAMP WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
-                await db.commit()
-            await broadcast_image({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
-            return True
+            if force:
+                try: os.remove(local_path)
+                except Exception: pass
+            else:
+                async with db_session() as db:
+                    await db.execute('UPDATE ships SET image_url = ?, image_fetched_at = CURRENT_TIMESTAMP WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
+                    await db.commit()
+                await broadcast_image({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
+                return True
 
         async with db_session() as db:
             await db.execute('INSERT OR IGNORE INTO ships (mmsi, image_fetched_at, last_seen) VALUES (?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)', (mmsi,))
             await db.execute('UPDATE ships SET image_fetched_at = CURRENT_TIMESTAMP WHERE mmsi = ?', (mmsi,))
             await db.commit()
         
-        async with httpx.AsyncClient() as client:
-            res = await client.get(f"https://www.myshiptracking.com/requests/autocomplete.php?type=1&site=1&q={mmsi}", headers={'User-Agent': 'Mozilla/5.0'}, timeout=10.0)
-            try:
-                data = res.json() if res.status_code == 200 else []
-            except Exception:
-                data = []
-            has_image = False
-            if data and isinstance(data, list) and len(data) > 0:
-                ship = data[0]
-                portrait_id = ship.get("PORTRAIT")
-                if portrait_id and portrait_id != '0':
-                    img_res = await client.get(f"https://static.myshiptracking.com/images/vessels/small/{portrait_id}.jpg", timeout=10.0)
-                    if img_res.status_code == 200:
-                        with open(os.path.join(IMAGES_DIR, f"{mmsi}.jpg"), "wb") as f: f.write(img_res.content)
-                        async with db_session() as db:
-                            await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
-                            await db.commit()
-                        await broadcast_image({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
-                        has_image = True
-            if not has_image:
-                if not await try_minglarn_image(mmsi):
-                    await asyncio.sleep(2); await try_marinetraffic_image(mmsi) or await handle_fallback_image(mmsi)
+        has_image = False
+        
+        # 1. Try Minglarn (fastest)
+        if await try_minglarn_image(mmsi):
+            has_image = True
+        
+        # 2. Try myshiptracking
+        if not has_image:
+            async with httpx.AsyncClient() as client:
+                res = await client.get(f"https://www.myshiptracking.com/requests/autocomplete.php?type=1&site=1&q={mmsi}", headers={'User-Agent': 'Mozilla/5.0'}, timeout=10.0)
+                try:
+                    data = res.json() if res.status_code == 200 else []
+                except Exception:
+                    data = []
+                if data and isinstance(data, list) and len(data) > 0:
+                    ship = data[0]
+                    portrait_id = ship.get("PORTRAIT")
+                    if portrait_id and portrait_id != '0':
+                        img_res = await client.get(f"https://static.myshiptracking.com/images/vessels/small/{portrait_id}.jpg", timeout=10.0)
+                        if img_res.status_code == 200:
+                            with open(os.path.join(IMAGES_DIR, f"{mmsi}.jpg"), "wb") as f: f.write(img_res.content)
+                            async with db_session() as db:
+                                await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
+                                await db.commit()
+                            await broadcast_image({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
+                            has_image = True
+                            
+        # 3. If still no image, check Playwright Settings and fallback
+        if not has_image:
+            settings = await get_all_settings()
+            if settings.get("playwright_enabled", "false") == "true":
+                logger.info(f"[Enrichment] Trying Playwright Scraper for {mmsi}")
+                if await get_scraper(IMAGES_DIR).fetch_image(mmsi):
+                    async with db_session() as db:
+                        await db.execute('UPDATE ships SET image_url = ? WHERE mmsi = ?', (f"/images/{mmsi}.jpg", mmsi))
+                        await db.commit()
+                    await broadcast_image({"mmsi": mmsi, "imageUrl": f"/images/{mmsi}.jpg"})
+                    has_image = True
+            
+        # 4. Final Http Fallback
+        if not has_image:
+            await asyncio.sleep(2)
+            if not await try_marinetraffic_image(mmsi):
+                await handle_fallback_image(mmsi)
+
     except Exception as e: logger.error(f"[Enrichment] Error for {mmsi}: {e}")
     finally:
         if mmsi in active_lookups: active_lookups.remove(mmsi)

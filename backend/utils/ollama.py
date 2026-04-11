@@ -7,6 +7,19 @@ from datetime import datetime
 
 logger = logging.getLogger("NavisCore")
 
+def _replace_placeholders(template: str, variables: dict) -> str:
+    """Helper to replace {var} in templates with automatic float rounding to 4 decimals."""
+    final_text = template
+    for key, value in variables.items():
+        placeholder = "{" + str(key) + "}"
+        if placeholder in final_text:
+            if isinstance(value, float):
+                val_str = str(round(value, 4))
+            else:
+                val_str = str(value) if value is not None else ""
+            final_text = final_text.replace(placeholder, val_str)
+    return final_text
+
 _ollama_lock = asyncio.Lock()
 
 def get_relative_time_string(timestamp_ms):
@@ -81,7 +94,7 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
                 "You are a maritime assistant. Based on this AIS data for a vessel in JSON format, "
                 "write a short information sentence (max 2 sentences) in English.\n\n"
                 "Include details such as:\n"
-                "- Nationality/Home country based on 'country_adjective' and 'country_code'. Put the country code in parentheses after the country name.\n"
+                "- Nationality/Home country based on {country_adjective} and {country_code}. Put the country code in parentheses after the country name.\n"
                 "- Vessel type {ship_type_label} and Status '{status_text}'\n"
                 "- Name {name} and MMSI {mmsi}\n"
                 "- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n"
@@ -90,19 +103,11 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
             )
 
         # Ersätt placeholders dynamiskt från payload
-        final_prompt = prompt_template
-        
-        # Lägg till special-placeholders i en temporär ordbok för ersättning
         template_vars = {**payload}
         template_vars["last_seen_relative"] = last_seen_rel
         template_vars["current_date"] = current_date
         
-        # Säker ersättning för att undvika f-string kraschar om användaren har { i texten
-        for key, value in template_vars.items():
-            placeholder = "{" + str(key) + "}"
-            if placeholder in final_prompt:
-                val_str = str(value) if value is not None else ""
-                final_prompt = final_prompt.replace(placeholder, val_str)
+        final_prompt = _replace_placeholders(prompt_template, template_vars)
 
         if api_type == 'openai':
             # Auto-adjust URL if it looks like a base URL
@@ -286,12 +291,7 @@ async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str,
         template_vars["has_previous_data"] = "yes" if has_prev else "no"
 
         # Safe placeholder replacement
-        final_prompt = prompt_template
-        for key, value in template_vars.items():
-            placeholder = "{" + str(key) + "}"
-            if placeholder in final_prompt:
-                val_str = str(value) if value is not None else ""
-                final_prompt = final_prompt.replace(placeholder, val_str)
+        final_prompt = _replace_placeholders(prompt_template, template_vars)
 
         if api_type == 'openai':
             final_url = url
@@ -416,12 +416,7 @@ async def fetch_ollama_daily_summary(stats_payload: dict, url: str, model: str, 
         template_vars["shiptype_summary"] = shiptype_summary
 
         # Safe placeholder replacement
-        final_prompt = prompt_template
-        for key, value in template_vars.items():
-            placeholder = "{" + str(key) + "}"
-            if placeholder in final_prompt:
-                val_str = str(value) if value is not None else ""
-                final_prompt = final_prompt.replace(placeholder, val_str)
+        final_prompt = _replace_placeholders(prompt_template, template_vars)
 
         if api_type == 'openai':
             final_url = url

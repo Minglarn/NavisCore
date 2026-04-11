@@ -1373,7 +1373,22 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                             {activeTab === 'data' && (
                                 <div className="settings-grid">
                                     <div className="settings-card">
+                                        <div className="settings-card-title"><Globe size={14} /> Advanced Image Enrichment</div>
+                                        <div className="form-group-premium">
+                                            <div>
+                                                <label>Enable Playwright Stealth Scraper</label>
+                                                <div className="description">Use an embedded headless browser to bypass anti-bot protections on image sites (Resource Intensive). Will be used as fallback when simple queries fail.</div>
+                                            </div>
+                                            <Toggle
+                                                checked={settings.playwright_enabled === 'true'}
+                                                onChange={val => setSettings({ ...settings, playwright_enabled: String(val) })}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="settings-card">
                                         <div className="settings-card-title"><Database size={14} /> System Backup & Migration</div>
+
                                         <div style={{ display: 'grid', gap: '20px' }}>
                                             <div className="form-group-premium">
                                                 <div>

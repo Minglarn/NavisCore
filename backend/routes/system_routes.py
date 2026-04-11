@@ -10,6 +10,7 @@ from datetime import datetime
 from fastapi import APIRouter, UploadFile, File, Response
 import aiosqlite
 from utils.ollama import fetch_ollama_short_info, fetch_ollama_hourly_summary, fetch_ollama_daily_summary
+from ais_logic import SHIP_TYPE_MAP, NAV_STATUS_MAP
 
 logger = logging.getLogger("NavisCore")
 
@@ -151,13 +152,13 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
 
     @router.post("/api/settings/test_ollama")
     async def test_ollama_api(config: dict):
-        """Test Ollama integration with a dummy payload."""
+        """Test Ollama integration with a random real vessel or mock payload."""
         logger.info(f"Ollama test triggered via API with model: {config.get('model')}")
         
-        # Create a realistic test payload
+        # Default mock payload (fallback)
         test_payload = {
             "mmsi": "265123456",
-            "name": "TEST VESSEL 1",
+            "name": "MOCK TEST VESSEL",
             "country_code": "SE",
             "country_name": "Sweden",
             "country_adjective": "Swedish",
@@ -167,8 +168,49 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
             "sog": 12.5,
             "lat": 59.3293,
             "lon": 18.0686,
-            "last_seen": int(datetime.now().timestamp() * 1000) - (10 * 60 * 1000) # 10 mins ago
+            "last_seen": int(datetime.now().timestamp() * 1000) - (10 * 60 * 1000)
         }
+
+        # Try to find a random real vessel from the DB
+        try:
+            async with db_session() as db:
+                db.row_factory = aiosqlite.Row
+                # Filter for real vessels: not ATON, not METEO, not BASE STATION, and must have a name
+                query = """
+                    SELECT * FROM ships 
+                    WHERE is_aton = 0 
+                      AND is_meteo = 0 
+                      AND is_base_station = 0 
+                      AND name IS NOT NULL 
+                      AND name != ''
+                    ORDER BY RANDOM() 
+                    LIMIT 1
+                """
+                async with db.execute(query) as cursor:
+                    row = await cursor.fetchone()
+                    if row:
+                        d = dict(row)
+                        logger.info(f"Using real vessel for AI test: {d.get('name')} ({d.get('mmsi')})")
+                        
+                        # Map DB fields to test_payload
+                        test_payload = {
+                            "mmsi": str(d.get("mmsi")),
+                            "name": d.get("name"),
+                            "country_code": d.get("country_code", "SE"),
+                            "country_name": d.get("country_name", "Unknown"),
+                            "country_adjective": d.get("country_adjective", "Unknown"),
+                            "ship_type_label": SHIP_TYPE_MAP.get(d.get("type"), "Unknown Type"),
+                            "status_text": NAV_STATUS_MAP.get(d.get("nav_status"), "Under Way"),
+                            "destination": d.get("destination", "Open Sea"),
+                            "sog": d.get("sog", 0.0),
+                            "lat": d.get("latitude", 0.0),
+                            "lon": d.get("longitude", 0.0),
+                            "last_seen": int(datetime.strptime(d["last_seen"], "%Y-%m-%d %H:%M:%S").timestamp() * 1000) if d.get("last_seen") else int(datetime.now().timestamp() * 1000)
+                        }
+                    else:
+                        logger.info("No real vessels found in DB for AI test, using mock.")
+        except Exception as e:
+            logger.warning(f"Error fetching real vessel for AI test: {e}. Using mock.")
         
         url = config.get("url")
         model = config.get("model")

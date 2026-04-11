@@ -1,6 +1,6 @@
 # NavisCore 📡
 
-![Version](https://img.shields.io/badge/version-2026.03.29-blue)
+![Version](https://img.shields.io/badge/version-2026.04.11-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
 ![Status](https://img.shields.io/badge/status-active-success)
@@ -10,21 +10,24 @@
 
 ![Screenshot](https://github.com/Minglarn/NavisCore/blob/main/screenshot.png?raw=true)
 
-## 🚀 Key Features
+## Key Features
 
 - **All-in-One Docker Solution**: Fully containerized environment with separate services for SDR decoding and data processing.
 - **High Concurrency Database**: Optimized SQLite engine using **Write-Ahead Logging (WAL)** and centralized session management for lock-free performance under heavy traffic.
 - **Standardized Ship Mapping**: Full support for **ITU-R M.1371-5** AIS standards, including a smart editable ship category system with predefined dropdowns.
 - **Smart Data Hybridization**: Seamless integration of local SDR data (via [AIS-catcher](https://github.com/jvde-github/AIS-catcher)) and global feeds from [AisStream.io](https://aisstream.io) with intelligent deduplication.
 - **Safety-Related Messages (AIS Type 12/14)**: Built-in support for receiving, persisting, and displaying critical maritime safety alerts in a dedicated notification system.
-- **Vessel Enrichment**: Automatic vessel image fetching with intelligent caching (30-day persistence) and fallback logic.
+- **Vessel Enrichment**: Automatic vessel image fetching with intelligent fallback logic.
+  - **Stage 1**: Direct MarineTraffic API/Scraping.
+  - **Stage 2**: Playwright-based VesselFinder scraping (for JS-protected pages).
+  - **⚠️ Note**: Playwright scraping is resource-intensive as it launches a headless Chromium instance within the container.
 - **Advanced Visualization**: Sleek, high-performance map featuring real-time tracking, COG lines, and persistent user settings (zoom, center, layer preferences).
 - **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, including a **high-precision live timer** that updates every 10 seconds for sub-minute accuracy.
 - **Automated Data Maintenance**: Configurable auto-purge system that cleans up old vessel records and images to maintain peak database performance.
-- **🤖 AI Intelligence (Ollama)**: Integrated local AI summaries for new vessels. NavisCore uses **Ollama** to generate natural language descriptions of ships based on real-time AIS data.
+- **AI Intelligence (Ollama)**: Integrated local AI summaries for new vessels. NavisCore uses **Ollama** to generate natural language descriptions of ships based on real-time AIS data.
 - **Global Localization**: Full English translation of backend AI prompt generation, country mappings, and UI elements.
 
-## 🤖 AI Intelligence (Ollama)
+## AI Intelligence (Ollama)
 
 NavisCore features a built-in AI enrichment engine that transforms raw AIS data into human-readable summaries.
 
@@ -52,7 +55,7 @@ Ensure your AI models and prompts are working flawlessly without waiting for a n
 - **Live Preview**: Read the exact output your model generates directly in the UI, making prompt engineering seamless and immediate.
 - **Built-in Stress Testing**: A dedicated `stress_test_ollama.py` tool allows sequential bulk testing of your model's stability and speed.
 
-## 🧭 UI Visual Indicators
+## UI Visual Indicators
 
 Understanding what happens on the map:
 
@@ -96,7 +99,7 @@ NavisCore automatically classifies signals based on reception distance to identi
 - **📡 ENHANCED RANGE** (Teal Badge): Signals received from **40–80 NM** (74–148 km). This typically indicates *Tropospheric Enhancement*.
 - **✨ TROPO DUCTING** (Purple Badge): Signals received from **>100 NM** (>185.2 km). This is a definitive indicator of *Tropospheric Ducting*, where signals travel far beyond the normal line-of-sight.
 
-## 🛠 Architecture
+## Architecture
 
 NavisCore is built with a modern, modular architecture:
 
@@ -105,7 +108,7 @@ NavisCore is built with a modern, modular architecture:
 3.  **Real-time Layer (WebSockets)**: Provides sub-second updates to all connected clients.
 4.  **UI Layer (React/Vite)**: A premium, responsive dashboard built with modern CSS and Leaflet.
 
-## 📦 Quick Start
+## Quick Start
 
 The easiest way to get started is with Docker Compose.
 
@@ -143,7 +146,7 @@ The easiest way to get started is with Docker Compose.
 
 3.  **Explore**: Access the dashboard at `http://localhost`.
 
-## 🔧 Development
+## Development
 
 Build from source to customize the experience:
 
@@ -156,7 +159,7 @@ docker-compose up -d --build
 ### Mock Mode
 No SDR? No problem. Set `MOCK_MODE=true` in the `app` environment to see simulated traffic in the Stockholm archipelago.
 
-## 📡 Data Sources & Hybrid Feed
+## Data Sources & Hybrid Feed
 
 NavisCore is designed to be a central hub for maritime data:
 
@@ -197,7 +200,7 @@ NavisCore is designed to be a central hub for maritime data:
   - **Coordinate System**: The system uses decimal degrees (WGS84). A Bounding Box is defined by its South-West (min lat, min lon) and North-East (max lat, max lon) corners.
   - **Auto-Sync**: The backend automatically restarts the stream filtering as soon as you save your new coordinates.
 
-## 🏠 Home Assistant Integration
+## Home Assistant Integration
 
 NavisCore can easily be integrated with [Home Assistant](https://www.home-assistant.io/) using its MQTT feed. Below is an example of an automation that notifies you when a new vessel is detected.
 
@@ -250,5 +253,5 @@ action:
         Max Range: {{ trigger.payload_json.max_range_nm }} nm
 ```
 
-## 📄 License & Contributing
+## License & Contributing
 Contributions are welcome! Feel free to open issues or submit pull requests.

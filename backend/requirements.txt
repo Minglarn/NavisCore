@@ -8,3 +8,6 @@ aiomqtt
 websockets
 python-multipart
 aiohttp
+playwright
+playwright-stealth
+python-dotenv

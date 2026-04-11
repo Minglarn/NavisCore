@@ -8,7 +8,7 @@ import random
 from datetime import datetime
 
 # Inställningar
-MODEL = "gemma-4-26b-a4b-moe"
+MODEL = "google/gemma-4-e4b"
 ITERATIONS = 10
 # Uppdaterad URL för OpenAI-kompatibelt API i Ollama
 # http://192.168.1.239:11434/api/generate <-- Om vi använder OLLAMA!!!

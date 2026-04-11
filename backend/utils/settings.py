@@ -58,6 +58,7 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "mqtt_pub_wait_for_name": "false",
         "new_vessel_threshold": "5",
         "new_vessel_timeout_h": "24",
+        "playwright_enabled": "false",
         "purge_days": "365",
         "ollama_hourly_prompt_template": ""
     }

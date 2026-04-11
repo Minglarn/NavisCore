@@ -3,6 +3,7 @@ import time
 import logging
 import shutil
 import os
+import asyncio
 from datetime import datetime, timezone
 from fastapi import APIRouter, UploadFile, File
 import aiosqlite
@@ -188,6 +189,17 @@ def setup_vessel_routes(db_session, get_all_settings, broadcast, IMAGES_DIR):
             return {"status": "success", "message": f"Vessel {mmsi} deleted from archive"}
         except Exception as e:
             logger.error(f"Error deleting ship {mmsi}: {e}")
+            return {"error": str(e)}
+
+    @router.post("/api/ships/{mmsi}/scrape")
+    async def scrape_ship_image(mmsi: str):
+        try:
+            if not mmsi.isdigit() or len(mmsi) != 9: return {"error": "Invalid MMSI"}
+            from utils.images import enrich_ship_data
+            asyncio.create_task(enrich_ship_data(mmsi, force=True))
+            return {"status": "success", "message": "Scraping task started"}
+        except Exception as e:
+            logger.error(f"Error triggering scrape for {mmsi}: {e}")
             return {"error": str(e)}
 
     return router

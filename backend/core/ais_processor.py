@@ -419,8 +419,8 @@ async def process_ais_data(data: dict):
                         pub_payload = {
                             "mmsi": mmsi_str,
                             "name": ship_data.get("name"),
-                            "lat": round(ship_data.get("lat"), 5) if ship_data.get("lat") is not None else None,
-                            "lon": round(ship_data.get("lon"), 5) if ship_data.get("lon") is not None else None,
+                            "lat": round(ship_data.get("lat"), 4) if ship_data.get("lat") is not None else None,
+                            "lon": round(ship_data.get("lon"), 4) if ship_data.get("lon") is not None else None,
                             "msg_type": msg_type,
                             "imo": ship_data.get("imo"),
                             "callsign": ship_data.get("callsign"),

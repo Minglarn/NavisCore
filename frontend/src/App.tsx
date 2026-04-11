@@ -2884,10 +2884,30 @@ export default function App() {
                             icon: <Search size={16} />,
                             onClick: () => {
                                 setSelectedShipMmsi(contextMenu.mmsi);
-                                // Forcing map to re-center is handled by popup/marker usually,
-                                // but we could trigger it here if needed.
                             },
                             separator: true
+                        },
+                        {
+                            label: 'Scrape for image',
+                            icon: <Globe size={16} />,
+                            onClick: async () => {
+                                setStatus(`Starting scrape for ${contextMenu.mmsi}...`);
+                                try {
+                                    const isDev = window.location.port === '5173';
+                                    const baseUrl = isDev ? 'http://127.0.0.1:8080/api' : '/api';
+                                    const res = await fetch(`${baseUrl}/ships/${contextMenu.mmsi}/scrape`, { method: 'POST' });
+                                    const data = await res.json();
+                                    if (data.status === 'success') {
+                                        setStatus(`Scrape task queued for ${contextMenu.mmsi}`);
+                                    } else {
+                                        setStatus(`Scrape error: ${data.error || 'Unknown error'}`);
+                                    }
+                                } catch (e) {
+                                    setStatus(`Scrape request failed`);
+                                    console.error(e);
+                                }
+                                setTimeout(() => setStatus('Connected to NavisCore'), 5000);
+                            }
                         },
                         {
                             label: 'Vessel Details',
