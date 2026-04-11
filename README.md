@@ -1,4 +1,4 @@
-# NavisCore 📡
+# NavisCore
 
 ![Version](https://img.shields.io/badge/version-2026.04.11-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -20,7 +20,7 @@
 - **Vessel Enrichment**: Automatic vessel image fetching with intelligent fallback logic.
   - **Stage 1**: Direct MarineTraffic API/Scraping.
   - **Stage 2**: Playwright-based VesselFinder scraping (for JS-protected pages).
-  - **⚠️ Note**: Playwright scraping is resource-intensive as it launches a headless Chromium instance within the container.
+  - **Note**: Playwright scraping is resource-intensive as it launches a headless Chromium instance within the container.
 - **Advanced Visualization**: Sleek, high-performance map featuring real-time tracking, COG lines, and persistent user settings (zoom, center, layer preferences).
 - **Visual Intelligence**: Real-time animations for new vessel discovery and data updates, including a **high-precision live timer** that updates every 10 seconds for sub-minute accuracy.
 - **Automated Data Maintenance**: Configurable auto-purge system that cleans up old vessel records and images to maintain peak database performance.
@@ -31,25 +31,25 @@
 
 NavisCore features a built-in AI enrichment engine that transforms raw AIS data into human-readable summaries.
 
-### 🧠 Local LLM Integration
+### Local LLM Integration
 Experience maritime situational awareness like never before with local Large Language Models.
 - **Privacy First**: All AI processing happens locally on your hardware via [Ollama](https://ollama.com).
 - **Dynamic Summaries**: Get concise descriptions like *"The Swedish tanker NEPTUNE is heading to Visby. Was last seen today at 14:20."*
 - **Optimized Performance**: Pre-configured to use **reasoning-off** and **minified payloads**, providing responses in under 10-15 seconds.
 
-### 📝 Dynamic Prompt Editor
+### Dynamic Prompt Editor
 Total control over your AI's personality. Access the editor via **Settings -> AI / Ollama**.
 - **Placeholders**: Use any field from the MQTT payload directly in your prompt using `{curly_brackets}`.
 - **Rich Variables**: Access over 30+ variables including `{name}`, `{mmsi}`, `{sog}`, `{destination}`, `{last_seen_relative}`, and many more.
 - **Live Guide**: Built-in variable guide helps you craft the perfect prompt with one-click insertion.
 
-### 🚀 Recommended Models
+### Recommended Models
 For the best balance between speed and quality, we recommend:
 1. **gemma4-nothink2:latest** (Fastest & most stable)
 2. **gemma4-fast:latest** (Great general performance)
 3. **gemma-analytisk:latest** (More detailed analysis)
 
-### 🧪 Live AI Diagnostics
+### Live AI Diagnostics
 Ensure your AI models and prompts are working flawlessly without waiting for a new vessel to appear.
 - **Real-Time Testing**: Click **Test AI Integration** in the settings panel to simulate a vessel event and trigger an instant test run.
 - **Live Preview**: Read the exact output your model generates directly in the UI, making prompt engineering seamless and immediate.
@@ -59,16 +59,16 @@ Ensure your AI models and prompts are working flawlessly without waiting for a n
 
 Understanding what happens on the map:
 
-### 💡 Animations & Effects
+### Animations & Effects
 - **🟡 Yellow Pulsing Ring**: Indicates a **New Vessel**. This appears when a ship is detected for the first time in your database or after a long absence (configurable timeout).
 - **🔵 Cyan Radar Ping**: Indicates a **Data Update**. This quick flash happens every time a new AIS message is received for that specific vessel.
 - **🚨 Red Pulsing Glow**: Indicates an **Emergency Status**. This vessel is broadcasting an active distress signal or emergency message.
 
-### 🧠 Smart Logic
+### Smart Logic
 - **SOG Status Override**: NavisCore automatically overrides misleading navigation statuses. For example, if a ship reports "At anchor" but its Speed Over Ground (SOG) exceeds 1.0 knot, the UI intelligently displays "Under way (SOG > 1kn)".
 - **Detailed Metadata**: Vessel HoverCards display enhanced data including dimensions (Length x Width), AIS Channel (A/B), and calculated distance from your station.
 
-### 🎨 Vessel Color Coding
+### Vessel Color Coding
 | Color | Vessel Type |
 | :--- | :--- |
 | **🟢 Green** | Cargo Ships |
@@ -92,12 +92,12 @@ Understanding what happens on the map:
 - **Wind Sock**: Weather or Meteorological station.
 - **Aircraft**: Search & Rescue aircraft or helicopters.
 
-### 📡 Signal Propagation Indicators (Tropo)
+### Signal Propagation Indicators (Tropo)
 
 NavisCore automatically classifies signals based on reception distance to identify unusual atmospheric conditions:
 
-- **📡 ENHANCED RANGE** (Teal Badge): Signals received from **40–80 NM** (74–148 km). This typically indicates *Tropospheric Enhancement*.
-- **✨ TROPO DUCTING** (Purple Badge): Signals received from **>100 NM** (>185.2 km). This is a definitive indicator of *Tropospheric Ducting*, where signals travel far beyond the normal line-of-sight.
+- **ENHANCED RANGE** (Teal Badge): Signals received from **40–80 NM** (74–148 km). This typically indicates *Tropospheric Enhancement*.
+- **TROPO DUCTING** (Purple Badge): Signals received from **>100 NM** (>185.2 km). This is a definitive indicator of *Tropospheric Ducting*, where signals travel far beyond the normal line-of-sight.
 
 ## Architecture
 
