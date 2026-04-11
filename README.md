@@ -27,15 +27,16 @@
 - **AI Intelligence (Ollama)**: Integrated local AI summaries for new vessels. NavisCore uses **Ollama** to generate natural language descriptions of ships based on real-time AIS data.
 - **Global Localization**: Full English translation of backend AI prompt generation, country mappings, and UI elements.
 
-## AI Intelligence (Ollama)
+## AI Intelligence (Ollama & OpenAI)
 
-NavisCore features a built-in AI enrichment engine that transforms raw AIS data into human-readable summaries.
+NavisCore features a built-in AI enrichment engine that transforms raw AIS data into human-readable summaries. It supports both **Ollama (Native)** and **OpenAI-compatible APIs** (such as LM Studio, LocalAI, or any v1-compliant endpoint).
 
 ### Local LLM Integration
 Experience maritime situational awareness like never before with local Large Language Models.
-- **Privacy First**: All AI processing happens locally on your hardware via [Ollama](https://ollama.com).
+- **Local & Remote Support**: Process data locally on your own hardware via [Ollama](https://ollama.com) or connect to external providers like OpenAI.
+- **API Flexibility**: Switch between **Ollama Native** and **OpenAI / LM Studio** formats directly in the settings.
 - **Dynamic Summaries**: Get concise descriptions like *"The Swedish tanker NEPTUNE is heading to Visby. Was last seen today at 14:20."*
-- **Optimized Performance**: Pre-configured to use **reasoning-off** and **minified payloads**, providing responses in under 10-15 seconds.
+- **Optimized Performance**: Pre-configured to use **reasoning-off** and **minified payloads**, providing responses in under 10 seconds.
 
 ### Dynamic Prompt Editor
 Total control over your AI's personality. Access the editor via **Settings -> AI / Ollama**.
