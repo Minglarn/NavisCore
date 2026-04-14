@@ -1,6 +1,6 @@
 # NavisCore
 
-![Version](https://img.shields.io/badge/version-2026.04.11-blue)
+![Version](https://img.shields.io/badge/version-2026.04.14-blue)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 ![Python](https://img.shields.io/badge/python-3.11+-blueviolet)
 ![Status](https://img.shields.io/badge/status-active-success)
