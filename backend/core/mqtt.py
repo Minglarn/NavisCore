@@ -349,7 +349,7 @@ async def notify_new_vessel(mmsi_str, pub_payload, settings):
     ollama_url = settings.get("ollama_url")
     ollama_api_type = settings.get("ollama_api_type", "native")
     ollama_model = settings.get("ollama_model", "")
-    ollama_prompt = settings.get("ollama_prompt_template", "")
+    ollama_prompt = settings.get("ollama_prompt", "")
     
     short_info_task = None
     if ollama_enabled and ollama_url and ollama_model:

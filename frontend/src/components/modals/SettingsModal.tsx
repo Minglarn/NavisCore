@@ -177,7 +177,7 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                             ))}
                         </div>
                         <div style={{ padding: '20px 25px', opacity: 0.5, fontSize: '0.7rem' }}>
-                            NavisCore v1.0.0
+                            NavisCore v2026.04.14
                         </div>
                     </div>
                 )}

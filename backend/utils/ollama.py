@@ -99,7 +99,7 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
                 "Include details such as:\n"
                 "- Nationality/Home country based on {country_adjective} and {country_code}. Put the country code in parentheses after the country name.\n"
                 "- Vessel type {ship_type_label} and Status '{status_text}'\n"
-                "- Name {name} and MMSI {mmsi}\n"
+                "- Name {name}\n"
                 "- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n"
                 "- When the vessel was last seen. Today's date is {current_date}. Base it on {last_seen_relative}.\n\n"
                 "Respond only with the information sentence, skip introductions like 'Here is...'."
