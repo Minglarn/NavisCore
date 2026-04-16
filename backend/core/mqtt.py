@@ -174,10 +174,12 @@ async def mqtt_stats_reporter():
                 ollama_api_type = s.get("ollama_api_type", "native")
                 ollama_hourly_prompt = s.get("ollama_hourly_prompt_template", "")
                 
+                ollama_max_tokens = int(s.get("ollama_max_tokens", "2000"))
+                
                 if ollama_enabled and ollama_url and ollama_model:
                     try:
                         ai_result = await asyncio.wait_for(
-                            fetch_ollama_hourly_summary(snapshot, ollama_url, ollama_model, ollama_hourly_prompt or None, ollama_api_type, prev_snapshot),
+                            fetch_ollama_hourly_summary(snapshot, ollama_url, ollama_model, ollama_hourly_prompt or None, ollama_api_type, prev_snapshot, ollama_max_tokens),
                             timeout=120.0
                         )
                         if ai_result and isinstance(ai_result, dict):
@@ -229,10 +231,12 @@ async def mqtt_stats_reporter():
                         ollama_api_type = s.get("ollama_api_type", "native")
                         ollama_daily_prompt = s.get("ollama_daily_prompt_template", "")
                         
+                        ollama_max_tokens = int(s.get("ollama_max_tokens", "2000"))
+                        
                         if ollama_enabled and ollama_url and ollama_model:
                             try:
                                 ai_result = await asyncio.wait_for(
-                                    fetch_ollama_daily_summary(daily_payload, ollama_url, ollama_model, ollama_daily_prompt or None, ollama_api_type),
+                                    fetch_ollama_daily_summary(daily_payload, ollama_url, ollama_model, ollama_daily_prompt or None, ollama_api_type, ollama_max_tokens),
                                     timeout=120.0
                                 )
                                 if ai_result and isinstance(ai_result, dict):
@@ -350,10 +354,11 @@ async def notify_new_vessel(mmsi_str, pub_payload, settings):
     ollama_api_type = settings.get("ollama_api_type", "native")
     ollama_model = settings.get("ollama_model", "")
     ollama_prompt = settings.get("ollama_prompt", "")
+    ollama_max_tokens = int(settings.get("ollama_max_tokens", "2000"))
     
     short_info_task = None
     if ollama_enabled and ollama_url and ollama_model:
-        short_info_task = asyncio.create_task(fetch_ollama_short_info(pub_payload, ollama_url, ollama_model, ollama_prompt, ollama_api_type))
+        short_info_task = asyncio.create_task(fetch_ollama_short_info(pub_payload, ollama_url, ollama_model, ollama_prompt, ollama_api_type, ollama_max_tokens))
         # Vi väntar en kort stund för att ge Ollama chansen att svara
         await asyncio.sleep(2)
         

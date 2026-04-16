@@ -24,7 +24,8 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                     url: settings.ollama_url,
                     model: settings.ollama_model,
                     prompt: settings.ollama_prompt,
-                    api_type: settings.ollama_api_type || 'native'
+                    api_type: settings.ollama_api_type || 'native',
+                    max_tokens: settings.ollama_max_tokens || 2000
                 })
             });
             const data = await response.json();
@@ -57,7 +58,8 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                     url: settings.ollama_url,
                     model: settings.ollama_model,
                     prompt: settings.ollama_hourly_prompt_template,
-                    api_type: settings.ollama_api_type || 'native'
+                    api_type: settings.ollama_api_type || 'native',
+                    max_tokens: settings.ollama_max_tokens || 2000
                 })
             });
             const data = await response.json();
@@ -90,7 +92,8 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                     url: settings.ollama_url,
                     model: settings.ollama_model,
                     prompt: settings.ollama_daily_prompt_template,
-                    api_type: settings.ollama_api_type || 'native'
+                    api_type: settings.ollama_api_type || 'native',
+                    max_tokens: settings.ollama_max_tokens || 2000
                 })
             });
             const data = await response.json();
@@ -836,6 +839,21 @@ export default function SettingsModal({ isOpen, onClose, settings, setSettings, 
                                             />
                                             <div className="description" style={{ marginTop: '5px' }}>
                                                 We recommend <strong>google/gemma-4-e4b</strong> for best accuracy and performance.
+                                            </div>
+                                        </div>
+
+                                        <div className="form-group-premium vertical">
+                                            <label>Max Completion Tokens</label>
+                                            <input 
+                                                type="number" 
+                                                className="input-premium" 
+                                                placeholder="2000" 
+                                                value={settings.ollama_max_tokens || 2000} 
+                                                onChange={e => setSettings({ ...settings, ollama_max_tokens: e.target.value })} 
+                                                style={{ width: '100%' }} 
+                                            />
+                                            <div className="description" style={{ marginTop: '5px' }}>
+                                                Maximum length of AI response. Use higher values (e.g. 2000) for <strong>Reasoning/Thought</strong> models.
                                             </div>
                                         </div>
 

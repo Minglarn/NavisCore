@@ -61,7 +61,8 @@ async def _get_all_settings_internal(db: aiosqlite.Connection):
         "playwright_enabled": "false",
         "purge_days": "365",
         "ollama_prompt": "You are a maritime assistant. Based on this AIS data for a vessel in JSON format, write a short information sentence (max 2 sentences) in English.\n\nInclude details such as:\n- Nationality/Home country based on 'country_adjective' and 'country_code'. Put the country code in parentheses after the country name.\n- Vessel type {ship_type_label} and Status '{status_text}'\n- Name {name} and MMSI {mmsi}\n- Destination {destination}, Speed {sog} and Position {lat}, {lon}\n- When the vessel was last seen. Today's date is {current_date}. Base it on {last_seen_relative}.\n\nRespond only with the information sentence, skip introductions like 'Here is...'.",
-        "ollama_hourly_prompt_template": ""
+        "ollama_hourly_prompt_template": "",
+        "ollama_max_tokens": "2000"
     }
     for k, v in defaults.items():
         if k not in settings:

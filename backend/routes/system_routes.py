@@ -216,9 +216,10 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
         model = config.get("model")
         prompt = config.get("prompt")
         api_type = config.get("api_type", "native")
+        max_tokens = int(config.get("max_tokens", 2000))
         
         try:
-            result = await fetch_ollama_short_info(test_payload, url, model, prompt, api_type)
+            result = await fetch_ollama_short_info(test_payload, url, model, prompt, api_type, max_tokens)
             if result:
                 return {"success": True, **result}
             else:
@@ -266,9 +267,10 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
         model = config.get("model")
         prompt = config.get("prompt")
         api_type = config.get("api_type", "native")
+        max_tokens = int(config.get("max_tokens", 2000))
         
         try:
-            result = await fetch_ollama_hourly_summary(test_stats, url, model, prompt or None, api_type, test_prev_stats)
+            result = await fetch_ollama_hourly_summary(test_stats, url, model, prompt or None, api_type, test_prev_stats, max_tokens)
             if result:
                 return {"success": True, **result}
             else:
@@ -309,9 +311,10 @@ def setup_system_routes(db_session, get_all_settings, set_setting, broadcast, st
         model = config.get("model")
         prompt = config.get("prompt")
         api_type = config.get("api_type", "native")
+        max_tokens = int(config.get("max_tokens", 2000))
         
         try:
-            result = await fetch_ollama_daily_summary(test_stats, url, model, prompt or None, api_type)
+            result = await fetch_ollama_daily_summary(test_stats, url, model, prompt or None, api_type, max_tokens)
             if result:
                 return {"success": True, **result}
             else:

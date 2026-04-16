@@ -54,7 +54,7 @@ def get_relative_time_string(timestamp_ms):
     except Exception:
         return "unknown time"
 
-async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native') -> dict:
+async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native', max_tokens: int = 2000) -> dict:
     """
     Calls the local AI service (Ollama or OpenAI-compatible) and returns a summary plus metrics.
     Returns: {"response": "...", "stats": {"duration_ms": ..., "tokens": ...}}
@@ -129,7 +129,7 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
                 ],
                 "stream": False,
                 "temperature": 0.2,
-                "max_tokens": 300
+                "max_tokens": max_tokens
             }
         else:
             final_url = url
@@ -140,7 +140,7 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
                 "options": {
                     "num_ctx": 8192,
                     "temperature": 0.2,
-                    "num_predict": 300
+                    "num_predict": max_tokens
                 }
             }
 
@@ -187,7 +187,7 @@ async def fetch_ollama_short_info(payload: dict, url: str, model: str, prompt_te
         return None
 
 
-async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native', prev_stats: dict = None) -> dict:
+async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native', prev_stats: dict = None, max_tokens: int = 2000) -> dict:
     """
     Calls the local AI service to generate a comprehensive hourly summary
     based on aggregated AIS statistics, optionally including trend data from the previous hour.
@@ -312,7 +312,7 @@ async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str,
                 ],
                 "stream": False,
                 "temperature": 0.3,
-                "max_tokens": 500
+                "max_tokens": max_tokens
             }
         else:
             final_url = url
@@ -323,7 +323,7 @@ async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str,
                 "options": {
                     "num_ctx": 8192,
                     "temperature": 0.3,
-                    "num_predict": 500
+                    "num_predict": max_tokens
                 }
             }
 
@@ -367,7 +367,7 @@ async def fetch_ollama_hourly_summary(stats_payload: dict, url: str, model: str,
         return None
 
 
-async def fetch_ollama_daily_summary(stats_payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native') -> dict:
+async def fetch_ollama_daily_summary(stats_payload: dict, url: str, model: str, prompt_template: str = None, api_type: str = 'native', max_tokens: int = 2000) -> dict:
     """
     Calls the local AI service to generate a comprehensive daily summary
     based on aggregated AIS statistics for the entire day.
@@ -437,7 +437,7 @@ async def fetch_ollama_daily_summary(stats_payload: dict, url: str, model: str, 
                 ],
                 "stream": False,
                 "temperature": 0.3,
-                "max_tokens": 500
+                "max_tokens": max_tokens
             }
         else:
             final_url = url
@@ -448,7 +448,7 @@ async def fetch_ollama_daily_summary(stats_payload: dict, url: str, model: str, 
                 "options": {
                     "num_ctx": 8192,
                     "temperature": 0.3,
-                    "num_predict": 500
+                    "num_predict": max_tokens
                 }
             }
 
